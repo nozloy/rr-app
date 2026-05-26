@@ -1,0 +1,9 @@
+## Interface: 120005
+## Title: RaidReminder
+## Notes: Export your current group setup and view raid lockouts.
+## Author: RaidReminder
+## Version: 0.1.2
+## IconTexture: Interface\AddOns\RaidReminder\Media\RaidReminderIcon.tga
+
+RaidReminderQr.lua
+RaidReminder.lua
