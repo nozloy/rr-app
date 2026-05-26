@@ -15,7 +15,7 @@ World of Warcraft\_retail_\Interface\AddOns\RaidReminder
 
 ## Commands
 
-In game, run `/rr` or `/raidreminder`, press `Ctrl+C` in the export field, then paste the `RR1?...` string into `/banners/import`. The same window also renders a compact `RRQ1?...` QR code for mobile import.
+In game, run `/rr` or `/raidreminder`, press `Ctrl+C` in the export field, then paste the `RR1?...` string into `/banners/import`. The same window also checks the current raid roster for lockouts in the raid where the raid leader is standing.
 
 Run `/rraid` to open a small raid lockout table for the current character. Raid, difficulty, and boss names come from the game client locale.
 
@@ -30,7 +30,6 @@ RaidReminder.zip
 └─ RaidReminder/
    ├─ RaidReminder.toc
    ├─ RaidReminder.lua
-   ├─ RaidReminderQr.lua
    ├─ Media/
    │  └─ RaidReminderIcon.tga
    └─ README.md

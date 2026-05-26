@@ -1,23 +1,35 @@
 local ADDON_NAME = ...
 local EXPORT_PREFIX = "RR1?"
-local QR_EXPORT_PREFIX = "RRQ1?"
-local QR_BOX_SIZE = 340
-local QR_QUIET_ZONE = 4
+local ADDON_MESSAGE_PREFIX = "RaidReminder"
+local ADDON_MESSAGE_SEPARATOR = "\t"
 local WINDOW_FRAME_STRATA = "FULLSCREEN_DIALOG"
 local WINDOW_FRAME_LEVEL = 1000
+local EXPORT_FRAME_WIDTH = 700
+local EXPORT_FRAME_COMPACT_HEIGHT = 150
+local EXPORT_FRAME_RAID_CHECK_HEIGHT = 560
+local RAID_CHECK_ROW_HEIGHT = 24
+local RAID_CHECK_WIDTH = 650
+local RAID_CHECK_REPLY_DELAY = 1
+local RAID_CHECK_REPLY_TIMEOUT = 3
 local RAID_LOCKOUT_ROW_HEIGHT = 22
 
 local frame
 local editBox
-local qrContainer
-local qrBackground
-local qrStatus
-local qrTextures = {}
+local raidCheckLabel
+local raidCheckHeader
+local raidCheckContent
+local raidCheckScrollFrame
+local raidCheckStatus
+local raidCheckRows = {}
+local raidCheckState
+local raidCheckRequestSerial = 0
+local addonMessagePrefixRegistered = false
 local raidLockoutFrame
 local raidLockoutContent
 local raidLockoutStatus
 local raidLockoutRows = {}
 local raidLockoutEventFrame
+local raidCheckEventFrame
 
 local CLASS_CODES = {
   DEATHKNIGHT = "DK",
@@ -57,16 +69,35 @@ local ROLE_CODES = {
   TANK = "T",
 }
 
+local RAID_CHECK_STATUS = {
+  clean = "clean",
+  hasLockout = "hasLockout",
+  noAddon = "noAddon",
+  pending = "pending",
+  unavailable = "unavailable",
+}
+
 local ADDON_LOCALE = GetLocale and GetLocale() or "enUS"
 local ADDON_TEXT = {
   enGB = {
     boss = "Boss",
+    bossesKilled = "Killed bosses",
+    character = "Character",
+    checking = "Checking...",
+    cleanLockout = "Clean lockout",
     close = "Close",
     difficulty = "Difficulty",
+    hasLockout = "Has lockout",
     killed = "Killed",
     loading = "Loading...",
+    noAddon = "No add-on",
+    noRaidGroup = "Join a raid group to check raid members.",
     noRaidLockouts = "No current raid lockouts were found.",
+    noRaidTarget = "Stand inside the raid instance as the raid leader to check this raid.",
     raid = "Raid",
+    raidCheckTitle = "Raid lockout check",
+    raidLeaderMark = "RL",
+    raidTarget = "Checking %s.",
     refresh = "Refresh",
     rowCount = "%d boss rows from current raid lockouts.",
     status = "Status",
@@ -76,12 +107,23 @@ local ADDON_TEXT = {
   },
   enUS = {
     boss = "Boss",
+    bossesKilled = "Killed bosses",
+    character = "Character",
+    checking = "Checking...",
+    cleanLockout = "Clean lockout",
     close = "Close",
     difficulty = "Difficulty",
+    hasLockout = "Has lockout",
     killed = "Killed",
     loading = "Loading...",
+    noAddon = "No add-on",
+    noRaidGroup = "Join a raid group to check raid members.",
     noRaidLockouts = "No current raid lockouts were found.",
+    noRaidTarget = "Stand inside the raid instance as the raid leader to check this raid.",
     raid = "Raid",
+    raidCheckTitle = "Raid lockout check",
+    raidLeaderMark = "RL",
+    raidTarget = "Checking %s.",
     refresh = "Refresh",
     rowCount = "%d boss rows from current raid lockouts.",
     status = "Status",
@@ -91,12 +133,23 @@ local ADDON_TEXT = {
   },
   ruRU = {
     boss = "Босс",
+    bossesKilled = "Убитые боссы",
+    character = "Участник",
+    checking = "Проверка...",
+    cleanLockout = "Чистое кд",
     close = "Закрыть",
     difficulty = "Сложность",
+    hasLockout = "Есть кд",
     killed = "Убит",
     loading = "Загрузка...",
+    noAddon = "Нет аддона",
+    noRaidGroup = "Вступите в рейдовую группу, чтобы проверить участников.",
     noRaidLockouts = "Текущие рейдовые сохранения не найдены.",
+    noRaidTarget = "Встаньте рейдлидером внутри рейда, чтобы проверить это кд.",
     raid = "Рейд",
+    raidCheckTitle = "Проверка кд рейда",
+    raidLeaderMark = "РЛ",
+    raidTarget = "Проверяем %s.",
     refresh = "Обновить",
     rowCount = "Строк боссов из текущих рейдовых сохранений: %d.",
     status = "Статус",
@@ -293,6 +346,147 @@ local function GetUnitNameAndRealm(unit, rosterName)
   end
 
   return name, realm
+end
+
+local function CompactRealmName(realm)
+  if type(realm) ~= "string" then
+    return nil
+  end
+
+  realm = realm:gsub("%s+", "")
+  if realm == "" then
+    return nil
+  end
+
+  return realm
+end
+
+local function BuildCharacterKey(name, realm)
+  if type(name) ~= "string" or name == "" then
+    return nil
+  end
+
+  realm = CompactRealmName(realm)
+  if realm then
+    return name .. "-" .. realm
+  end
+
+  return name
+end
+
+local function BuildCharacterKeyFromFullName(fullName)
+  local name, realm = SplitFullName(fullName)
+  return BuildCharacterKey(name, realm)
+end
+
+local function GetPlayerCharacterKey()
+  local name, realm
+  if UnitFullName then
+    name, realm = UnitFullName("player")
+  end
+
+  if not name or name == "" then
+    name = UnitName and UnitName("player") or nil
+  end
+
+  return BuildCharacterKey(name, realm)
+end
+
+local function IsSenderPlayer(sender)
+  local senderKey = BuildCharacterKeyFromFullName(sender)
+  local playerKey = GetPlayerCharacterKey()
+
+  if senderKey and playerKey and senderKey == playerKey then
+    return true
+  end
+
+  local senderName = SplitFullName(sender)
+  local playerName = UnitName and UnitName("player") or nil
+  return senderName and playerName and senderName == playerName
+end
+
+local function GetDisplayCharacterName(name, realm)
+  if type(name) ~= "string" or name == "" then
+    return AddonText("unknown")
+  end
+
+  realm = CompactRealmName(realm)
+  if realm then
+    return name .. "-" .. realm
+  end
+
+  return name
+end
+
+local function CleanAddonMessageField(value)
+  value = tostring(value or "")
+  return value:gsub(ADDON_MESSAGE_SEPARATOR, " ")
+end
+
+local function BuildAddonMessage(...)
+  local parts = {}
+  for index = 1, select("#", ...) do
+    parts[index] = CleanAddonMessageField(select(index, ...))
+  end
+
+  return table.concat(parts, ADDON_MESSAGE_SEPARATOR)
+end
+
+local function SplitAddonMessage(message)
+  local parts = {}
+  message = tostring(message or "") .. ADDON_MESSAGE_SEPARATOR
+
+  for part in message:gmatch("([^" .. ADDON_MESSAGE_SEPARATOR .. "]*)" .. ADDON_MESSAGE_SEPARATOR) do
+    table.insert(parts, part)
+  end
+
+  return parts
+end
+
+local function RegisterAddonMessages()
+  if addonMessagePrefixRegistered then
+    return
+  end
+
+  if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+    addonMessagePrefixRegistered = C_ChatInfo.RegisterAddonMessagePrefix(ADDON_MESSAGE_PREFIX) ~= false
+  elseif RegisterAddonMessagePrefix then
+    addonMessagePrefixRegistered = RegisterAddonMessagePrefix(ADDON_MESSAGE_PREFIX) ~= false
+  end
+end
+
+local function SendRaidReminderAddonMessage(message, distribution, target)
+  RegisterAddonMessages()
+
+  if not distribution then
+    return false
+  end
+
+  if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+    return C_ChatInfo.SendAddonMessage(ADDON_MESSAGE_PREFIX, message, distribution, target)
+  end
+
+  if SendAddonMessage then
+    return SendAddonMessage(ADDON_MESSAGE_PREFIX, message, distribution, target)
+  end
+
+  return false
+end
+
+local function GetGroupAddonDistribution()
+  if IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
+    return "INSTANCE_CHAT"
+  end
+
+  if IsInRaid and IsInRaid() then
+    return "RAID"
+  end
+
+  if IsInGroup and IsInGroup() then
+    return "PARTY"
+  end
+
+  return nil
 end
 
 local function AddMember(members, compactMembers, rosterMembers, unit, playerSpecRole, rosterName)
@@ -492,123 +686,605 @@ local function BuildExportString(fields)
   return EXPORT_PREFIX .. table.concat(params, "&")
 end
 
-local function BuildQrExportString(fields)
-  fields = fields or GetExportFields()
-
-  local params = {}
-  AddParam(params, "n", fields.playerName)
-  AddParam(params, "l", fields.raidLeaderName)
-  AddParam(params, "r", fields.realmName)
-  AddParam(params, "c", CompactClass(fields.classFile))
-  AddParam(params, "cl", fields.localizedClass)
-  AddParam(params, "s", fields.specName)
-  AddParam(params, "i", fields.itemLevel)
-  AddParam(params, "g", CompactGroupType(fields.groupType))
-  AddParam(params, "z", fields.groupSize)
-  AddParam(params, "m", fields.compactMembers)
-  AddParam(params, "t", CompactInstanceType(fields.instanceType))
-  AddParam(params, "in", fields.instanceName)
-  AddParam(params, "di", fields.difficultyID)
-  AddParam(params, "dn", fields.difficultyName)
-  AddParam(params, "sr", fields.selectedRaidDifficultyID)
-  AddParam(params, "sn", fields.selectedRaidDifficultyName)
-  AddParam(params, "kl", fields.keyLevel)
-  AddParam(params, "km", fields.keyChallengeMapID)
-  AddParam(params, "kn", fields.keyMapName)
-
-  return QR_EXPORT_PREFIX .. table.concat(params, "&")
+local function RaidNamesMatch(left, right)
+  return type(left) == "string" and type(right) == "string" and left ~= "" and right ~= "" and left == right
 end
 
-local function HideQrTexturesFrom(startIndex)
-  for index = startIndex, #qrTextures do
-    qrTextures[index]:Hide()
+local function RaidDifficultiesMatch(savedDifficultyId, targetDifficultyId)
+  targetDifficultyId = tonumber(targetDifficultyId)
+  if not targetDifficultyId or targetDifficultyId == 0 then
+    return true
   end
+
+  return tonumber(savedDifficultyId) == targetDifficultyId
 end
 
-local function GetQrTexture(index)
-  local texture = qrTextures[index]
-  if not texture then
-    texture = qrContainer:CreateTexture(nil, "ARTWORK")
-    texture:SetColorTexture(0, 0, 0, 1)
-    qrTextures[index] = texture
+local function GetKilledBossesForRaid(raidName, difficultyId)
+  local killedBosses = {}
+
+  if not GetNumSavedInstances or not GetSavedInstanceInfo or not GetSavedInstanceEncounterInfo then
+    return nil, AddonText("unavailable")
   end
 
-  texture:Show()
-  return texture
-end
+  local savedInstanceCount = GetNumSavedInstances()
+  for instanceIndex = 1, savedInstanceCount do
+    local name, _, _, savedDifficultyId, locked, _, _, isRaid, _, _, numEncounters =
+      GetSavedInstanceInfo(instanceIndex)
 
-local function DrawQrCode(text)
-  if not qrContainer or not qrBackground or not qrStatus then
-    return
-  end
-
-  if not RaidReminderQr or type(RaidReminderQr.qrcode) ~= "function" then
-    HideQrTexturesFrom(1)
-    qrBackground:Hide()
-    qrStatus:SetText("QR encoder is not loaded.")
-    return
-  end
-
-  local ok, qrOk, matrix = pcall(RaidReminderQr.qrcode, text, 1)
-  if not ok or not qrOk or type(matrix) ~= "table" then
-    HideQrTexturesFrom(1)
-    qrBackground:Hide()
-    qrStatus:SetText("QR could not be generated. Copy the text export instead.")
-    return
-  end
-
-  local matrixSize = #matrix
-  if matrixSize == 0 then
-    HideQrTexturesFrom(1)
-    qrBackground:Hide()
-    qrStatus:SetText("QR payload is empty.")
-    return
-  end
-
-  local fullSize = matrixSize + QR_QUIET_ZONE * 2
-  local moduleSize = math.floor(QR_BOX_SIZE / fullSize)
-  if moduleSize < 1 then
-    moduleSize = 1
-  end
-
-  local drawnSize = fullSize * moduleSize
-  qrContainer:SetSize(drawnSize, drawnSize)
-  qrBackground:ClearAllPoints()
-  qrBackground:SetAllPoints(qrContainer)
-  qrBackground:SetColorTexture(1, 1, 1, 1)
-  qrBackground:Show()
-
-  local textureIndex = 0
-  for y = 1, matrixSize do
-    local x = 1
-    while x <= matrixSize do
-      while x <= matrixSize and (not matrix[x] or not matrix[x][y] or matrix[x][y] <= 0) do
-        x = x + 1
-      end
-
-      local startX = x
-      while x <= matrixSize and matrix[x] and matrix[x][y] and matrix[x][y] > 0 do
-        x = x + 1
-      end
-
-      if startX <= matrixSize then
-        textureIndex = textureIndex + 1
-        local texture = GetQrTexture(textureIndex)
-        texture:ClearAllPoints()
-        texture:SetPoint(
-          "TOPLEFT",
-          qrContainer,
-          "TOPLEFT",
-          (startX - 1 + QR_QUIET_ZONE) * moduleSize,
-          -((y - 1 + QR_QUIET_ZONE) * moduleSize)
-        )
-        texture:SetSize((x - startX) * moduleSize, moduleSize)
+    if
+      isRaid
+      and locked
+      and numEncounters
+      and numEncounters > 0
+      and RaidNamesMatch(name, raidName)
+      and RaidDifficultiesMatch(savedDifficultyId, difficultyId)
+    then
+      for encounterIndex = 1, numEncounters do
+        local bossName, _, isKilled = GetSavedInstanceEncounterInfo(instanceIndex, encounterIndex)
+        if isKilled and bossName and bossName ~= "" then
+          table.insert(killedBosses, bossName)
+        end
       end
     end
   end
 
-  HideQrTexturesFrom(textureIndex + 1)
-  qrStatus:SetText("Scan this QR on /banners/import, or copy the RR1 string above.")
+  return killedBosses
+end
+
+local function GetRaidCheckTarget(fields)
+  fields = fields or GetExportFields()
+  if fields.instanceType ~= "raid" or not fields.instanceName or fields.instanceName == "" then
+    return nil
+  end
+
+  return {
+    difficultyId = fields.difficultyID or fields.selectedRaidDifficultyID,
+    difficultyName = fields.difficultyName or fields.selectedRaidDifficultyName,
+    raidName = fields.instanceName,
+  }
+end
+
+local function GetRaidCheckTargetLabel(target)
+  if not target then
+    return AddonText("unknown")
+  end
+
+  if target.difficultyName and target.difficultyName ~= "" then
+    return target.raidName .. " - " .. target.difficultyName
+  end
+
+  return target.raidName
+end
+
+local function RaidCheckTargetsMatch(left, right)
+  if not left or not right then
+    return false
+  end
+
+  return left.raidName == right.raidName and tostring(left.difficultyId or "") == tostring(right.difficultyId or "")
+end
+
+local function AddRaidCheckEntryAlias(state, entry, key)
+  if not state or not state.entryByKey or not entry or not key or key == "" then
+    return
+  end
+
+  state.entryByKey[key] = entry
+end
+
+local function BuildRaidRosterEntries()
+  local entries = {}
+
+  if not IsInRaid or not IsInRaid() then
+    return entries
+  end
+
+  local raidMembers = GetNumGroupMembers and GetNumGroupMembers() or 0
+  for index = 1, raidMembers do
+    local rosterName, rank = nil, nil
+    if GetRaidRosterInfo then
+      rosterName, rank = GetRaidRosterInfo(index)
+    end
+
+    local unit = "raid" .. index
+    local name, realm = GetUnitNameAndRealm(unit, rosterName)
+    if not name or name == "" then
+      name, realm = SplitFullName(rosterName)
+    end
+
+    local key = BuildCharacterKey(name, realm)
+    if key then
+      local isLeader = rank == 2
+      if UnitExists(unit) and UnitIsGroupLeader and UnitIsGroupLeader(unit) then
+        isLeader = true
+      end
+
+      table.insert(entries, {
+        displayName = GetDisplayCharacterName(name, realm),
+        isLeader = isLeader,
+        key = key,
+        killedBosses = {},
+        name = name,
+        realm = realm,
+        status = RAID_CHECK_STATUS.pending,
+      })
+    end
+  end
+
+  return entries
+end
+
+local function FindRaidCheckEntry(sender)
+  if not raidCheckState or not raidCheckState.entryByKey then
+    return nil
+  end
+
+  return raidCheckState.entryByKey[BuildCharacterKeyFromFullName(sender)] or raidCheckState.entryByKey[sender]
+end
+
+local function GetRaidCheckStatusText(entry)
+  if entry.status == RAID_CHECK_STATUS.clean then
+    return AddonText("cleanLockout")
+  end
+
+  if entry.status == RAID_CHECK_STATUS.hasLockout then
+    return AddonText("hasLockout")
+  end
+
+  if entry.status == RAID_CHECK_STATUS.noAddon then
+    return AddonText("noAddon")
+  end
+
+  if entry.status == RAID_CHECK_STATUS.unavailable then
+    return AddonText("unavailable")
+  end
+
+  return AddonText("checking")
+end
+
+local function SetRaidCheckStatusColor(fontString, entry)
+  if entry.status == RAID_CHECK_STATUS.clean then
+    fontString:SetTextColor(0.36, 0.86, 0.45)
+  elseif entry.status == RAID_CHECK_STATUS.hasLockout then
+    fontString:SetTextColor(1, 0.38, 0.32)
+  elseif entry.status == RAID_CHECK_STATUS.noAddon or entry.status == RAID_CHECK_STATUS.unavailable then
+    fontString:SetTextColor(1, 0.73, 0.28)
+  else
+    fontString:SetTextColor(0.78, 0.78, 0.78)
+  end
+end
+
+local function GetRaidCheckSortWeight(entry)
+  if entry.status == RAID_CHECK_STATUS.hasLockout then
+    return 1
+  end
+
+  if entry.status == RAID_CHECK_STATUS.noAddon then
+    return 2
+  end
+
+  if entry.status == RAID_CHECK_STATUS.unavailable then
+    return 3
+  end
+
+  if entry.status == RAID_CHECK_STATUS.pending then
+    return 4
+  end
+
+  return 5
+end
+
+local function ShowRaidCheckTooltip(owner, entry)
+  if not GameTooltip or not entry then
+    return
+  end
+
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  GameTooltip:SetText(entry.displayName)
+
+  if raidCheckState and raidCheckState.target then
+    GameTooltip:AddLine(GetRaidCheckTargetLabel(raidCheckState.target), 0.78, 0.78, 0.78)
+  end
+
+  if entry.status == RAID_CHECK_STATUS.hasLockout then
+    GameTooltip:AddLine(AddonText("bossesKilled") .. ":", 1, 0.82, 0)
+    for _, bossName in ipairs(entry.killedBosses or {}) do
+      GameTooltip:AddLine(bossName, 1, 1, 1)
+    end
+  else
+    GameTooltip:AddLine(GetRaidCheckStatusText(entry), 1, 1, 1)
+  end
+
+  GameTooltip:Show()
+end
+
+local function HideRaidCheckRowsFrom(startIndex)
+  for index = startIndex, #raidCheckRows do
+    raidCheckRows[index]:Hide()
+  end
+end
+
+local function SetRaidCheckTableVisible(isVisible)
+  if raidCheckHeader then
+    if isVisible then
+      raidCheckHeader:Show()
+    else
+      raidCheckHeader:Hide()
+    end
+  end
+
+  if raidCheckScrollFrame then
+    if isVisible then
+      raidCheckScrollFrame:Show()
+    else
+      raidCheckScrollFrame:Hide()
+    end
+  end
+end
+
+local function SetExportFrameMode(mode)
+  if not frame then
+    return
+  end
+
+  local showRaidCheck = mode == "raidCheck"
+  frame:SetSize(EXPORT_FRAME_WIDTH, showRaidCheck and EXPORT_FRAME_RAID_CHECK_HEIGHT or EXPORT_FRAME_COMPACT_HEIGHT)
+
+  if raidCheckLabel then
+    if showRaidCheck then
+      raidCheckLabel:Show()
+    else
+      raidCheckLabel:Hide()
+    end
+  end
+
+  if raidCheckStatus then
+    if showRaidCheck then
+      raidCheckStatus:Show()
+    else
+      raidCheckStatus:SetText("")
+      raidCheckStatus:Hide()
+    end
+  end
+
+  SetRaidCheckTableVisible(showRaidCheck)
+
+  if not showRaidCheck then
+    HideRaidCheckRowsFrom(1)
+    if raidCheckContent then
+      raidCheckContent:SetHeight(1)
+    end
+  end
+end
+
+local function GetRaidCheckRow(index)
+  local row = raidCheckRows[index]
+  if row then
+    row:Show()
+    return row
+  end
+
+  row = CreateFrame("Frame", nil, raidCheckContent)
+  row:SetHeight(RAID_CHECK_ROW_HEIGHT)
+  row:SetPoint("TOPLEFT", 0, -((index - 1) * RAID_CHECK_ROW_HEIGHT))
+  row:SetPoint("RIGHT", raidCheckContent, "RIGHT", 0, 0)
+  row:EnableMouse(true)
+
+  row.background = row:CreateTexture(nil, "BACKGROUND")
+  row.background:SetAllPoints(row)
+  row.background:SetColorTexture(1, 1, 1, index % 2 == 0 and 0.04 or 0.02)
+
+  row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.nameText:SetPoint("LEFT", 6, 0)
+  row.nameText:SetWidth(390)
+  row.nameText:SetJustifyH("LEFT")
+  row.nameText:SetWordWrap(false)
+
+  row.statusText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.statusText:SetPoint("LEFT", row.nameText, "RIGHT", 18, 0)
+  row.statusText:SetWidth(210)
+  row.statusText:SetJustifyH("LEFT")
+  row.statusText:SetWordWrap(false)
+
+  row:SetScript("OnEnter", function(self)
+    ShowRaidCheckTooltip(self, self.entry)
+  end)
+  row:SetScript("OnLeave", function()
+    if GameTooltip then
+      GameTooltip:Hide()
+    end
+  end)
+
+  raidCheckRows[index] = row
+  return row
+end
+
+local function RenderRaidCheckRows(statusText)
+  if not raidCheckContent or not raidCheckStatus then
+    return
+  end
+
+  if statusText then
+    HideRaidCheckRowsFrom(1)
+    raidCheckContent:SetHeight(1)
+    raidCheckStatus:SetText("")
+    SetExportFrameMode("compact")
+    return
+  end
+
+  if not raidCheckState or not raidCheckState.entries then
+    HideRaidCheckRowsFrom(1)
+    raidCheckContent:SetHeight(1)
+    raidCheckStatus:SetText("")
+    SetExportFrameMode("compact")
+    return
+  end
+
+  local entries = {}
+  for index, entry in ipairs(raidCheckState.entries) do
+    entries[index] = entry
+  end
+
+  table.sort(entries, function(left, right)
+    local leftWeight = GetRaidCheckSortWeight(left)
+    local rightWeight = GetRaidCheckSortWeight(right)
+    if leftWeight ~= rightWeight then
+      return leftWeight < rightWeight
+    end
+
+    if left.isLeader ~= right.isLeader then
+      return left.isLeader
+    end
+
+    return left.displayName < right.displayName
+  end)
+
+  raidCheckContent:SetHeight(math.max(#entries * RAID_CHECK_ROW_HEIGHT, 1))
+  SetExportFrameMode("raidCheck")
+
+  for index, entry in ipairs(entries) do
+    local row = GetRaidCheckRow(index)
+    row.entry = entry
+
+    local displayName = entry.displayName
+    if entry.isLeader then
+      displayName = displayName .. " (" .. AddonText("raidLeaderMark") .. ")"
+    end
+
+    row.nameText:SetText(displayName)
+    row.statusText:SetText(GetRaidCheckStatusText(entry))
+    SetRaidCheckStatusColor(row.statusText, entry)
+  end
+
+  HideRaidCheckRowsFrom(#entries + 1)
+  raidCheckStatus:SetText(string.format(AddonText("raidTarget"), GetRaidCheckTargetLabel(raidCheckState.target)))
+end
+
+local function ApplyRaidCheckResult(entry, killedBosses, errorText)
+  if not entry then
+    return
+  end
+
+  entry.killedBosses = killedBosses or {}
+
+  if errorText then
+    entry.status = RAID_CHECK_STATUS.unavailable
+  elseif #entry.killedBosses > 0 then
+    entry.status = RAID_CHECK_STATUS.hasLockout
+  else
+    entry.status = RAID_CHECK_STATUS.clean
+  end
+end
+
+local function ApplyLocalRaidCheckResult(requestId)
+  if not raidCheckState or raidCheckState.requestId ~= requestId then
+    return
+  end
+
+  local entry = raidCheckState.localEntry
+  if not entry then
+    return
+  end
+
+  local killedBosses, errorText = GetKilledBossesForRaid(
+    raidCheckState.target.raidName,
+    raidCheckState.target.difficultyId
+  )
+  ApplyRaidCheckResult(entry, killedBosses, errorText)
+  RenderRaidCheckRows()
+end
+
+local function SendRaidCheckResponse(sender, requestId, raidName, difficultyId)
+  if RequestRaidInfo then
+    RequestRaidInfo()
+  end
+
+  local function sendResponse()
+    local killedBosses, errorText = GetKilledBossesForRaid(raidName, difficultyId)
+    local status = RAID_CHECK_STATUS.clean
+    if errorText then
+      status = RAID_CHECK_STATUS.unavailable
+      killedBosses = {}
+    elseif killedBosses and #killedBosses > 0 then
+      status = RAID_CHECK_STATUS.hasLockout
+    end
+
+    SendRaidReminderAddonMessage(
+      BuildAddonMessage("RSP", requestId, status, killedBosses and #killedBosses or 0),
+      "WHISPER",
+      sender
+    )
+
+    for index, bossName in ipairs(killedBosses or {}) do
+      SendRaidReminderAddonMessage(BuildAddonMessage("BOS", requestId, index, bossName), "WHISPER", sender)
+    end
+  end
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(RAID_CHECK_REPLY_DELAY, sendResponse)
+  else
+    sendResponse()
+  end
+end
+
+local function SendRaidCheckRequest(state)
+  if not state or not state.target then
+    return
+  end
+
+  SendRaidReminderAddonMessage(
+    BuildAddonMessage("REQ", state.requestId, state.target.raidName, state.target.difficultyId or ""),
+    GetGroupAddonDistribution()
+  )
+end
+
+local function MarkMissingRaidCheckAddons(requestId)
+  if not raidCheckState or raidCheckState.requestId ~= requestId then
+    return
+  end
+
+  for _, entry in ipairs(raidCheckState.entries) do
+    if entry.status == RAID_CHECK_STATUS.pending then
+      entry.status = RAID_CHECK_STATUS.noAddon
+    end
+  end
+
+  RenderRaidCheckRows()
+end
+
+local function RefreshRaidCheck(fields)
+  if not raidCheckContent or not raidCheckStatus then
+    return
+  end
+
+  local target = GetRaidCheckTarget(fields)
+  if not target then
+    raidCheckState = nil
+    RenderRaidCheckRows()
+    return
+  end
+
+  if not IsInRaid or not IsInRaid() then
+    raidCheckState = nil
+    RenderRaidCheckRows()
+    return
+  end
+
+  raidCheckRequestSerial = raidCheckRequestSerial + 1
+  local requestId = tostring(math.floor((GetTime and GetTime() or 0) * 1000)) .. "-" .. raidCheckRequestSerial
+  local entries = BuildRaidRosterEntries()
+  local state = {
+    entries = entries,
+    entryByKey = {},
+    requestId = requestId,
+    target = target,
+  }
+
+  for _, entry in ipairs(entries) do
+    AddRaidCheckEntryAlias(state, entry, entry.key)
+    AddRaidCheckEntryAlias(state, entry, entry.name)
+    AddRaidCheckEntryAlias(state, entry, BuildCharacterKey(entry.name, entry.realm))
+
+    if entry.key == GetPlayerCharacterKey() or entry.name == (UnitName and UnitName("player") or nil) then
+      state.localEntry = entry
+    end
+  end
+
+  raidCheckState = state
+  RenderRaidCheckRows()
+
+  if RequestRaidInfo then
+    RequestRaidInfo()
+  end
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(RAID_CHECK_REPLY_DELAY, function()
+      ApplyLocalRaidCheckResult(requestId)
+    end)
+    C_Timer.After(RAID_CHECK_REPLY_TIMEOUT, function()
+      MarkMissingRaidCheckAddons(requestId)
+    end)
+  else
+    ApplyLocalRaidCheckResult(requestId)
+    MarkMissingRaidCheckAddons(requestId)
+  end
+
+  SendRaidCheckRequest(state)
+end
+
+local function HandleRaidCheckResponse(sender, parts)
+  if not raidCheckState or parts[2] ~= raidCheckState.requestId then
+    return
+  end
+
+  local entry = FindRaidCheckEntry(sender)
+  if not entry then
+    return
+  end
+
+  local status = parts[3]
+  entry.killedBosses = {}
+
+  if status == RAID_CHECK_STATUS.hasLockout then
+    entry.status = RAID_CHECK_STATUS.hasLockout
+  elseif status == RAID_CHECK_STATUS.unavailable then
+    entry.status = RAID_CHECK_STATUS.unavailable
+  else
+    entry.status = RAID_CHECK_STATUS.clean
+  end
+
+  RenderRaidCheckRows()
+end
+
+local function HandleRaidCheckBoss(sender, parts)
+  if not raidCheckState or parts[2] ~= raidCheckState.requestId then
+    return
+  end
+
+  local entry = FindRaidCheckEntry(sender)
+  if not entry then
+    return
+  end
+
+  table.insert(entry.killedBosses, parts[4] or AddonText("unknown"))
+  if #entry.killedBosses > 0 then
+    entry.status = RAID_CHECK_STATUS.hasLockout
+  end
+
+  RenderRaidCheckRows()
+end
+
+local function HandleRaidCheckRequest(sender, parts)
+  if IsSenderPlayer(sender) then
+    return
+  end
+
+  local requestId = parts[2]
+  local raidName = parts[3]
+  local difficultyId = tonumber(parts[4])
+  if not requestId or requestId == "" or not raidName or raidName == "" then
+    return
+  end
+
+  SendRaidCheckResponse(sender, requestId, raidName, difficultyId)
+end
+
+local function HandleRaidCheckAddonMessage(prefix, message, _, sender)
+  if prefix ~= ADDON_MESSAGE_PREFIX or type(message) ~= "string" or not sender then
+    return
+  end
+
+  RegisterAddonMessages()
+
+  local parts = SplitAddonMessage(message)
+  local command = parts[1]
+  if command == "REQ" then
+    HandleRaidCheckRequest(sender, parts)
+  elseif command == "RSP" and not IsSenderPlayer(sender) then
+    HandleRaidCheckResponse(sender, parts)
+  elseif command == "BOS" and not IsSenderPlayer(sender) then
+    HandleRaidCheckBoss(sender, parts)
+  end
 end
 
 local function SelectExportText()
@@ -627,7 +1303,7 @@ local function RefreshExport()
 
   local fields = GetExportFields()
   editBox:SetText(BuildExportString(fields))
-  DrawQrCode(BuildQrExportString(fields))
+  RefreshRaidCheck(fields)
   SelectExportText()
 end
 
@@ -637,7 +1313,7 @@ local function CreateExportFrame()
   end
 
   frame = CreateFrame("Frame", "RaidReminderExportFrame", UIParent, "BasicFrameTemplateWithInset")
-  frame:SetSize(700, 560)
+  frame:SetSize(EXPORT_FRAME_WIDTH, EXPORT_FRAME_COMPACT_HEIGHT)
   frame:SetPoint("CENTER")
   BringExportFrameToFront()
   frame:SetMovable(true)
@@ -671,34 +1347,55 @@ local function CreateExportFrame()
     self:ClearFocus()
   end)
 
-  local qrLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  qrLabel:SetPoint("TOP", editBox, "BOTTOM", 0, -18)
-  qrLabel:SetText("Mobile QR import")
+  raidCheckLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  raidCheckLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -18)
+  raidCheckLabel:SetText(AddonText("raidCheckTitle"))
 
-  qrContainer = CreateFrame("Frame", nil, frame)
-  qrContainer:SetSize(QR_BOX_SIZE, QR_BOX_SIZE)
-  qrContainer:SetPoint("TOP", editBox, "BOTTOM", 0, -40)
+  raidCheckHeader = CreateFrame("Frame", nil, frame)
+  raidCheckHeader:SetSize(RAID_CHECK_WIDTH, RAID_CHECK_ROW_HEIGHT)
+  raidCheckHeader:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -40)
 
-  qrBackground = qrContainer:CreateTexture(nil, "BACKGROUND")
-  qrBackground:SetColorTexture(1, 1, 1, 1)
-  qrBackground:SetAllPoints(qrContainer)
+  local raidCheckHeaderBackground = raidCheckHeader:CreateTexture(nil, "BACKGROUND")
+  raidCheckHeaderBackground:SetAllPoints(raidCheckHeader)
+  raidCheckHeaderBackground:SetColorTexture(1, 1, 1, 0.08)
 
-  qrStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  qrStatus:SetPoint("TOP", qrContainer, "BOTTOM", 0, -8)
-  qrStatus:SetWidth(650)
-  qrStatus:SetJustifyH("CENTER")
-  qrStatus:SetText("QR will update with the export string.")
+  local characterHeader = raidCheckHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  characterHeader:SetPoint("LEFT", 6, 0)
+  characterHeader:SetWidth(390)
+  characterHeader:SetJustifyH("LEFT")
+  characterHeader:SetText(AddonText("character"))
+
+  local statusHeader = raidCheckHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  statusHeader:SetPoint("LEFT", characterHeader, "RIGHT", 18, 0)
+  statusHeader:SetWidth(210)
+  statusHeader:SetJustifyH("LEFT")
+  statusHeader:SetText(AddonText("status"))
+
+  raidCheckScrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+  raidCheckScrollFrame:SetPoint("TOPLEFT", raidCheckHeader, "BOTTOMLEFT", 0, -4)
+  raidCheckScrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -42, 58)
+
+  raidCheckContent = CreateFrame("Frame", nil, raidCheckScrollFrame)
+  raidCheckContent:SetSize(RAID_CHECK_WIDTH, 1)
+  raidCheckScrollFrame:SetScrollChild(raidCheckContent)
+
+  raidCheckStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  raidCheckStatus:SetPoint("BOTTOM", 0, 42)
+  raidCheckStatus:SetWidth(RAID_CHECK_WIDTH)
+  raidCheckStatus:SetJustifyH("CENTER")
+  raidCheckStatus:SetText("")
+  SetExportFrameMode("compact")
 
   local refreshButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   refreshButton:SetSize(120, 24)
   refreshButton:SetPoint("BOTTOMLEFT", 220, 18)
-  refreshButton:SetText("Update")
+  refreshButton:SetText(AddonText("refresh"))
   refreshButton:SetScript("OnClick", RefreshExport)
 
   local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
   closeButton:SetSize(120, 24)
   closeButton:SetPoint("BOTTOMRIGHT", -220, 18)
-  closeButton:SetText("Close")
+  closeButton:SetText(AddonText("close"))
   closeButton:SetScript("OnClick", function()
     frame:Hide()
   end)
@@ -994,6 +1691,38 @@ local function ShowRaidLockoutFrame()
   raidLockoutFrame:Show()
   RefreshRaidLockoutFrame()
 end
+
+raidCheckEventFrame = CreateFrame("Frame")
+raidCheckEventFrame:RegisterEvent("PLAYER_LOGIN")
+raidCheckEventFrame:RegisterEvent("CHAT_MSG_ADDON")
+raidCheckEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+raidCheckEventFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
+raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
+  if event == "PLAYER_LOGIN" then
+    RegisterAddonMessages()
+  elseif event == "CHAT_MSG_ADDON" then
+    HandleRaidCheckAddonMessage(...)
+  elseif event == "GROUP_ROSTER_UPDATE" then
+    if frame and frame:IsShown() then
+      RefreshRaidCheck(GetExportFields())
+    end
+  elseif event == "UPDATE_INSTANCE_INFO" then
+    if frame and frame:IsShown() then
+      local fields = GetExportFields()
+      local target = GetRaidCheckTarget(fields)
+      if not target or not IsInRaid or not IsInRaid() then
+        raidCheckState = nil
+        RenderRaidCheckRows()
+      elseif not raidCheckState or not RaidCheckTargetsMatch(raidCheckState.target, target) then
+        RefreshRaidCheck(fields)
+      else
+        ApplyLocalRaidCheckResult(raidCheckState.requestId)
+      end
+    end
+  end
+end)
+
+RegisterAddonMessages()
 
 SLASH_RAIDREMINDER1 = "/rr"
 SLASH_RAIDREMINDER2 = "/raidreminder"

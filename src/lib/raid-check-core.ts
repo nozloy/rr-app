@@ -14,6 +14,8 @@ const EU_WEEKLY_RESET_DAY = 3;
 const EU_WEEKLY_RESET_HOUR_UTC = 4;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+export const ALL_SEASON_RAIDS_VALUE = "all-season-raids";
+
 export type RaidCheckDifficulty = {
   id: number;
   label: string;
@@ -23,6 +25,8 @@ export type RaidCheckDifficulty = {
 export type RaidCheckKilledBoss = {
   id: number | null;
   name: string;
+  raidName?: string;
+  raidSlug?: string;
   sourceName: string;
   lastKillTimestamp: number;
 };

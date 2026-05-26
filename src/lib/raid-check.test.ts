@@ -1,5 +1,6 @@
 import { ADDON_EXPORT_PREFIX } from "@/lib/addon-export";
 import type { BlizzardCharacterRaidEncounters } from "@/lib/blizzard-api";
+import { ALL_SEASON_RAIDS_VALUE } from "@/lib/raid-check-core";
 
 const { blizzardApiMock, MockBattleNetAuthError, MockBlizzardApiRequestError } =
   vi.hoisted(() => {
@@ -61,6 +62,65 @@ function makeEncounterSummary(killTimestamp?: number): BlizzardCharacterRaidEnco
                       },
                       completed_count: killTimestamp ? 1 : 0,
                       last_kill_timestamp: killTimestamp,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function makeSeasonEncounterSummary(): BlizzardCharacterRaidEncounters {
+  return {
+    expansions: [
+      {
+        instances: [
+          {
+            instance: {
+              name: "The Dreamrift",
+            },
+            modes: [
+              {
+                difficulty: {
+                  type: "HEROIC",
+                  name: "Heroic",
+                },
+                progress: {
+                  encounters: [
+                    {
+                      encounter: {
+                        name: "Dreamrift Sentinel",
+                      },
+                      completed_count: 1,
+                      last_kill_timestamp: Date.parse("2026-05-20T09:00:00.000Z"),
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            instance: {
+              name: "The Voidspire",
+            },
+            modes: [
+              {
+                difficulty: {
+                  type: "HEROIC",
+                  name: "Heroic",
+                },
+                progress: {
+                  encounters: [
+                    {
+                      encounter: {
+                        name: "Imperator Averzian",
+                      },
+                      completed_count: 1,
+                      last_kill_timestamp: Date.parse("2026-05-21T10:00:00.000Z"),
                     },
                   ],
                 },
@@ -235,6 +295,58 @@ describe("raid check", () => {
         status: "locked",
       },
     ]);
+  });
+
+  it("checks every current season raid with one encounter request per character", async () => {
+    blizzardApiMock.fetchCharacterRaidEncounters.mockImplementation(
+      async (_token: string, _realmSlug: string, characterName: string) => {
+        if (characterName === "Locked") {
+          return makeSeasonEncounterSummary();
+        }
+
+        return makeEncounterSummary(Date.parse("2026-05-13T03:00:00.000Z"));
+      },
+    );
+
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      raidSlug: ALL_SEASON_RAIDS_VALUE,
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Draenor",
+        classFile: "PALADIN",
+        groupType: "raid",
+        groupSize: "2",
+        instanceType: "raid",
+        instanceName: "The Voidspire",
+        roster:
+          "Clean:Draenor:MAGE:DAMAGER,Locked:Ревущий фьорд:WARLOCK:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.raidName).toBe("Все рейды сезона");
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows.find((row) => row.name === "Clean")).toMatchObject({
+      status: "clean",
+      killedBosses: [],
+    });
+    expect(result.rows.find((row) => row.name === "Locked")).toMatchObject({
+      status: "locked",
+      killedBosses: [
+        {
+          raidSlug: "the-dreamrift",
+          raidName: "Провал снов",
+          sourceName: "Dreamrift Sentinel",
+        },
+        {
+          raidSlug: "the-voidspire",
+          raidName: "Шпиль Бездны",
+          sourceName: "Imperator Averzian",
+        },
+      ],
+    });
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(2);
   });
 
   it("rejects an unknown manual raid slug", async () => {

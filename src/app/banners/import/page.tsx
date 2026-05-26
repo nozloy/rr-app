@@ -41,7 +41,7 @@ export default async function ImportBannerPage({
 
   return (
     <>
-      <AppHeader compact />
+      <AppHeader />
       <main className="app-shell space-y-6 py-6">
         <Card className="surface-card rounded-2xl">
           <CardContent className="p-6 md:p-8">

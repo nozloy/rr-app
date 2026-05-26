@@ -41,6 +41,7 @@ import {
   type AddonExportData,
 } from "@/lib/addon-export";
 import {
+  ALL_SEASON_RAIDS_VALUE,
   getDefaultRaidCheckDifficultyID,
   getRaidCheckDifficultyOptions,
 } from "@/lib/raid-check-core";
@@ -139,6 +140,13 @@ function getDefaultRaidSlug(preview: ImportPreview) {
     getRaidByName(preview.exportData.instanceName)?.slug ??
     currentRaidInstances[0]?.slug ??
     ""
+  );
+}
+
+function sortRaidCheckRows(rows: RaidCheckCharacterResult[]) {
+  return [...rows].sort(
+    (left, right) =>
+      issueStatusPriority[left.status] - issueStatusPriority[right.status],
   );
 }
 
@@ -246,7 +254,10 @@ function RaidCheckStatus({ row }: { row: RaidCheckCharacterResult }) {
       {hasKills ? (
         <RaidCheckInfoTooltip label={`Подробности кд: ${row.name}`}>
           {row.killedBosses.map((boss) => (
-            <span className="raidcheck-tooltip-row" key={`${boss.id}-${boss.name}`}>
+            <span
+              className="raidcheck-tooltip-row"
+              key={`${boss.raidSlug ?? row.raidSlug}-${boss.id}-${boss.name}-${boss.lastKillTimestamp}`}
+            >
               <span>{boss.name}</span>
               {boss.lastKillTimestamp > 0 ? (
                 <span>{formatKillTime(boss.lastKillTimestamp)}</span>
@@ -350,12 +361,7 @@ export function RaidCheckForm() {
   );
   const issueRows = useMemo(
     () =>
-      [...resultRows]
-        .filter((row) => row.status !== "clean")
-        .sort(
-          (left, right) =>
-            issueStatusPriority[left.status] - issueStatusPriority[right.status],
-        ),
+      sortRaidCheckRows(resultRows.filter((row) => row.status !== "clean")),
     [resultRows],
   );
   const cleanRows = resultRows.filter((row) => row.status === "clean");
@@ -413,9 +419,6 @@ export function RaidCheckForm() {
                 <div className="eyebrow">Источник</div>
                 <h2>Строка из аддона</h2>
               </div>
-              <Badge variant={preview.status === "ready" ? "success" : "arcane"}>
-                RR1
-              </Badge>
             </div>
 
             <p className="raidcheck-copy">
@@ -462,6 +465,12 @@ export function RaidCheckForm() {
                   <SelectValue placeholder="Выберите актуальный рейд" />
                 </SelectTrigger>
                 <SelectContent className="raidcheck-select-content">
+                  <SelectItem value={ALL_SEASON_RAIDS_VALUE}>
+                    <span className="raidcheck-premium-option">
+                      <span>Все рейды сезона</span>
+                      <span className="raidcheck-premium-tag">Premium</span>
+                    </span>
+                  </SelectItem>
                   {currentRaidInstances.map((raid) => (
                     <SelectItem key={raid.slug} value={raid.slug}>
                       {raid.name}
@@ -521,13 +530,6 @@ export function RaidCheckForm() {
               <div className="eyebrow">Результат</div>
               <h2>Таблица кд</h2>
             </div>
-            {resultStats ? (
-              <Badge variant={resultStats.locked > 0 ? "warning" : "success"}>
-                {resultStats.locked > 0 ? "Есть кд" : "Чисто"}
-              </Badge>
-            ) : (
-              <Badge variant="outline">Ожидание</Badge>
-            )}
           </div>
 
           {result?.status === "success" ? (

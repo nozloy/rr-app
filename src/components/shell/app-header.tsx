@@ -5,7 +5,6 @@ import { getOptionalSession } from "@/lib/session";
 
 type AppHeaderProps = {
   className?: string;
-  compact?: boolean;
   user?: AppHeaderUser | null;
 };
 
@@ -41,7 +40,6 @@ async function getHeaderUser(): Promise<AppHeaderUser | null> {
 
 export async function AppHeader({
   className,
-  compact = false,
   user,
 }: AppHeaderProps) {
   const envReady = hasRequiredRuntimeEnv();
@@ -50,7 +48,6 @@ export async function AppHeader({
   return (
     <AppHeaderClient
       className={className}
-      compact={compact}
       envReady={envReady}
       user={resolvedUser}
     />

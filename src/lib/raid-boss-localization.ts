@@ -71,7 +71,7 @@ const raidBossNameCatalog: RaidBossNameEntry[] = [
 		raidSlug: 'the-dreamrift',
 		names: {
 			en: 'Chimaerus the Undreamt God',
-			ru: 'Химерий, Неприснившийся Бог',
+			ru: 'Химерий',
 		},
 		provisional: true,
 		sourceNames: [

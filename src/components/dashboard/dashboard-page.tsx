@@ -29,7 +29,7 @@ export function DashboardPageView({
 
   return (
     <main className="dashboard-page" id="top">
-      <AppHeader compact user={headerUser} />
+      <AppHeader user={headerUser} />
 
       <div className="dashboard-hero-band">
         <DashboardHero displayName={preferredName} />

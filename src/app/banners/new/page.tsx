@@ -98,7 +98,7 @@ export default async function NewBannerPage({
   if (!defaultCharacter || !defaultDungeon || !defaultRaid) {
     return (
       <>
-        <AppHeader compact user={headerUser} />
+        <AppHeader user={headerUser} />
         <main className="app-shell space-y-6 py-6">
           <Card className="surface-card rounded-2xl">
             <CardContent className="p-6 md:p-8">
@@ -168,7 +168,7 @@ export default async function NewBannerPage({
 
   return (
     <>
-      <AppHeader compact user={headerUser} />
+      <AppHeader user={headerUser} />
       <main className="app-shell space-y-6 py-6">
         <Card className="surface-card rounded-2xl">
         <CardContent className="p-6 md:p-8">

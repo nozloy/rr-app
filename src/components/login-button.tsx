@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { LogIn } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 
 type LoginButtonProps = Omit<ButtonProps, "children" | "onClick" | "type"> & {
@@ -23,7 +22,7 @@ export function LoginButton({
       variant={variant}
       {...props}
     >
-      <LogIn className="size-4" aria-hidden="true" />
+      <span className="battle-net-login-icon" aria-hidden="true" />
       Войти через Battle.net
     </Button>
   );

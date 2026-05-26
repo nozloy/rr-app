@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/shell/app-header";
 export default function RaidCheckPage() {
   return (
     <>
-      <AppHeader compact />
+      <AppHeader />
       <main className="raidcheck-page">
         <RaidCheckHero />
         <RaidCheckProcess />

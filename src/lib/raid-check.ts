@@ -16,6 +16,7 @@ import {
   getKilledBossesForRaidDifficulty,
   getRaidCheckDifficultyById,
   getRaidCheckDifficultyOptions,
+  ALL_SEASON_RAIDS_VALUE,
   type RaidCheckDifficulty,
   type RaidCheckKilledBoss,
 } from "@/lib/raid-check-core";
@@ -23,7 +24,12 @@ import {
   DEFAULT_RAID_CHECK_LOCALE,
   type RaidCheckLocale,
 } from "@/lib/raid-boss-localization";
-import { getRaidByName, getRaidBySlug, type RaidDefinition } from "@/lib/raids";
+import {
+  currentRaidInstances,
+  getRaidByName,
+  getRaidBySlug,
+  type RaidDefinition,
+} from "@/lib/raids";
 
 const RAID_CHECK_CONCURRENCY = 5;
 
@@ -38,6 +44,8 @@ export type RaidCheckCharacterResult = {
   realm: string;
   classFile: string;
   role: string;
+  raidName: string;
+  raidSlug: string;
   status: RaidCheckCharacterStatus;
   killedBosses: RaidCheckKilledBoss[];
   error: string | null;
@@ -128,17 +136,53 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function checkCharacter({
+function getResultRaidMeta(raids: RaidDefinition[]) {
+  if (raids.length === 1) {
+    return {
+      raidName: raids[0].name,
+      raidSlug: raids[0].slug,
+    };
+  }
+
+  return {
+    raidName: "Все рейды сезона",
+    raidSlug: ALL_SEASON_RAIDS_VALUE,
+  };
+}
+
+function buildUnavailableResult({
+  error = null,
+  member,
+  raids,
+  status,
+}: {
+  error?: string | null;
+  member: AddonRosterMember;
+  raids: RaidDefinition[];
+  status?: RaidCheckCharacterStatus;
+}): RaidCheckCharacterResult {
+  const raidMeta = getResultRaidMeta(raids);
+
+  return {
+    ...member,
+    ...raidMeta,
+    status: status ?? "error",
+    killedBosses: [],
+    error,
+  };
+}
+
+async function checkCharacterForRaids({
   accessToken,
   member,
-  raid,
+  raids,
   difficulty,
   resetStart,
   locale,
 }: {
   accessToken: string;
   member: AddonRosterMember;
-  raid: RaidDefinition;
+  raids: RaidDefinition[];
   difficulty: RaidCheckDifficulty;
   resetStart: Date;
   locale: RaidCheckLocale;
@@ -147,12 +191,12 @@ async function checkCharacter({
     const realmSlug = await resolveRealmSlug(accessToken, member.realm);
 
     if (!realmSlug) {
-      return {
-        ...member,
-        status: "not_found",
-        killedBosses: [],
+      return buildUnavailableResult({
         error: "Реалм не найден.",
-      };
+        member,
+        raids,
+        status: "not_found",
+      });
     }
 
     const encounters = await fetchCharacterRaidEncounters(
@@ -160,39 +204,48 @@ async function checkCharacter({
       realmSlug,
       member.name,
     );
-    const killedBosses = getKilledBossesForRaidDifficulty({
-      encounters,
-      raid,
-      difficulty,
-      resetStart,
-      locale,
-    });
+
+    const killedBosses = raids.flatMap((raid) =>
+      getKilledBossesForRaidDifficulty({
+        encounters,
+        raid,
+        difficulty,
+        resetStart,
+        locale,
+      }).map((boss) => ({
+        ...boss,
+        raidName: raid.name,
+        raidSlug: raid.slug,
+      })),
+    );
+    const raidMeta = getResultRaidMeta(raids);
 
     return {
       ...member,
+      ...raidMeta,
       status: killedBosses.length > 0 ? "locked" : "clean",
       killedBosses,
       error: null,
     };
   } catch (error) {
     if (error instanceof BlizzardApiRequestError && error.status === 404) {
-      return {
-        ...member,
-        status: "not_found",
-        killedBosses: [],
+      return buildUnavailableResult({
         error: "Персонаж не найден.",
-      };
+        member,
+        raids,
+        status: "not_found",
+      });
     }
 
-    return {
-      ...member,
-      status: "error",
-      killedBosses: [],
+    return buildUnavailableResult({
       error:
         error instanceof Error
           ? error.message
           : "Не удалось проверить персонажа.",
-    };
+      member,
+      raids,
+      status: "error",
+    });
   }
 }
 
@@ -216,9 +269,11 @@ export async function checkRaidLockoutsForExport({
 
   const defaultDifficultyID = getDefaultRaidCheckDifficultyID(exportData);
   const difficultyOptions = getRaidCheckDifficultyOptions(exportData);
-  const selectedRaid = raidSlug ? getRaidBySlug(raidSlug) : null;
+  const checksAllSeasonRaids = raidSlug === ALL_SEASON_RAIDS_VALUE;
+  const selectedRaid =
+    raidSlug && !checksAllSeasonRaids ? getRaidBySlug(raidSlug) : null;
 
-  if (raidSlug && !selectedRaid) {
+  if (raidSlug && !checksAllSeasonRaids && !selectedRaid) {
     return {
       ...errorResult("Выбранный рейд не найден в актуальном каталоге."),
       difficultyOptions,
@@ -226,7 +281,11 @@ export async function checkRaidLockoutsForExport({
     };
   }
 
-  if (!selectedRaid && (exportData.groupType !== "raid" || !exportData.instanceName)) {
+  if (
+    !checksAllSeasonRaids &&
+    !selectedRaid &&
+    (exportData.groupType !== "raid" || !exportData.instanceName)
+  ) {
     return {
       ...errorResult("Выберите актуальный рейд или вставьте строку /rr, сделанную в рейде."),
       difficultyOptions,
@@ -235,7 +294,7 @@ export async function checkRaidLockoutsForExport({
   }
 
   const raid = selectedRaid ?? getRaidByName(exportData.instanceName);
-  if (!raid) {
+  if (!checksAllSeasonRaids && !raid) {
     return {
       ...errorResult("Текущий рейд из строки аддона не найден в каталоге."),
       difficultyOptions,
@@ -244,13 +303,30 @@ export async function checkRaidLockoutsForExport({
     };
   }
 
+  const raids: RaidDefinition[] = checksAllSeasonRaids
+    ? currentRaidInstances
+    : raid
+      ? [raid]
+      : [];
+  if (raids.length === 0) {
+    return {
+      ...errorResult("В каталоге нет рейдов сезона для проверки."),
+      difficultyOptions,
+      defaultDifficultyID,
+    };
+  }
+
   const roster = getRoster(exportData).slice(0, 40);
   const usedFallbackRoster = exportData.roster.length === 0;
   const warnings = [
     ...(exportData.groupType !== "raid"
-      ? [
-          "Строка сделана не в рейде. Проверяем выбранный рейд вручную по найденному составу или экспортирующему персонажу.",
-        ]
+      ? checksAllSeasonRaids
+        ? [
+            "Строка сделана не в рейде. Проверяем все рейды сезона по найденному составу или экспортирующему персонажу.",
+          ]
+        : [
+            "Строка сделана не в рейде. Проверяем выбранный рейд вручную по найденному составу или экспортирующему персонажу.",
+          ]
       : []),
     ...(selectedRaid && exportData.instanceName && getRaidByName(exportData.instanceName)?.slug !== selectedRaid.slug
       ? [
@@ -276,10 +352,10 @@ export async function checkRaidLockoutsForExport({
       roster,
       RAID_CHECK_CONCURRENCY,
       (member) =>
-        checkCharacter({
+        checkCharacterForRaids({
           accessToken,
           member,
-          raid,
+          raids,
           difficulty,
           resetStart,
           locale,
@@ -289,7 +365,7 @@ export async function checkRaidLockoutsForExport({
     return {
       status: "success",
       message: null,
-      raidName: raid.name,
+      raidName: checksAllSeasonRaids ? "Все рейды сезона" : raids[0].name,
       difficulty,
       difficultyOptions,
       defaultDifficultyID,
@@ -307,7 +383,7 @@ export async function checkRaidLockoutsForExport({
             ? error.message
             : "Не удалось выполнить проверку.",
       ),
-      raidName: raid.name,
+      raidName: checksAllSeasonRaids ? "Все рейды сезона" : raids[0].name,
       difficulty,
       difficultyOptions,
       defaultDifficultyID,

@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CheckCircle2,
   ChevronDown,
   LogOut,
   Menu,
@@ -31,7 +30,6 @@ export type AppHeaderUser = {
 
 type AppHeaderClientProps = {
   className?: string;
-  compact?: boolean;
   envReady: boolean;
   user?: AppHeaderUser | null;
 };
@@ -68,30 +66,22 @@ function HeaderAvatar({ user }: { user: AppHeaderUser }) {
 
 export function AppHeaderClient({
   className,
-  compact = false,
   envReady,
   user,
 }: AppHeaderClientProps) {
   const pathname = usePathname() ?? "/";
-  const isAuthenticated = Boolean(user);
-  const visibleNavItems = headerNavItems.filter(
-    (item) => item.auth !== "authenticated" || isAuthenticated,
-  );
 
   return (
-    <header
-      className={cn("app-header", compact && "app-header-compact", className)}
-    >
+    <header className={cn("app-header", className)}>
       <BrandLockup
         href="/"
-        compact={compact}
         className="app-header-brand"
         markClassName="app-header-brand-mark"
         textClassName="app-header-brand-text"
       />
 
       <nav className="app-header-nav" aria-label="Основная навигация">
-        {visibleNavItems.map((item) => (
+        {headerNavItems.map((item) => (
           <Link
             className={cn(isActivePath(pathname, item.href) && "is-active")}
             href={item.href}
@@ -121,7 +111,7 @@ export function AppHeaderClient({
           >
             <DropdownMenuLabel>Навигация</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {visibleNavItems.map((item) => {
+            {headerNavItems.map((item) => {
               const Icon = item.icon;
 
               return (
@@ -144,11 +134,6 @@ export function AppHeaderClient({
 
         {user ? (
           <>
-            <div className="app-header-status">
-              <CheckCircle2 className="size-4" aria-hidden="true" />
-              Battle.net подключен
-            </div>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -203,7 +188,6 @@ export function AppHeaderClient({
             className="app-header-login-button"
             disabled={!envReady}
             size="lg"
-            variant="outline"
           />
         )}
       </div>

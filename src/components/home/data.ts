@@ -72,7 +72,6 @@ export type FeatureTile = {
 
 export const homeNavItems: HomeNavItem[] = [
   { label: "Главная", href: "/", isActive: true },
-  { label: "Импорт", href: "/banners/import" },
   { label: "Проверить кд", href: "/raidcheck" },
 ];
 
