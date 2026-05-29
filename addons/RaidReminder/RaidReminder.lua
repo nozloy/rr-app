@@ -2,20 +2,25 @@ local ADDON_NAME = ...
 local EXPORT_PREFIX = "RR1?"
 local ADDON_MESSAGE_PREFIX = "RaidReminder"
 local ADDON_MESSAGE_SEPARATOR = "\t"
+local MEDIA_PATH = "Interface\\AddOns\\RaidReminder\\Media\\"
 local WINDOW_FRAME_STRATA = "FULLSCREEN_DIALOG"
 local WINDOW_FRAME_LEVEL = 1000
-local EXPORT_FRAME_WIDTH = 700
-local EXPORT_FRAME_COMPACT_HEIGHT = 150
-local EXPORT_FRAME_RAID_CHECK_HEIGHT = 560
-local RAID_CHECK_ROW_HEIGHT = 24
-local RAID_CHECK_WIDTH = 650
+local EXPORT_FRAME_WIDTH = 900
+local EXPORT_FRAME_COMPACT_HEIGHT = 250
+local EXPORT_FRAME_FULL_HEIGHT = 730
+local RAID_CHECK_ROW_HEIGHT = 28
+local RAID_CHECK_WIDTH = 820
 local RAID_CHECK_REPLY_DELAY = 1
 local RAID_CHECK_REPLY_TIMEOUT = 3
 local RAID_LOCKOUT_ROW_HEIGHT = 22
+local INSPECT_TIMEOUT = 2.8
+local INSPECT_DELAY = 0.25
+local INSPECT_MAX_ATTEMPTS = 2
 
 local frame
 local editBox
 local raidCheckLabel
+local raidCheckTargetText
 local raidCheckHeader
 local raidCheckContent
 local raidCheckScrollFrame
@@ -24,12 +29,26 @@ local raidCheckRows = {}
 local raidCheckState
 local raidCheckRequestSerial = 0
 local addonMessagePrefixRegistered = false
+local raidCheckShowProblemsOnly = false
+local raidCheckShowAddonOnly = false
+local raidCheckProblemFilter
+local raidCheckAddonFilter
+local raidCheckNoRaidPanel
+local raidCheckSummary = {}
+local raidCheckExportPanel
+local raidCheckTablePanel
+local raidCheckEventFrame
+local inspectTooltip
+local inspectQueue = {
+  active = nil,
+  queue = {},
+  token = nil,
+}
 local raidLockoutFrame
 local raidLockoutContent
 local raidLockoutStatus
 local raidLockoutRows = {}
 local raidLockoutEventFrame
-local raidCheckEventFrame
 
 local CLASS_CODES = {
   DEATHKNIGHT = "DK",
@@ -77,85 +96,311 @@ local RAID_CHECK_STATUS = {
   unavailable = "unavailable",
 }
 
+local GEAR_CHECK_STATUS = {
+  issue = "issue",
+  notChecked = "notChecked",
+  pending = "pending",
+  ready = "ready",
+}
+
+local READINESS_STATUS = {
+  partial = "partial",
+  ready = "ready",
+  notReady = "notReady",
+}
+
+local STATUS_COLORS = {
+  gold = { 1, 0.82, 0 },
+  gray = { 0.72, 0.72, 0.68 },
+  green = { 0.34, 1, 0.32 },
+  red = { 1, 0.28, 0.22 },
+  white = { 0.92, 0.88, 0.78 },
+}
+
+local TABLE_COLUMNS = {
+  { key = "character", width = 190 },
+  { key = "itemLevel", width = 70 },
+  { key = "lockout", width = 105 },
+  { key = "enchants", width = 105 },
+  { key = "gems", width = 105 },
+  { key = "result", width = 135 },
+  { key = "action", width = 110 },
+}
+
+local ENCHANT_SLOTS = {
+  { slotId = 5, textKey = "slotChest" },
+  { slotId = 7, textKey = "slotLegs" },
+  { slotId = 8, textKey = "slotFeet" },
+  { slotId = 11, textKey = "slotFinger1" },
+  { slotId = 12, textKey = "slotFinger2" },
+  { slotId = 16, textKey = "slotMainHand" },
+  { slotId = 17, textKey = "slotOffHand", weaponOnly = true },
+}
+
+local GEM_SCAN_SLOTS = {
+  { slotId = 1, textKey = "slotHead" },
+  { slotId = 2, textKey = "slotNeck" },
+  { slotId = 3, textKey = "slotShoulder" },
+  { slotId = 5, textKey = "slotChest" },
+  { slotId = 6, textKey = "slotWaist" },
+  { slotId = 7, textKey = "slotLegs" },
+  { slotId = 8, textKey = "slotFeet" },
+  { slotId = 9, textKey = "slotWrist" },
+  { slotId = 10, textKey = "slotHands" },
+  { slotId = 11, textKey = "slotFinger1" },
+  { slotId = 12, textKey = "slotFinger2" },
+  { slotId = 13, textKey = "slotTrinket1" },
+  { slotId = 14, textKey = "slotTrinket2" },
+  { slotId = 15, textKey = "slotBack" },
+  { slotId = 16, textKey = "slotMainHand" },
+  { slotId = 17, textKey = "slotOffHand" },
+}
+
+local ITEM_LEVEL_SLOTS = {
+  1,
+  2,
+  3,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+}
+
 local ADDON_LOCALE = GetLocale and GetLocale() or "enUS"
 local ADDON_TEXT = {
   enGB = {
+    action = "Action",
+    addonPlayers = "With add-on",
+    addonSummary = "Players with add-on",
     boss = "Boss",
     bossesKilled = "Killed bosses",
     character = "Character",
     checking = "Checking...",
     cleanLockout = "Clean lockout",
+    cleanSummary = "Clean lockout",
     close = "Close",
+    copy = "Copy",
     difficulty = "Difficulty",
+    emptySocket = "Empty Socket",
+    enchantOk = "OK",
+    enchants = "Enchants",
+    enchantSummary = "Missing enchants",
+    export = "Export",
+    exportHint = "Press Ctrl+C to copy the selected string, then paste it into RaidReminder.pro.",
+    exportTitle = "Service export",
+    filterAddon = "Only players with add-on",
+    filterProblems = "Only problems",
+    gems = "Gems",
+    gemsOk = "OK",
+    gemSummary = "Missing gems",
     hasLockout = "Has lockout",
+    itemLevel = "iLVL",
     killed = "Killed",
     loading = "Loading...",
+    lockout = "Lockout",
+    missingEnchants = "Missing enchants",
+    missingGems = "Missing gems",
     noAddon = "No add-on",
     noRaidGroup = "Join a raid group to check raid members.",
     noRaidLockouts = "No current raid lockouts were found.",
     noRaidTarget = "Stand inside the raid instance as the raid leader to check this raid.",
+    notChecked = "Not checked",
+    notReadyStatus = "Not ready",
+    partialStatus = "Partial readiness",
     raid = "Raid",
     raidCheckTitle = "Raid lockout check",
     raidLeaderMark = "RL",
+    raidReadinessNoRaid = "Export is available. Join a raid group to check readiness.",
+    raidReadinessTitle = "Raid readiness check",
     raidTarget = "Checking %s.",
+    readyStatus = "Ready",
     refresh = "Refresh",
+    result = "Result",
     rowCount = "%d boss rows from current raid lockouts.",
+    slotBack = "Back",
+    slotChest = "Chest",
+    slotFeet = "Feet",
+    slotFinger1 = "Ring 1",
+    slotFinger2 = "Ring 2",
+    slotHands = "Hands",
+    slotHead = "Head",
+    slotLegs = "Legs",
+    slotMainHand = "Main hand",
+    slotNeck = "Neck",
+    slotOffHand = "Off hand",
+    slotShoulder = "Shoulder",
+    slotTrinket1 = "Trinket 1",
+    slotTrinket2 = "Trinket 2",
+    slotWaist = "Waist",
+    slotWrist = "Wrist",
     status = "Status",
     unknown = "Unknown",
     unlocked = "Not killed",
     unavailable = "Raid lockout API is unavailable in this client.",
+    whisper = "Whisper",
+    whisperMissingEnchants = "Missing enchants",
+    whisperMissingGems = "Empty gem sockets",
+    whisperNoIssues = "No missing enchants or gems were found.",
+    whisperPrefix = "RaidReminder check:",
   },
   enUS = {
+    action = "Action",
+    addonPlayers = "With add-on",
+    addonSummary = "Players with add-on",
     boss = "Boss",
     bossesKilled = "Killed bosses",
     character = "Character",
     checking = "Checking...",
     cleanLockout = "Clean lockout",
+    cleanSummary = "Clean lockout",
     close = "Close",
+    copy = "Copy",
     difficulty = "Difficulty",
+    emptySocket = "Empty Socket",
+    enchantOk = "OK",
+    enchants = "Enchants",
+    enchantSummary = "Missing enchants",
+    export = "Export",
+    exportHint = "Press Ctrl+C to copy the selected string, then paste it into RaidReminder.pro.",
+    exportTitle = "Service export",
+    filterAddon = "Only players with add-on",
+    filterProblems = "Only problems",
+    gems = "Gems",
+    gemsOk = "OK",
+    gemSummary = "Missing gems",
     hasLockout = "Has lockout",
+    itemLevel = "iLVL",
     killed = "Killed",
     loading = "Loading...",
+    lockout = "Lockout",
+    missingEnchants = "Missing enchants",
+    missingGems = "Missing gems",
     noAddon = "No add-on",
     noRaidGroup = "Join a raid group to check raid members.",
     noRaidLockouts = "No current raid lockouts were found.",
     noRaidTarget = "Stand inside the raid instance as the raid leader to check this raid.",
+    notChecked = "Not checked",
+    notReadyStatus = "Not ready",
+    partialStatus = "Partial readiness",
     raid = "Raid",
     raidCheckTitle = "Raid lockout check",
     raidLeaderMark = "RL",
+    raidReadinessNoRaid = "Export is available. Join a raid group to check readiness.",
+    raidReadinessTitle = "Raid readiness check",
     raidTarget = "Checking %s.",
+    readyStatus = "Ready",
     refresh = "Refresh",
+    result = "Result",
     rowCount = "%d boss rows from current raid lockouts.",
+    slotBack = "Back",
+    slotChest = "Chest",
+    slotFeet = "Feet",
+    slotFinger1 = "Ring 1",
+    slotFinger2 = "Ring 2",
+    slotHands = "Hands",
+    slotHead = "Head",
+    slotLegs = "Legs",
+    slotMainHand = "Main hand",
+    slotNeck = "Neck",
+    slotOffHand = "Off hand",
+    slotShoulder = "Shoulder",
+    slotTrinket1 = "Trinket 1",
+    slotTrinket2 = "Trinket 2",
+    slotWaist = "Waist",
+    slotWrist = "Wrist",
     status = "Status",
     unknown = "Unknown",
     unlocked = "Not killed",
     unavailable = "Raid lockout API is unavailable in this client.",
+    whisper = "Whisper",
+    whisperMissingEnchants = "Missing enchants",
+    whisperMissingGems = "Empty gem sockets",
+    whisperNoIssues = "No missing enchants or gems were found.",
+    whisperPrefix = "RaidReminder check:",
   },
   ruRU = {
+    action = "Действие",
+    addonPlayers = "С аддоном",
+    addonSummary = "Участников с аддоном",
     boss = "Босс",
     bossesKilled = "Убитые боссы",
     character = "Участник",
     checking = "Проверка...",
     cleanLockout = "Чистое кд",
+    cleanSummary = "Чистое КД",
     close = "Закрыть",
+    copy = "Копировать",
     difficulty = "Сложность",
+    emptySocket = "Пустое гнездо",
+    enchantOk = "OK",
+    enchants = "Чанты",
+    enchantSummary = "Без чантов",
+    export = "Экспорт",
+    exportHint = "Нажмите Ctrl+C, чтобы скопировать выделенную строку для RaidReminder.pro.",
+    exportTitle = "Экспорт для сервиса",
+    filterAddon = "Только игроки с аддоном",
+    filterProblems = "Только проблемы",
+    gems = "Камни",
+    gemsOk = "OK",
+    gemSummary = "Без камней",
     hasLockout = "Есть кд",
+    itemLevel = "iLVL",
     killed = "Убит",
     loading = "Загрузка...",
+    lockout = "КД",
+    missingEnchants = "Без чантов",
+    missingGems = "Нет камней",
     noAddon = "Нет аддона",
     noRaidGroup = "Вступите в рейдовую группу, чтобы проверить участников.",
     noRaidLockouts = "Текущие рейдовые сохранения не найдены.",
     noRaidTarget = "Встаньте рейдлидером внутри рейда, чтобы проверить это кд.",
+    notChecked = "Не проверен",
+    notReadyStatus = "Не готов",
+    partialStatus = "Неполная готовность",
     raid = "Рейд",
     raidCheckTitle = "Проверка кд рейда",
     raidLeaderMark = "РЛ",
+    raidReadinessNoRaid = "Экспорт доступен. Для проверки готовности вступите в рейд.",
+    raidReadinessTitle = "Проверка готовности рейда",
     raidTarget = "Проверяем %s.",
+    readyStatus = "Готов",
     refresh = "Обновить",
+    result = "Итог",
     rowCount = "Строк боссов из текущих рейдовых сохранений: %d.",
+    slotBack = "Спина",
+    slotChest = "Грудь",
+    slotFeet = "Ступни",
+    slotFinger1 = "Кольцо 1",
+    slotFinger2 = "Кольцо 2",
+    slotHands = "Кисти рук",
+    slotHead = "Голова",
+    slotLegs = "Ноги",
+    slotMainHand = "Правая рука",
+    slotNeck = "Шея",
+    slotOffHand = "Левая рука",
+    slotShoulder = "Плечи",
+    slotTrinket1 = "Аксессуар 1",
+    slotTrinket2 = "Аксессуар 2",
+    slotWaist = "Пояс",
+    slotWrist = "Запястья",
     status = "Статус",
     unknown = "Неизвестно",
     unlocked = "Не убит",
     unavailable = "API рейдовых сохранений недоступен в этом клиенте.",
+    whisper = "Шепнуть",
+    whisperMissingEnchants = "Нет чантов",
+    whisperMissingGems = "Пустые гнезда",
+    whisperNoIssues = "Не найдено проблем с чантами или камнями.",
+    whisperPrefix = "Проверка RaidReminder:",
   },
 }
 
@@ -219,6 +464,73 @@ end
 local function AddonText(key)
   local localeText = ADDON_TEXT[ADDON_LOCALE] or ADDON_TEXT.enUS
   return localeText[key] or ADDON_TEXT.enUS[key] or key
+end
+
+local function SetTextColor(fontString, colorName)
+  local color = STATUS_COLORS[colorName] or STATUS_COLORS.white
+  fontString:SetTextColor(color[1], color[2], color[3])
+end
+
+local function GetClassColor(classFile)
+  local color = RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile]
+  if color then
+    return color.r or 1, color.g or 1, color.b or 1
+  end
+
+  return 0.92, 0.88, 0.78
+end
+
+local function JoinList(values, separator)
+  if not values or #values == 0 then
+    return ""
+  end
+
+  return table.concat(values, separator or ", ")
+end
+
+local function CountList(values)
+  if type(values) ~= "table" then
+    return 0
+  end
+
+  return #values
+end
+
+local function SetFrameShown(frameToSet, isShown)
+  if not frameToSet then
+    return
+  end
+
+  if isShown then
+    frameToSet:Show()
+  else
+    frameToSet:Hide()
+  end
+end
+
+local function PlayRaidReminderSound(soundName)
+  if not PlaySound or not SOUNDKIT then
+    return
+  end
+
+  local sound = SOUNDKIT[soundName]
+  if sound then
+    PlaySound(sound)
+  end
+end
+
+local function RegisterSpecialFrame(frameName)
+  if type(frameName) ~= "string" or frameName == "" or not UISpecialFrames then
+    return
+  end
+
+  for _, existingFrameName in ipairs(UISpecialFrames) do
+    if existingFrameName == frameName then
+      return
+    end
+  end
+
+  table.insert(UISpecialFrames, frameName)
 end
 
 local function BringRaidLockoutFrameToFront()
@@ -799,14 +1111,23 @@ local function BuildRaidRosterEntries()
         isLeader = true
       end
 
+      local _, classFile = UnitClass(unit)
       table.insert(entries, {
+        classFile = classFile,
         displayName = GetDisplayCharacterName(name, realm),
+        emptyGemSlots = {},
+        enchantStatus = GEAR_CHECK_STATUS.pending,
+        gemStatus = GEAR_CHECK_STATUS.pending,
+        hasAddon = false,
         isLeader = isLeader,
+        itemLevel = nil,
         key = key,
         killedBosses = {},
+        missingEnchants = {},
         name = name,
         realm = realm,
         status = RAID_CHECK_STATUS.pending,
+        unit = unit,
       })
     end
   end
@@ -836,42 +1157,155 @@ local function GetRaidCheckStatusText(entry)
   end
 
   if entry.status == RAID_CHECK_STATUS.unavailable then
+    if raidCheckState and not raidCheckState.target then
+      return AddonText("notChecked")
+    end
+
     return AddonText("unavailable")
   end
 
   return AddonText("checking")
 end
 
-local function SetRaidCheckStatusColor(fontString, entry)
-  if entry.status == RAID_CHECK_STATUS.clean then
-    fontString:SetTextColor(0.36, 0.86, 0.45)
-  elseif entry.status == RAID_CHECK_STATUS.hasLockout then
-    fontString:SetTextColor(1, 0.38, 0.32)
-  elseif entry.status == RAID_CHECK_STATUS.noAddon or entry.status == RAID_CHECK_STATUS.unavailable then
-    fontString:SetTextColor(1, 0.73, 0.28)
+local function SetRaidCheckStatusColor(fontString, status)
+  if status == RAID_CHECK_STATUS.clean then
+    SetTextColor(fontString, "green")
+  elseif status == RAID_CHECK_STATUS.hasLockout then
+    SetTextColor(fontString, "red")
+  elseif status == RAID_CHECK_STATUS.noAddon or status == RAID_CHECK_STATUS.unavailable then
+    SetTextColor(fontString, "gold")
   else
-    fontString:SetTextColor(0.78, 0.78, 0.78)
+    SetTextColor(fontString, "gray")
+  end
+end
+
+local function GetEnchantStatusText(entry)
+  if entry.enchantStatus == GEAR_CHECK_STATUS.ready then
+    return AddonText("enchantOk")
+  end
+
+  if entry.enchantStatus == GEAR_CHECK_STATUS.issue then
+    return AddonText("missingEnchants")
+  end
+
+  if entry.enchantStatus == GEAR_CHECK_STATUS.notChecked then
+    return AddonText("notChecked")
+  end
+
+  return AddonText("checking")
+end
+
+local function GetGemStatusText(entry)
+  if entry.gemStatus == GEAR_CHECK_STATUS.ready then
+    return AddonText("gemsOk")
+  end
+
+  if entry.gemStatus == GEAR_CHECK_STATUS.issue then
+    return AddonText("missingGems")
+  end
+
+  if entry.gemStatus == GEAR_CHECK_STATUS.notChecked then
+    return AddonText("notChecked")
+  end
+
+  return AddonText("checking")
+end
+
+local function SetGearStatusColor(fontString, status)
+  if status == GEAR_CHECK_STATUS.ready then
+    SetTextColor(fontString, "green")
+  elseif status == GEAR_CHECK_STATUS.issue then
+    SetTextColor(fontString, "red")
+  elseif status == GEAR_CHECK_STATUS.notChecked then
+    SetTextColor(fontString, "gold")
+  else
+    SetTextColor(fontString, "gray")
+  end
+end
+
+local function GetEntryReadiness(entry)
+  local hardIssues = 0
+  local softIssues = 0
+
+  if entry.status == RAID_CHECK_STATUS.clean then
+    -- clean
+  elseif entry.status == RAID_CHECK_STATUS.hasLockout then
+    hardIssues = hardIssues + 1
+  else
+    softIssues = softIssues + 1
+  end
+
+  if entry.enchantStatus == GEAR_CHECK_STATUS.issue then
+    hardIssues = hardIssues + 1
+  elseif entry.enchantStatus ~= GEAR_CHECK_STATUS.ready then
+    softIssues = softIssues + 1
+  end
+
+  if entry.gemStatus == GEAR_CHECK_STATUS.issue then
+    hardIssues = hardIssues + 1
+  elseif entry.gemStatus ~= GEAR_CHECK_STATUS.ready then
+    softIssues = softIssues + 1
+  end
+
+  if hardIssues >= 2 then
+    return READINESS_STATUS.notReady, hardIssues, softIssues
+  end
+
+  if hardIssues > 0 or softIssues > 0 then
+    return READINESS_STATUS.partial, hardIssues, softIssues
+  end
+
+  return READINESS_STATUS.ready, hardIssues, softIssues
+end
+
+local function GetReadinessStatusText(entry)
+  local readinessStatus = GetEntryReadiness(entry)
+  if readinessStatus == READINESS_STATUS.ready then
+    return AddonText("readyStatus")
+  end
+
+  if readinessStatus == READINESS_STATUS.notReady then
+    return AddonText("notReadyStatus")
+  end
+
+  return AddonText("partialStatus")
+end
+
+local function SetReadinessStatusColor(fontString, entry)
+  local readinessStatus = GetEntryReadiness(entry)
+  if readinessStatus == READINESS_STATUS.ready then
+    SetTextColor(fontString, "green")
+  elseif readinessStatus == READINESS_STATUS.notReady then
+    SetTextColor(fontString, "red")
+  else
+    SetTextColor(fontString, "gold")
   end
 end
 
 local function GetRaidCheckSortWeight(entry)
-  if entry.status == RAID_CHECK_STATUS.hasLockout then
+  local readinessStatus = GetEntryReadiness(entry)
+  if readinessStatus == READINESS_STATUS.notReady then
     return 1
   end
 
-  if entry.status == RAID_CHECK_STATUS.noAddon then
+  if readinessStatus == READINESS_STATUS.partial then
     return 2
   end
 
-  if entry.status == RAID_CHECK_STATUS.unavailable then
-    return 3
-  end
-
-  if entry.status == RAID_CHECK_STATUS.pending then
-    return 4
-  end
-
   return 5
+end
+
+local function FormatGemIssues(entry)
+  local formatted = {}
+  for _, issue in ipairs(entry.emptyGemSlots or {}) do
+    if issue.count and issue.count > 1 then
+      table.insert(formatted, issue.slotName .. " x" .. issue.count)
+    else
+      table.insert(formatted, issue.slotName)
+    end
+  end
+
+  return formatted
 end
 
 local function ShowRaidCheckTooltip(owner, entry)
@@ -895,6 +1329,24 @@ local function ShowRaidCheckTooltip(owner, entry)
     GameTooltip:AddLine(GetRaidCheckStatusText(entry), 1, 1, 1)
   end
 
+  if CountList(entry.missingEnchants) > 0 then
+    GameTooltip:AddLine(AddonText("whisperMissingEnchants") .. ":", 1, 0.82, 0)
+    for _, slotName in ipairs(entry.missingEnchants) do
+      GameTooltip:AddLine(slotName, 1, 1, 1)
+    end
+  elseif entry.enchantStatus == GEAR_CHECK_STATUS.notChecked then
+    GameTooltip:AddLine(AddonText("enchants") .. ": " .. AddonText("notChecked"), 1, 0.82, 0)
+  end
+
+  if CountList(entry.emptyGemSlots) > 0 then
+    GameTooltip:AddLine(AddonText("whisperMissingGems") .. ":", 1, 0.82, 0)
+    for _, issueText in ipairs(FormatGemIssues(entry)) do
+      GameTooltip:AddLine(issueText, 1, 1, 1)
+    end
+  elseif entry.gemStatus == GEAR_CHECK_STATUS.notChecked then
+    GameTooltip:AddLine(AddonText("gems") .. ": " .. AddonText("notChecked"), 1, 0.82, 0)
+  end
+
   GameTooltip:Show()
 end
 
@@ -905,21 +1357,9 @@ local function HideRaidCheckRowsFrom(startIndex)
 end
 
 local function SetRaidCheckTableVisible(isVisible)
-  if raidCheckHeader then
-    if isVisible then
-      raidCheckHeader:Show()
-    else
-      raidCheckHeader:Hide()
-    end
-  end
-
-  if raidCheckScrollFrame then
-    if isVisible then
-      raidCheckScrollFrame:Show()
-    else
-      raidCheckScrollFrame:Hide()
-    end
-  end
+  SetFrameShown(raidCheckTablePanel, isVisible)
+  SetFrameShown(raidCheckHeader, isVisible)
+  SetFrameShown(raidCheckScrollFrame, isVisible)
 end
 
 local function SetExportFrameMode(mode)
@@ -927,35 +1367,29 @@ local function SetExportFrameMode(mode)
     return
   end
 
-  local showRaidCheck = mode == "raidCheck"
-  frame:SetSize(EXPORT_FRAME_WIDTH, showRaidCheck and EXPORT_FRAME_RAID_CHECK_HEIGHT or EXPORT_FRAME_COMPACT_HEIGHT)
-
-  if raidCheckLabel then
-    if showRaidCheck then
-      raidCheckLabel:Show()
-    else
-      raidCheckLabel:Hide()
-    end
-  end
-
-  if raidCheckStatus then
-    if showRaidCheck then
-      raidCheckStatus:Show()
-    else
-      raidCheckStatus:SetText("")
-      raidCheckStatus:Hide()
-    end
-  end
-
-  SetRaidCheckTableVisible(showRaidCheck)
-
-  if not showRaidCheck then
-    HideRaidCheckRowsFrom(1)
-    if raidCheckContent then
-      raidCheckContent:SetHeight(1)
-    end
-  end
+  local showFullRaidCheck = raidCheckState and raidCheckState.entries and #raidCheckState.entries > 0
+  frame:SetSize(EXPORT_FRAME_WIDTH, showFullRaidCheck and EXPORT_FRAME_FULL_HEIGHT or EXPORT_FRAME_COMPACT_HEIGHT)
+  SetFrameShown(raidCheckLabel, true)
+  SetFrameShown(raidCheckTargetText, true)
+  SetFrameShown(raidCheckStatus, false)
+  SetFrameShown(raidCheckProblemFilter, showFullRaidCheck)
+  SetFrameShown(raidCheckAddonFilter, showFullRaidCheck)
+  SetFrameShown(raidCheckSummary.panel, showFullRaidCheck)
+  SetRaidCheckTableVisible(showFullRaidCheck)
 end
+
+local function GetTableColumnOffset(columnIndex)
+  local offset = 0
+  for index = 1, columnIndex - 1 do
+    offset = offset + TABLE_COLUMNS[index].width
+  end
+
+  return offset
+end
+
+local SendRaidReminderWhisper
+local UpdateRaidCheckSummary
+local ApplyButtonTextures
 
 local function GetRaidCheckRow(index)
   local row = raidCheckRows[index]
@@ -972,19 +1406,77 @@ local function GetRaidCheckRow(index)
 
   row.background = row:CreateTexture(nil, "BACKGROUND")
   row.background:SetAllPoints(row)
-  row.background:SetColorTexture(1, 1, 1, index % 2 == 0 and 0.04 or 0.02)
+  row.background:SetColorTexture(0, 0, 0, index % 2 == 0 and 0.2 or 0.32)
 
   row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  row.nameText:SetPoint("LEFT", 6, 0)
-  row.nameText:SetWidth(390)
-  row.nameText:SetJustifyH("LEFT")
+  row.nameText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(1) + 20, 0)
+  row.nameText:SetWidth(TABLE_COLUMNS[1].width - 24)
+  row.nameText:SetJustifyH("CENTER")
   row.nameText:SetWordWrap(false)
 
-  row.statusText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  row.statusText:SetPoint("LEFT", row.nameText, "RIGHT", 18, 0)
-  row.statusText:SetWidth(210)
-  row.statusText:SetJustifyH("LEFT")
-  row.statusText:SetWordWrap(false)
+  row.leaderIcon = row:CreateTexture(nil, "ARTWORK")
+  row.leaderIcon:SetSize(16, 16)
+  row.leaderIcon:SetPoint("RIGHT", row.nameText, "LEFT", -2, 0)
+  row.leaderIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+
+  row.itemLevelText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.itemLevelText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(2), 0)
+  row.itemLevelText:SetWidth(TABLE_COLUMNS[2].width)
+  row.itemLevelText:SetJustifyH("CENTER")
+  row.itemLevelText:SetWordWrap(false)
+
+  row.lockoutText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.lockoutText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(3), 0)
+  row.lockoutText:SetWidth(TABLE_COLUMNS[3].width)
+  row.lockoutText:SetJustifyH("CENTER")
+  row.lockoutText:SetWordWrap(false)
+
+  row.enchantText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.enchantText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(4), 0)
+  row.enchantText:SetWidth(TABLE_COLUMNS[4].width)
+  row.enchantText:SetJustifyH("CENTER")
+  row.enchantText:SetWordWrap(false)
+
+  row.gemText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.gemText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(5), 0)
+  row.gemText:SetWidth(TABLE_COLUMNS[5].width)
+  row.gemText:SetJustifyH("CENTER")
+  row.gemText:SetWordWrap(false)
+
+  row.resultText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.resultText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(6), 0)
+  row.resultText:SetWidth(TABLE_COLUMNS[6].width)
+  row.resultText:SetJustifyH("CENTER")
+  row.resultText:SetWordWrap(false)
+
+  row.actionText = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  row.actionText:SetPoint("LEFT", row, "LEFT", GetTableColumnOffset(7), 0)
+  row.actionText:SetWidth(TABLE_COLUMNS[7].width)
+  row.actionText:SetJustifyH("CENTER")
+  row.actionText:SetText("-")
+
+  row.whisperButton = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+  row.whisperButton:SetSize(28, 22)
+  row.whisperButton:SetPoint("CENTER", row.actionText, "CENTER", 0, 0)
+  row.whisperButton:SetText("")
+  ApplyButtonTextures(row.whisperButton)
+  row.whisperButton.icon = row.whisperButton:CreateTexture(nil, "ARTWORK")
+  row.whisperButton.icon:SetSize(16, 16)
+  row.whisperButton.icon:SetPoint("CENTER")
+  row.whisperButton.icon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+  row.whisperButton:SetScript("OnClick", function(self)
+    if self.entry then
+      SendRaidReminderWhisper(self.entry)
+    end
+  end)
+  row.whisperButton:SetScript("OnEnter", function(self)
+    ShowRaidCheckTooltip(self:GetParent(), self.entry)
+  end)
+  row.whisperButton:SetScript("OnLeave", function()
+    if GameTooltip then
+      GameTooltip:Hide()
+    end
+  end)
 
   row:SetScript("OnEnter", function(self)
     ShowRaidCheckTooltip(self, self.entry)
@@ -1004,25 +1496,33 @@ local function RenderRaidCheckRows(statusText)
     return
   end
 
-  if statusText then
-    HideRaidCheckRowsFrom(1)
-    raidCheckContent:SetHeight(1)
-    raidCheckStatus:SetText("")
-    SetExportFrameMode("compact")
-    return
-  end
-
   if not raidCheckState or not raidCheckState.entries then
     HideRaidCheckRowsFrom(1)
     raidCheckContent:SetHeight(1)
-    raidCheckStatus:SetText("")
-    SetExportFrameMode("compact")
+    raidCheckStatus:SetText(statusText or AddonText("raidReadinessNoRaid"))
+    if raidCheckTargetText then
+      raidCheckTargetText:SetText(statusText or AddonText("raidReadinessNoRaid"))
+    end
+    SetExportFrameMode("raidCheck")
+    UpdateRaidCheckSummary()
     return
   end
 
   local entries = {}
-  for index, entry in ipairs(raidCheckState.entries) do
-    entries[index] = entry
+  for _, entry in ipairs(raidCheckState.entries) do
+    local readinessStatus = GetEntryReadiness(entry)
+    local includeEntry = true
+    if raidCheckShowProblemsOnly and readinessStatus == READINESS_STATUS.ready then
+      includeEntry = false
+    end
+
+    if raidCheckShowAddonOnly and not entry.hasAddon then
+      includeEntry = false
+    end
+
+    if includeEntry then
+      table.insert(entries, entry)
+    end
   end
 
   table.sort(entries, function(left, right)
@@ -1047,17 +1547,46 @@ local function RenderRaidCheckRows(statusText)
     row.entry = entry
 
     local displayName = entry.displayName
-    if entry.isLeader then
-      displayName = displayName .. " (" .. AddonText("raidLeaderMark") .. ")"
-    end
 
     row.nameText:SetText(displayName)
-    row.statusText:SetText(GetRaidCheckStatusText(entry))
-    SetRaidCheckStatusColor(row.statusText, entry)
+    row.nameText:SetTextColor(GetClassColor(entry.classFile))
+    SetFrameShown(row.leaderIcon, entry.isLeader)
+
+    row.itemLevelText:SetText(entry.itemLevel or "-")
+    SetTextColor(row.itemLevelText, entry.itemLevel and "white" or "gray")
+
+    row.lockoutText:SetText(GetRaidCheckStatusText(entry))
+    SetRaidCheckStatusColor(row.lockoutText, entry.status)
+
+    row.enchantText:SetText(GetEnchantStatusText(entry))
+    SetGearStatusColor(row.enchantText, entry.enchantStatus)
+
+    row.gemText:SetText(GetGemStatusText(entry))
+    SetGearStatusColor(row.gemText, entry.gemStatus)
+
+    row.resultText:SetText(GetReadinessStatusText(entry))
+    SetReadinessStatusColor(row.resultText, entry)
+
+    local canWhisper = CountList(entry.missingEnchants) > 0 or CountList(entry.emptyGemSlots) > 0
+    row.whisperButton.entry = entry
+    SetFrameShown(row.whisperButton, canWhisper)
+    SetFrameShown(row.actionText, not canWhisper)
   end
 
   HideRaidCheckRowsFrom(#entries + 1)
-  raidCheckStatus:SetText(string.format(AddonText("raidTarget"), GetRaidCheckTargetLabel(raidCheckState.target)))
+  if raidCheckState.target then
+    local targetLabel = GetRaidCheckTargetLabel(raidCheckState.target)
+    raidCheckStatus:SetText(string.format(AddonText("raidTarget"), targetLabel))
+    if raidCheckTargetText then
+      raidCheckTargetText:SetText(AddonText("raid") .. ": " .. targetLabel)
+    end
+  else
+    raidCheckStatus:SetText(AddonText("noRaidTarget"))
+    if raidCheckTargetText then
+      raidCheckTargetText:SetText(AddonText("noRaidTarget"))
+    end
+  end
+  UpdateRaidCheckSummary()
 end
 
 local function ApplyRaidCheckResult(entry, killedBosses, errorText)
@@ -1065,6 +1594,7 @@ local function ApplyRaidCheckResult(entry, killedBosses, errorText)
     return
   end
 
+  entry.hasAddon = true
   entry.killedBosses = killedBosses or {}
 
   if errorText then
@@ -1092,6 +1622,461 @@ local function ApplyLocalRaidCheckResult(requestId)
   )
   ApplyRaidCheckResult(entry, killedBosses, errorText)
   RenderRaidCheckRows()
+end
+
+local function GetItemLinkFields(itemLink)
+  local itemString = type(itemLink) == "string" and itemLink:match("item:([^|]+)") or nil
+  if not itemString then
+    return {}
+  end
+
+  local fields = {}
+  for value in (itemString .. ":"):gmatch("([^:]*):") do
+    table.insert(fields, value)
+    if #fields >= 8 then
+      break
+    end
+  end
+
+  return fields
+end
+
+local function HasPermanentEnchant(itemLink)
+  local fields = GetItemLinkFields(itemLink)
+  local enchantId = tonumber(fields[2])
+  return enchantId and enchantId > 0
+end
+
+local function CountFilledGemFields(itemLink)
+  local fields = GetItemLinkFields(itemLink)
+  local count = 0
+  for fieldIndex = 3, 6 do
+    local gemId = tonumber(fields[fieldIndex])
+    if gemId and gemId > 0 then
+      count = count + 1
+    end
+  end
+
+  return count
+end
+
+local function IsWeaponItemLink(itemLink)
+  if not itemLink then
+    return false
+  end
+
+  if not GetItemInfoInstant then
+    return true
+  end
+
+  local _, _, _, equipLoc, _, classId = GetItemInfoInstant(itemLink)
+  local weaponClass = Enum and Enum.ItemClass and Enum.ItemClass.Weapon or LE_ITEM_CLASS_WEAPON or 2
+  return classId == weaponClass or equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_WEAPONOFFHAND"
+end
+
+local function GetItemStatsTable(itemLink)
+  if not itemLink then
+    return nil
+  end
+
+  if C_Item and C_Item.GetItemStats then
+    return SafeCall(function()
+      return C_Item.GetItemStats(itemLink)
+    end)
+  end
+
+  if GetItemStats then
+    return SafeCall(function()
+      return GetItemStats(itemLink)
+    end)
+  end
+
+  return nil
+end
+
+local function GetSocketCountFromStats(itemLink)
+  local count = 0
+  local stats = GetItemStatsTable(itemLink)
+  if type(stats) == "table" then
+    for statName, statValue in pairs(stats) do
+      if type(statName) == "string" and statName:find("EMPTY_SOCKET_", 1, true) then
+        count = count + (tonumber(statValue) or 1)
+      end
+    end
+  end
+
+  return count
+end
+
+local function GetTooltipEmptySocketCount(itemLink)
+  if not itemLink or not GameTooltip then
+    return 0
+  end
+
+  if not inspectTooltip then
+    inspectTooltip = CreateFrame("GameTooltip", "RaidReminderInspectTooltip", nil, "GameTooltipTemplate")
+  end
+
+  inspectTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+  inspectTooltip:ClearLines()
+  inspectTooltip:SetHyperlink(itemLink)
+
+  local emptySocketText = LocalText("EMPTY_SOCKET", AddonText("emptySocket"))
+  local count = 0
+  for lineIndex = 1, inspectTooltip:NumLines() do
+    local line = _G["RaidReminderInspectTooltipTextLeft" .. lineIndex]
+    local text = line and line:GetText()
+    if text and emptySocketText and text:find(emptySocketText, 1, true) then
+      count = count + 1
+    end
+  end
+
+  inspectTooltip:Hide()
+  return count
+end
+
+local function GetEmptySocketCount(itemLink)
+  local tooltipEmptySockets = GetTooltipEmptySocketCount(itemLink)
+  if tooltipEmptySockets > 0 then
+    return tooltipEmptySockets
+  end
+
+  local socketCount = GetSocketCountFromStats(itemLink)
+  return math.max(socketCount - CountFilledGemFields(itemLink), 0)
+end
+
+local function GetGearSlotLabel(slotInfo)
+  return AddonText(slotInfo.textKey)
+end
+
+local function GetDetailedItemLevel(itemLink)
+  if not itemLink then
+    return nil
+  end
+
+  local itemLevel
+  if C_Item and C_Item.GetDetailedItemLevelInfo then
+    itemLevel = SafeCall(function()
+      return C_Item.GetDetailedItemLevelInfo(itemLink)
+    end)
+  elseif GetDetailedItemLevelInfo then
+    itemLevel = SafeCall(function()
+      return GetDetailedItemLevelInfo(itemLink)
+    end)
+  end
+
+  itemLevel = tonumber(itemLevel)
+  if itemLevel and itemLevel > 0 then
+    return itemLevel
+  end
+
+  return nil
+end
+
+local function CalculateUnitItemLevel(unit)
+  if not GetInventoryItemLink then
+    return nil
+  end
+
+  local total = 0
+  local count = 0
+  for _, slotId in ipairs(ITEM_LEVEL_SLOTS) do
+    local itemLink = GetInventoryItemLink(unit, slotId)
+    local itemLevel = GetDetailedItemLevel(itemLink)
+    if itemLevel then
+      total = total + itemLevel
+      count = count + 1
+    end
+  end
+
+  if count == 0 then
+    return nil
+  end
+
+  return math.floor((total / count) + 0.5)
+end
+
+local function ApplyUninspectableGearResult(entry)
+  if not entry then
+    return
+  end
+
+  entry.missingEnchants = {}
+  entry.emptyGemSlots = {}
+  entry.enchantStatus = GEAR_CHECK_STATUS.notChecked
+  entry.gemStatus = GEAR_CHECK_STATUS.notChecked
+end
+
+local function AnalyzeUnitGear(unit)
+  local missingEnchants = {}
+  local emptyGemSlots = {}
+  local seenItemLinks = 0
+
+  for _, slotInfo in ipairs(ENCHANT_SLOTS) do
+    local itemLink = GetInventoryItemLink and GetInventoryItemLink(unit, slotInfo.slotId)
+    if itemLink then
+      seenItemLinks = seenItemLinks + 1
+      local shouldRequireEnchant = true
+      if slotInfo.weaponOnly then
+        shouldRequireEnchant = IsWeaponItemLink(itemLink)
+      end
+
+      if shouldRequireEnchant and not HasPermanentEnchant(itemLink) then
+        table.insert(missingEnchants, GetGearSlotLabel(slotInfo))
+      end
+    end
+  end
+
+  for _, slotInfo in ipairs(GEM_SCAN_SLOTS) do
+    local itemLink = GetInventoryItemLink and GetInventoryItemLink(unit, slotInfo.slotId)
+    if itemLink then
+      seenItemLinks = seenItemLinks + 1
+      local emptySocketCount = GetEmptySocketCount(itemLink)
+      if emptySocketCount > 0 then
+        table.insert(emptyGemSlots, {
+          count = emptySocketCount,
+          slotName = GetGearSlotLabel(slotInfo),
+        })
+      end
+    end
+  end
+
+  return {
+    emptyGemSlots = emptyGemSlots,
+    missingEnchants = missingEnchants,
+    seenItemLinks = seenItemLinks,
+  }
+end
+
+local function ApplyGearResult(entry, unit)
+  if not entry then
+    return
+  end
+
+  entry.itemLevel = CalculateUnitItemLevel(unit)
+  if UnitIsUnit and UnitIsUnit(unit, "player") and GetEquippedItemLevel then
+    entry.itemLevel = GetEquippedItemLevel() or entry.itemLevel
+  end
+
+  local result = AnalyzeUnitGear(unit)
+  if result.seenItemLinks == 0 then
+    ApplyUninspectableGearResult(entry)
+    return
+  end
+
+  entry.missingEnchants = result.missingEnchants
+  entry.emptyGemSlots = result.emptyGemSlots
+  entry.enchantStatus = CountList(entry.missingEnchants) > 0 and GEAR_CHECK_STATUS.issue or GEAR_CHECK_STATUS.ready
+  entry.gemStatus = CountList(entry.emptyGemSlots) > 0 and GEAR_CHECK_STATUS.issue or GEAR_CHECK_STATUS.ready
+end
+
+local function ResetInspectQueue(token)
+  if inspectQueue.active and ClearInspectPlayer then
+    ClearInspectPlayer()
+  end
+
+  inspectQueue.token = token
+  inspectQueue.queue = {}
+  inspectQueue.active = nil
+end
+
+local function FinishActiveInspect()
+  if ClearInspectPlayer then
+    ClearInspectPlayer()
+  end
+
+  inspectQueue.active = nil
+end
+
+local ProcessNextInspect
+
+local function ScheduleNextInspect()
+  if C_Timer and C_Timer.After then
+    C_Timer.After(INSPECT_DELAY, ProcessNextInspect)
+  else
+    ProcessNextInspect()
+  end
+end
+
+local function RetryOrFailInspect(active)
+  if not active or not active.entry then
+    FinishActiveInspect()
+    ScheduleNextInspect()
+    return
+  end
+
+  local entry = active.entry
+  FinishActiveInspect()
+
+  if active.attempt < INSPECT_MAX_ATTEMPTS then
+    entry.inspectAttempt = active.attempt + 1
+    table.insert(inspectQueue.queue, 1, entry)
+  else
+    ApplyUninspectableGearResult(entry)
+    RenderRaidCheckRows()
+  end
+
+  ScheduleNextInspect()
+end
+
+local function HandleInspectTimeout(token, guid)
+  local active = inspectQueue.active
+  if not active or inspectQueue.token ~= token then
+    return
+  end
+
+  if guid and active.guid and active.guid ~= guid then
+    return
+  end
+
+  RetryOrFailInspect(active)
+end
+
+ProcessNextInspect = function()
+  if inspectQueue.active or not raidCheckState or inspectQueue.token ~= raidCheckState.requestId then
+    return
+  end
+
+  local entry = table.remove(inspectQueue.queue, 1)
+  if not entry then
+    return
+  end
+
+  local unit = entry.unit
+  if not UnitExists or not UnitExists(unit) or (UnitIsConnected and not UnitIsConnected(unit)) then
+    ApplyUninspectableGearResult(entry)
+    RenderRaidCheckRows()
+    ScheduleNextInspect()
+    return
+  end
+
+  if not CanInspect or not NotifyInspect or not CanInspect(unit, false) then
+    ApplyUninspectableGearResult(entry)
+    RenderRaidCheckRows()
+    ScheduleNextInspect()
+    return
+  end
+
+  local guid = UnitGUID and UnitGUID(unit)
+  local token = inspectQueue.token
+  inspectQueue.active = {
+    attempt = entry.inspectAttempt or 1,
+    entry = entry,
+    guid = guid,
+    token = token,
+    unit = unit,
+  }
+
+  NotifyInspect(unit)
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(INSPECT_TIMEOUT, function()
+      HandleInspectTimeout(token, guid)
+    end)
+  end
+end
+
+local function StartRaidInspectScan(state)
+  ResetInspectQueue(state and state.requestId or nil)
+  if not state or not state.entries then
+    return
+  end
+
+  local playerKey = GetPlayerCharacterKey()
+  for _, entry in ipairs(state.entries) do
+    entry.inspectAttempt = 1
+    if entry.key == playerKey or (UnitIsUnit and entry.unit and UnitIsUnit(entry.unit, "player")) then
+      ApplyGearResult(entry, "player")
+    else
+      entry.enchantStatus = GEAR_CHECK_STATUS.pending
+      entry.gemStatus = GEAR_CHECK_STATUS.pending
+      table.insert(inspectQueue.queue, entry)
+    end
+  end
+
+  RenderRaidCheckRows()
+  ScheduleNextInspect()
+end
+
+local function HandleInspectReady(guid)
+  local active = inspectQueue.active
+  if not active or not raidCheckState or active.token ~= raidCheckState.requestId then
+    return
+  end
+
+  if guid and active.guid and active.guid ~= guid then
+    return
+  end
+
+  ApplyGearResult(active.entry, active.unit)
+  FinishActiveInspect()
+  RenderRaidCheckRows()
+  ScheduleNextInspect()
+end
+
+function UpdateRaidCheckSummary()
+  if not raidCheckSummary or not raidCheckSummary.addonValue then
+    return
+  end
+
+  local total = 0
+  local addonCount = 0
+  local cleanCount = 0
+  local enchantIssueCount = 0
+  local gemIssueCount = 0
+
+  if raidCheckState and raidCheckState.entries then
+    total = #raidCheckState.entries
+    for _, entry in ipairs(raidCheckState.entries) do
+      if entry.hasAddon then
+        addonCount = addonCount + 1
+      end
+
+      if entry.status == RAID_CHECK_STATUS.clean then
+        cleanCount = cleanCount + 1
+      end
+
+      if CountList(entry.missingEnchants) > 0 then
+        enchantIssueCount = enchantIssueCount + 1
+      end
+
+      if CountList(entry.emptyGemSlots) > 0 then
+        gemIssueCount = gemIssueCount + 1
+      end
+    end
+  end
+
+  raidCheckSummary.addonValue:SetText(addonCount .. " / " .. total)
+  raidCheckSummary.cleanValue:SetText(cleanCount)
+  raidCheckSummary.enchantValue:SetText(enchantIssueCount)
+  raidCheckSummary.gemValue:SetText(gemIssueCount)
+end
+
+function SendRaidReminderWhisper(entry)
+  if not entry then
+    return
+  end
+
+  local parts = {}
+  if CountList(entry.missingEnchants) > 0 then
+    table.insert(parts, AddonText("whisperMissingEnchants") .. ": " .. JoinList(entry.missingEnchants, ", "))
+  end
+
+  local gemIssues = FormatGemIssues(entry)
+  if CountList(gemIssues) > 0 then
+    table.insert(parts, AddonText("whisperMissingGems") .. ": " .. JoinList(gemIssues, ", "))
+  end
+
+  local message
+  if #parts == 0 then
+    message = AddonText("whisperNoIssues")
+  else
+    message = AddonText("whisperPrefix") .. " " .. table.concat(parts, "; ")
+  end
+
+  if SendChatMessage then
+    SendChatMessage(message, "WHISPER", nil, entry.displayName)
+  end
 end
 
 local function SendRaidCheckResponse(sender, requestId, raidName, difficultyId)
@@ -1157,19 +2142,14 @@ local function RefreshRaidCheck(fields)
     return
   end
 
-  local target = GetRaidCheckTarget(fields)
-  if not target then
-    raidCheckState = nil
-    RenderRaidCheckRows()
-    return
-  end
-
   if not IsInRaid or not IsInRaid() then
     raidCheckState = nil
-    RenderRaidCheckRows()
+    ResetInspectQueue(nil)
+    RenderRaidCheckRows(AddonText("raidReadinessNoRaid"))
     return
   end
 
+  local target = GetRaidCheckTarget(fields)
   raidCheckRequestSerial = raidCheckRequestSerial + 1
   local requestId = tostring(math.floor((GetTime and GetTime() or 0) * 1000)) .. "-" .. raidCheckRequestSerial
   local entries = BuildRaidRosterEntries()
@@ -1185,13 +2165,23 @@ local function RefreshRaidCheck(fields)
     AddRaidCheckEntryAlias(state, entry, entry.name)
     AddRaidCheckEntryAlias(state, entry, BuildCharacterKey(entry.name, entry.realm))
 
+    if not target then
+      entry.status = RAID_CHECK_STATUS.unavailable
+    end
+
     if entry.key == GetPlayerCharacterKey() or entry.name == (UnitName and UnitName("player") or nil) then
       state.localEntry = entry
+      entry.hasAddon = true
     end
   end
 
   raidCheckState = state
   RenderRaidCheckRows()
+  StartRaidInspectScan(state)
+
+  if not target then
+    return
+  end
 
   if RequestRaidInfo then
     RequestRaidInfo()
@@ -1223,6 +2213,7 @@ local function HandleRaidCheckResponse(sender, parts)
   end
 
   local status = parts[3]
+  entry.hasAddon = true
   entry.killedBosses = {}
 
   if status == RAID_CHECK_STATUS.hasLockout then
@@ -1246,6 +2237,7 @@ local function HandleRaidCheckBoss(sender, parts)
     return
   end
 
+  entry.hasAddon = true
   table.insert(entry.killedBosses, parts[4] or AddonText("unknown"))
   if #entry.killedBosses > 0 then
     entry.status = RAID_CHECK_STATUS.hasLockout
@@ -1307,6 +2299,109 @@ local function RefreshExport()
   SelectExportText()
 end
 
+local function ApplyPanelBackdrop(panel, alpha)
+  if panel.SetBackdrop then
+    panel:SetBackdrop({
+      bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true,
+      tileSize = 16,
+      edgeSize = 14,
+      insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    panel:SetBackdropColor(0.02, 0.018, 0.014, alpha or 0.94)
+    panel:SetBackdropBorderColor(0.72, 0.58, 0.28, 0.9)
+    return
+  end
+
+  local background = panel:CreateTexture(nil, "BACKGROUND")
+  background:SetAllPoints(panel)
+  background:SetColorTexture(0.02, 0.018, 0.014, alpha or 0.94)
+end
+
+local function CreateBorderedPanel(parent, width, height, point, relativeTo, relativePoint, x, y)
+  local panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+  panel:SetSize(width, height)
+  panel:SetPoint(point, relativeTo, relativePoint, x, y)
+  ApplyPanelBackdrop(panel)
+  return panel
+end
+
+function ApplyButtonTextures(button)
+  if button.SetNormalFontObject then
+    if GameFontNormalSmall then
+      button:SetNormalFontObject(GameFontNormalSmall)
+    end
+    if GameFontHighlightSmall then
+      button:SetHighlightFontObject(GameFontHighlightSmall)
+    end
+    if GameFontDisableSmall then
+      button:SetDisabledFontObject(GameFontDisableSmall)
+    end
+  end
+end
+
+local function CreateStyledButton(parent, width, height, text)
+  local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  button:SetSize(width, height)
+  ApplyButtonTextures(button)
+  button:SetText(text)
+  return button
+end
+
+local function CreateFilterCheckbox(parent, text, checked, onClick)
+  local checkbox = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+  checkbox:SetSize(24, 24)
+  checkbox:SetChecked(checked)
+  checkbox.label = checkbox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  checkbox.label:SetPoint("LEFT", checkbox, "RIGHT", 6, 1)
+  checkbox.label:SetText(text)
+  checkbox:SetScript("OnClick", onClick)
+  return checkbox
+end
+
+local function CreateSummaryCard(parent, iconPath, label, colorName)
+  local card = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+  card:SetSize(198, 58)
+  ApplyPanelBackdrop(card, 0.78)
+
+  card.icon = card:CreateTexture(nil, "ARTWORK")
+  card.icon:SetSize(34, 34)
+  card.icon:SetPoint("LEFT", 10, 0)
+  card.icon:SetTexture(iconPath)
+
+  card.label = card:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  card.label:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10, -3)
+  card.label:SetWidth(136)
+  card.label:SetJustifyH("LEFT")
+  card.label:SetText(label)
+
+  card.value = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+  card.value:SetPoint("TOPLEFT", card.label, "BOTTOMLEFT", 0, -2)
+  card.value:SetText("0")
+  SetTextColor(card.value, colorName or "white")
+
+  return card
+end
+
+local function CreateTableHeader(parent)
+  raidCheckHeader = CreateFrame("Frame", nil, parent)
+  raidCheckHeader:SetSize(RAID_CHECK_WIDTH, RAID_CHECK_ROW_HEIGHT)
+  raidCheckHeader:SetPoint("TOPLEFT", parent, "TOPLEFT", 16, -16)
+
+  local background = raidCheckHeader:CreateTexture(nil, "BACKGROUND")
+  background:SetAllPoints(raidCheckHeader)
+  background:SetColorTexture(0.12, 0.09, 0.05, 0.86)
+
+  for index, column in ipairs(TABLE_COLUMNS) do
+    local label = raidCheckHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    label:SetPoint("LEFT", raidCheckHeader, "LEFT", GetTableColumnOffset(index), 0)
+    label:SetWidth(column.width)
+    label:SetJustifyH("CENTER")
+    label:SetText(AddonText(column.key))
+  end
+end
+
 local function CreateExportFrame()
   if frame then
     return
@@ -1323,18 +2418,35 @@ local function CreateExportFrame()
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
   frame:Hide()
+  frame:SetScript("OnHide", function()
+    PlayRaidReminderSound("IG_CHARACTER_INFO_CLOSE")
+  end)
+  RegisterSpecialFrame("RaidReminderExportFrame")
 
-  local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  title:SetPoint("TOP", 0, -7)
-  title:SetText("RaidReminder Export")
+  if frame.TitleText then
+    frame.TitleText:SetText("RaidReminder")
+    frame.TitleText:SetTextColor(1, 0.82, 0)
+  else
+    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+    title:SetPoint("TOP", 0, -8)
+    title:SetText("RaidReminder")
+    title:SetTextColor(1, 0.82, 0)
+  end
 
-  local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  hint:SetPoint("TOPLEFT", 24, -34)
-  hint:SetText("Press Ctrl+C to copy the selected string, then paste it into RaidReminder.")
+  raidCheckExportPanel = CreateBorderedPanel(frame, 820, 92, "TOP", frame, "TOP", 0, -38)
 
-  editBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-  editBox:SetSize(650, 28)
-  editBox:SetPoint("TOPLEFT", 24, -56)
+  local exportTitle = raidCheckExportPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  exportTitle:SetPoint("TOPLEFT", 18, -14)
+  exportTitle:SetText(AddonText("exportTitle"))
+  exportTitle:SetTextColor(1, 0.82, 0)
+
+  local hint = raidCheckExportPanel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  hint:SetPoint("TOPLEFT", 18, -62)
+  hint:SetText(AddonText("exportHint"))
+
+  editBox = CreateFrame("EditBox", nil, raidCheckExportPanel, "InputBoxTemplate")
+  editBox:SetSize(740, 28)
+  editBox:SetPoint("TOPLEFT", 18, -36)
   editBox:SetAutoFocus(false)
   editBox:SetFontObject(ChatFontNormal)
   editBox:SetScript("OnEditFocusGained", function(self)
@@ -1347,63 +2459,80 @@ local function CreateExportFrame()
     self:ClearFocus()
   end)
 
-  raidCheckLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  raidCheckLabel:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -18)
-  raidCheckLabel:SetText(AddonText("raidCheckTitle"))
+  raidCheckLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  raidCheckLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 60, -150)
+  raidCheckLabel:SetText(AddonText("raidReadinessTitle"))
+  raidCheckLabel:SetTextColor(1, 0.82, 0)
 
-  raidCheckHeader = CreateFrame("Frame", nil, frame)
-  raidCheckHeader:SetSize(RAID_CHECK_WIDTH, RAID_CHECK_ROW_HEIGHT)
-  raidCheckHeader:SetPoint("TOPLEFT", editBox, "BOTTOMLEFT", 0, -40)
+  raidCheckTargetText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  raidCheckTargetText:SetPoint("TOPLEFT", raidCheckLabel, "BOTTOMLEFT", 0, -12)
+  raidCheckTargetText:SetWidth(520)
+  raidCheckTargetText:SetJustifyH("LEFT")
+  raidCheckTargetText:SetText(AddonText("raidReadinessNoRaid"))
 
-  local raidCheckHeaderBackground = raidCheckHeader:CreateTexture(nil, "BACKGROUND")
-  raidCheckHeaderBackground:SetAllPoints(raidCheckHeader)
-  raidCheckHeaderBackground:SetColorTexture(1, 1, 1, 0.08)
+  raidCheckProblemFilter = CreateFilterCheckbox(frame, AddonText("filterProblems"), raidCheckShowProblemsOnly, function(self)
+    raidCheckShowProblemsOnly = self:GetChecked() and true or false
+    RenderRaidCheckRows()
+  end)
+  raidCheckProblemFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 560, -168)
 
-  local characterHeader = raidCheckHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  characterHeader:SetPoint("LEFT", 6, 0)
-  characterHeader:SetWidth(390)
-  characterHeader:SetJustifyH("LEFT")
-  characterHeader:SetText(AddonText("character"))
+  raidCheckAddonFilter = CreateFilterCheckbox(frame, AddonText("filterAddon"), raidCheckShowAddonOnly, function(self)
+    raidCheckShowAddonOnly = self:GetChecked() and true or false
+    RenderRaidCheckRows()
+  end)
+  raidCheckAddonFilter:SetPoint("LEFT", raidCheckProblemFilter.label, "RIGHT", 28, 0)
 
-  local statusHeader = raidCheckHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  statusHeader:SetPoint("LEFT", characterHeader, "RIGHT", 18, 0)
-  statusHeader:SetWidth(210)
-  statusHeader:SetJustifyH("LEFT")
-  statusHeader:SetText(AddonText("status"))
+  local summaryPanel = CreateBorderedPanel(frame, 850, 74, "TOP", frame, "TOP", 0, -214)
+  local addonCard = CreateSummaryCard(summaryPanel, "Interface\\Icons\\INV_Misc_GroupNeedMore", AddonText("addonSummary"), "white")
+  addonCard:SetPoint("LEFT", summaryPanel, "LEFT", 14, 0)
+  local cleanCard = CreateSummaryCard(summaryPanel, "Interface\\RaidFrame\\ReadyCheck-Ready", AddonText("cleanSummary"), "green")
+  cleanCard:SetPoint("LEFT", addonCard, "RIGHT", 10, 0)
+  local enchantCard = CreateSummaryCard(summaryPanel, "Interface\\Icons\\INV_Misc_EnchantedScroll", AddonText("enchantSummary"), "gold")
+  enchantCard:SetPoint("LEFT", cleanCard, "RIGHT", 10, 0)
+  local gemCard = CreateSummaryCard(summaryPanel, "Interface\\Icons\\INV_Misc_Gem_X4_MetaGem_Cut", AddonText("gemSummary"), "gold")
+  gemCard:SetPoint("LEFT", enchantCard, "RIGHT", 10, 0)
 
-  raidCheckScrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+  raidCheckSummary.addonValue = addonCard.value
+  raidCheckSummary.cleanValue = cleanCard.value
+  raidCheckSummary.enchantValue = enchantCard.value
+  raidCheckSummary.gemValue = gemCard.value
+  raidCheckSummary.panel = summaryPanel
+
+  raidCheckTablePanel = CreateBorderedPanel(frame, 850, 350, "TOP", frame, "TOP", 0, -302)
+  CreateTableHeader(raidCheckTablePanel)
+
+  raidCheckScrollFrame = CreateFrame("ScrollFrame", nil, raidCheckTablePanel, "UIPanelScrollFrameTemplate")
   raidCheckScrollFrame:SetPoint("TOPLEFT", raidCheckHeader, "BOTTOMLEFT", 0, -4)
-  raidCheckScrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -42, 58)
+  raidCheckScrollFrame:SetPoint("BOTTOMRIGHT", raidCheckTablePanel, "BOTTOMRIGHT", -34, 20)
 
   raidCheckContent = CreateFrame("Frame", nil, raidCheckScrollFrame)
   raidCheckContent:SetSize(RAID_CHECK_WIDTH, 1)
   raidCheckScrollFrame:SetScrollChild(raidCheckContent)
 
-  raidCheckStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  raidCheckStatus:SetPoint("BOTTOM", 0, 42)
-  raidCheckStatus:SetWidth(RAID_CHECK_WIDTH)
-  raidCheckStatus:SetJustifyH("CENTER")
+  raidCheckStatus = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  raidCheckStatus:SetPoint("BOTTOMLEFT", raidCheckTablePanel, "BOTTOMLEFT", 18, 12)
+  raidCheckStatus:SetWidth(620)
+  raidCheckStatus:SetJustifyH("LEFT")
   raidCheckStatus:SetText("")
-  SetExportFrameMode("compact")
+  raidCheckStatus:SetTextColor(0.82, 0.78, 0.68)
 
-  local refreshButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  refreshButton:SetSize(120, 24)
-  refreshButton:SetPoint("BOTTOMLEFT", 220, 18)
-  refreshButton:SetText(AddonText("refresh"))
+  local refreshButton = CreateStyledButton(frame, 150, 28, AddonText("refresh"))
+  refreshButton:SetPoint("BOTTOM", frame, "BOTTOM", -95, 24)
   refreshButton:SetScript("OnClick", RefreshExport)
 
-  local closeButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  closeButton:SetSize(120, 24)
-  closeButton:SetPoint("BOTTOMRIGHT", -220, 18)
-  closeButton:SetText(AddonText("close"))
+  local closeButton = CreateStyledButton(frame, 150, 28, AddonText("close"))
+  closeButton:SetPoint("LEFT", refreshButton, "RIGHT", 40, 0)
   closeButton:SetScript("OnClick", function()
     frame:Hide()
   end)
+
+  SetExportFrameMode("raidCheck")
 end
 
 local function ShowExportFrame()
   CreateExportFrame()
   BringExportFrameToFront()
+  PlayRaidReminderSound("IG_CHARACTER_INFO_OPEN")
   frame:Show()
   RefreshExport()
 
@@ -1611,6 +2740,10 @@ local function CreateRaidLockoutFrame()
   raidLockoutFrame:SetScript("OnDragStart", raidLockoutFrame.StartMoving)
   raidLockoutFrame:SetScript("OnDragStop", raidLockoutFrame.StopMovingOrSizing)
   raidLockoutFrame:Hide()
+  raidLockoutFrame:SetScript("OnHide", function()
+    PlayRaidReminderSound("IG_CHARACTER_INFO_CLOSE")
+  end)
+  RegisterSpecialFrame("RaidReminderRaidLockoutFrame")
 
   local title = raidLockoutFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   title:SetPoint("TOP", 0, -7)
@@ -1688,6 +2821,7 @@ end
 local function ShowRaidLockoutFrame()
   CreateRaidLockoutFrame()
   BringRaidLockoutFrameToFront()
+  PlayRaidReminderSound("IG_CHARACTER_INFO_OPEN")
   raidLockoutFrame:Show()
   RefreshRaidLockoutFrame()
 end
@@ -1697,11 +2831,14 @@ raidCheckEventFrame:RegisterEvent("PLAYER_LOGIN")
 raidCheckEventFrame:RegisterEvent("CHAT_MSG_ADDON")
 raidCheckEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 raidCheckEventFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
+raidCheckEventFrame:RegisterEvent("INSPECT_READY")
 raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_LOGIN" then
     RegisterAddonMessages()
   elseif event == "CHAT_MSG_ADDON" then
     HandleRaidCheckAddonMessage(...)
+  elseif event == "INSPECT_READY" then
+    HandleInspectReady(...)
   elseif event == "GROUP_ROSTER_UPDATE" then
     if frame and frame:IsShown() then
       RefreshRaidCheck(GetExportFields())
@@ -1710,12 +2847,13 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
     if frame and frame:IsShown() then
       local fields = GetExportFields()
       local target = GetRaidCheckTarget(fields)
-      if not target or not IsInRaid or not IsInRaid() then
+      if not IsInRaid or not IsInRaid() then
         raidCheckState = nil
+        ResetInspectQueue(nil)
         RenderRaidCheckRows()
-      elseif not raidCheckState or not RaidCheckTargetsMatch(raidCheckState.target, target) then
+      elseif (target and (not raidCheckState or not RaidCheckTargetsMatch(raidCheckState.target, target))) then
         RefreshRaidCheck(fields)
-      else
+      elseif raidCheckState and raidCheckState.target then
         ApplyLocalRaidCheckResult(raidCheckState.requestId)
       end
     end

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { CalendarDays, Coins, Crown, UsersRound } from "lucide-react";
+import { CalendarDays, Crown, Link2, UsersRound } from "lucide-react";
 import type { FeaturedRaid } from "@/components/home/data";
 import { DifficultyBadge } from "@/components/home/difficulty-badge";
 
@@ -39,11 +39,10 @@ export function RaidCard({ raid }: RaidCardProps) {
             <UsersRound className="size-4" aria-hidden="true" />
             {raid.party}
           </span>
-          <span className="home-raid-price">
-            <Coins className="size-4" aria-hidden="true" />
-            Слот: {raid.slotPrice}
-          </span>
         </div>
+        <button className="home-raid-link" type="button" aria-label={`Открыть рейд ${raid.title}`}>
+          <Link2 className="size-5" aria-hidden="true" />
+        </button>
       </div>
     </article>
   );

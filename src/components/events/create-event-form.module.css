@@ -1,0 +1,29 @@
+@reference '../../app/globals.css';
+
+.createEventPage {
+	@apply relative z-[1] min-h-screen pb-8;
+
+	background:
+		linear-gradient(180deg, rgba(2, 7, 18, 0.12), rgba(2, 7, 18, 0.88)),
+		#020814;
+}
+
+.createEventPage::before {
+	content: '';
+	position: absolute;
+	inset: 4.8rem 0 auto;
+	z-index: -1;
+	height: 360px;
+	background:
+		linear-gradient(
+			90deg,
+			rgba(2, 7, 18, 0.98) 0%,
+			rgba(2, 7, 18, 0.42) 55%,
+			rgba(2, 7, 18, 0.9) 100%
+		),
+		linear-gradient(180deg, rgba(2, 7, 18, 0.1), rgba(2, 7, 18, 0.96)),
+		url('/home/hero-midnight-citadel.jpg');
+	background-position: center 42%;
+	background-size: cover;
+	pointer-events: none;
+}

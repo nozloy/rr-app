@@ -5,7 +5,6 @@ import {
   Dice5,
   Gem,
   KeyRound,
-  LogIn,
   Search,
   Server,
   Shield,
@@ -211,12 +210,6 @@ export const roleRequirements: RoleRequirement[] = [
 ];
 
 export const featureTiles: FeatureTile[] = [
-  {
-    title: "Вход через Battle.net",
-    text: "Безопасный вход без паролей. Прогрессия и персонажи под рукой.",
-    icon: LogIn,
-    tone: "battle",
-  },
   {
     title: "Планирование событий",
     text: "Укажи время, роли и требования. Участники видят все заранее.",

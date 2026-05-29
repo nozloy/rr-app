@@ -11,7 +11,11 @@ import {
 import { LoginButton } from "@/components/login-button";
 import { LogoutButton } from "@/components/logout-button";
 import { BrandLockup } from "@/components/shell/brand-lockup";
-import { accountMenuItems, headerNavItems } from "@/components/shell/nav-items";
+import {
+  accountMenuItems,
+  authenticatedHeaderNavItems,
+  headerNavItems,
+} from "@/components/shell/nav-items";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -70,6 +74,9 @@ export function AppHeaderClient({
   user,
 }: AppHeaderClientProps) {
   const pathname = usePathname() ?? "/";
+  const mainNavItems = user
+    ? [...headerNavItems, ...authenticatedHeaderNavItems]
+    : headerNavItems;
 
   return (
     <header className={cn("app-header", className)}>
@@ -81,7 +88,7 @@ export function AppHeaderClient({
       />
 
       <nav className="app-header-nav" aria-label="Основная навигация">
-        {headerNavItems.map((item) => (
+        {mainNavItems.map((item) => (
           <Link
             className={cn(isActivePath(pathname, item.href) && "is-active")}
             href={item.href}
@@ -111,7 +118,7 @@ export function AppHeaderClient({
           >
             <DropdownMenuLabel>Навигация</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {headerNavItems.map((item) => {
+            {mainNavItems.map((item) => {
               const Icon = item.icon;
 
               return (
@@ -162,7 +169,13 @@ export function AppHeaderClient({
 
                   return (
                     <DropdownMenuItem asChild key={item.href}>
-                      <Link className="app-header-dropdown-link" href={item.href}>
+                      <Link
+                        className={cn(
+                          "app-header-dropdown-link",
+                          isActivePath(pathname, item.href) && "is-active",
+                        )}
+                        href={item.href}
+                      >
                         <Icon className="size-4" aria-hidden="true" />
                         {item.label}
                       </Link>

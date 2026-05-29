@@ -1,4 +1,5 @@
 import {
+  CalendarPlus,
   Home,
   SearchCheck,
 } from "lucide-react";
@@ -15,7 +16,16 @@ export const headerNavItems: HeaderNavItem[] = [
   { href: "/raidcheck", icon: SearchCheck, label: "Проверить кд" },
 ];
 
+export const authenticatedHeaderNavItems: HeaderNavItem[] = [
+  { href: "/events/new", icon: CalendarPlus, label: "Создать рейд" },
+];
+
 export const accountMenuItems = [
+  {
+    href: "/events/new",
+    icon: CalendarPlus,
+    label: "Создать рейд",
+  },
   {
     href: "/raidcheck",
     icon: SearchCheck,

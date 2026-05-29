@@ -9,7 +9,7 @@ const midnightBosses = [
 	['Vaelgor & Ezzorak', 'Ваэлгор и Эззорак'],
 	['Lightblinded Vanguard', 'Ослепленный авангард'],
 	['Crown of the Cosmos', 'Корона Космоса'],
-	['Chimaerus the Undreamt God', 'Химерий, Неприснившийся Бог'],
+	['Chimaerus the Undreamt God', 'Химерий'],
 	["Belo'ren, Child of Al'ar", "Бело'рен, Дитя Ал'ара"],
 	['Midnight Falls', 'Торжество Полуночи'],
 ] as const
