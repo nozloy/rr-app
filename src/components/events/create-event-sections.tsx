@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState, type ReactNode, type SVGProps } from 'react'
+import { useEffect, useState, type ReactNode, type SVGProps } from 'react'
 import {
 	CalendarDays,
 	Check,
@@ -12,8 +12,9 @@ import {
 	Coins,
 	Crown,
 	Dice5,
-	IdCard,
+	Info,
 	MapPin,
+	Package,
 	Plus,
 	Settings,
 	UserRound,
@@ -32,16 +33,18 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import {
-	activityTabs,
 	addons,
-	calendarMonthNames,
-	calendarWeekdays,
-	publishTargetFields,
-	roleFields,
+	getActivityTabs,
+	getCalendarMonthNames,
+	getCalendarWeekdays,
+	getPublishTargetFields,
+	getRoleFields,
 	timeHours,
 	timeMinutes,
 	unrollTemplates,
 } from './create-event-data'
+import { useAppLocale } from '@/components/shell/locale-provider'
+import { t } from '@/lib/i18n'
 import type {
 	CreateEventDraft,
 	EventActivityType,
@@ -67,6 +70,93 @@ import {
 	readNumber,
 	toDateInputValue,
 } from './create-event-utils'
+
+const WOWHEAD_TOOLTIP_SCRIPT_ID = 'raid-reminder-wowhead-tooltips'
+
+type WowheadTooltipSize = 'tiny' | 'small' | 'medium' | 'large'
+
+type WowheadTooltipOptions = {
+	colorLinks?: boolean
+	colorlinks?: boolean
+	iconSize?: WowheadTooltipSize
+	iconizeLinks?: boolean
+	iconizelinks?: boolean
+	renameLinks?: boolean
+	renamelinks?: boolean
+}
+
+type WowheadWindow = Window &
+	typeof globalThis & {
+		$WowheadPower?: {
+			refreshLinks?: (force?: boolean) => void
+		}
+		WH?: {
+			Tooltips?: {
+				refreshLinks?: (force?: boolean) => void
+			}
+		}
+		whTooltips?: WowheadTooltipOptions
+		wowhead_tooltips?: WowheadTooltipOptions
+	}
+
+function configureWowheadTooltips() {
+	const wowheadWindow = window as WowheadWindow
+
+	wowheadWindow.whTooltips = {
+		colorLinks: false,
+		iconSize: 'medium',
+		iconizeLinks: true,
+		renameLinks: false,
+	}
+	wowheadWindow.wowhead_tooltips = {
+		colorlinks: false,
+		iconSize: 'medium',
+		iconizelinks: true,
+		renamelinks: false,
+	}
+}
+
+function refreshWowheadLinks() {
+	const wowheadWindow = window as WowheadWindow
+	const refreshLinks =
+		wowheadWindow.$WowheadPower?.refreshLinks ??
+		wowheadWindow.WH?.Tooltips?.refreshLinks
+
+	refreshLinks?.(true)
+}
+
+function WowheadTooltipLoader({ refreshKey }: { refreshKey: string }) {
+	useEffect(() => {
+		configureWowheadTooltips()
+
+		const existingScript = document.getElementById(WOWHEAD_TOOLTIP_SCRIPT_ID)
+
+		if (existingScript) {
+			refreshWowheadLinks()
+			return
+		}
+
+		const script = document.createElement('script')
+		script.id = WOWHEAD_TOOLTIP_SCRIPT_ID
+		script.async = true
+		script.src = 'https://wow.zamimg.com/js/tooltips.js'
+		script.addEventListener('load', refreshWowheadLinks)
+
+		document.head.append(script)
+
+		return () => {
+			script.removeEventListener('load', refreshWowheadLinks)
+		}
+	}, [])
+
+	useEffect(() => {
+		const refreshTimer = window.setTimeout(refreshWowheadLinks, 80)
+
+		return () => window.clearTimeout(refreshTimer)
+	}, [refreshKey])
+
+	return null
+}
 
 type RoleValidationMap = Record<EventRole, RoleValidationResult>
 
@@ -104,12 +194,13 @@ export function LeaderSection({
 	onManualLeaderRealmChange,
 	selectedCharacter,
 }: LeaderSectionProps) {
+	const locale = useAppLocale()
 	const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false)
 
 	return (
 		<section className={eventUi.panel}>
 			<div className={eventUi.panelHead}>
-				<SectionTitle number={1}>Лидер события</SectionTitle>
+				<SectionTitle number={1}>{t(locale, 'events.sectionLeader')}</SectionTitle>
 			</div>
 
 			<div className={cn(eventUi.grid, 'mt-3 min-[761px]:grid-cols-2')}>
@@ -129,13 +220,13 @@ export function LeaderSection({
 							aria-hidden='true'
 						/>
 						<span>
-							<strong className='text-base font-extrabold text-white'>
-								Мой персонаж
+							<strong className='text-base font-semibold text-white'>
+								{t(locale, 'events.myCharacter')}
 							</strong>
 							<small className='mt-1 block text-sm text-event-copy'>
 								{characters.length > 1
-									? 'Нажмите на карточку, чтобы выбрать другого персонажа'
-									: 'Выберите одного из ваших персонажей'}
+									? t(locale, 'events.myCharacterHintMulti')
+									: t(locale, 'events.myCharacterHintSingle')}
 							</small>
 						</span>
 					</button>
@@ -148,7 +239,7 @@ export function LeaderSection({
 							>
 								<DropdownMenuTrigger asChild>
 									<button
-										aria-label='Выбрать персонажа'
+										aria-label={t(locale, 'events.chooseCharacter')}
 										className={cn(
 											eventUi.characterSelect,
 											eventUi.characterSelectTrigger,
@@ -223,40 +314,43 @@ export function LeaderSection({
 						)
 					) : (
 						<span className={eventUi.emptyNote}>
-							Синхронизируйте персонажа в кабинете
+							{t(locale, 'events.characterSyncHint')}
 						</span>
 					)}
 				</div>
 
 				<div className={eventUi.choiceCard(draft.leaderMode === 'manual')}>
-					<button
-						aria-pressed={draft.leaderMode === 'manual'}
-						className={eventUi.choiceToggle}
-						onClick={() => onLeaderModeChange('manual')}
-						type='button'
-					>
-						<span
-							className={eventUi.choiceRadio(draft.leaderMode === 'manual')}
-							aria-hidden='true'
-						/>
-						<span className={eventUi.choiceTitle}>
-							<strong className='text-base font-extrabold text-white'>
-								Указать вручную
-							</strong>
-							<Badge className={eventUi.premiumBadge} variant='arcane'>
-								<Crown className='size-3' aria-hidden='true' />
-								Premium
-							</Badge>
-							<small className='text-sm text-event-copy'>
-								Укажите данные рейд-лидера вручную
-							</small>
-						</span>
-					</button>
+					<div className={eventUi.choiceHeader}>
+						<button
+							aria-pressed={draft.leaderMode === 'manual'}
+							className={eventUi.choiceToggle}
+							onClick={() => onLeaderModeChange('manual')}
+							type='button'
+						>
+							<span
+								className={eventUi.choiceRadio(draft.leaderMode === 'manual')}
+								aria-hidden='true'
+							/>
+							<span className={eventUi.choiceTitle}>
+								<strong className='text-base font-semibold text-white'>
+									{t(locale, 'events.manualLeader')}
+								</strong>
+								<small className='text-sm text-event-copy'>
+									{t(locale, 'events.manualLeaderHint')}
+								</small>
+							</span>
+						</button>
+						<Badge className={eventUi.premiumBadge} variant='arcane'>
+							<Crown className='size-3' aria-hidden='true' />
+							Premium
+						</Badge>
+					</div>
 
 					<div className={eventUi.inlineFields}>
 						<label>
-							<span>Ник рейд-лидера</span>
+							<span>{t(locale, 'events.leaderName')}</span>
 							<Input
+								className={eventUi.textInput}
 								disabled={draft.leaderMode !== 'manual'}
 								onChange={event =>
 									onManualLeaderNameChange(event.currentTarget.value)
@@ -265,8 +359,9 @@ export function LeaderSection({
 							/>
 						</label>
 						<label>
-							<span>Сервер</span>
+							<span>{t(locale, 'events.leaderRealm')}</span>
 							<Input
+								className={eventUi.textInput}
 								disabled={draft.leaderMode !== 'manual'}
 								onChange={event =>
 									onManualLeaderRealmChange(event.currentTarget.value)
@@ -327,6 +422,9 @@ export function DateTimeSection({
 	onTimePartChange,
 	time,
 }: DateTimeSectionProps) {
+	const locale = useAppLocale()
+	const calendarMonthNames = getCalendarMonthNames(locale)
+	const calendarWeekdays = getCalendarWeekdays(locale)
 	const [isDateCalendarOpen, setIsDateCalendarOpen] = useState(false)
 	const [isTimePickerOpen, setIsTimePickerOpen] = useState(false)
 	const [calendarMonth, setCalendarMonth] = useState(() =>
@@ -346,7 +444,7 @@ export function DateTimeSection({
 
 	return (
 		<section className={eventUi.panel}>
-			<SectionTitle number={2}>Дата и время</SectionTitle>
+			<SectionTitle number={2}>{t(locale, 'events.sectionDateTime')}</SectionTitle>
 			<div className={eventUi.inlineFields}>
 				<div className={eventUi.stackField}>
 					<DropdownMenu
@@ -372,7 +470,7 @@ export function DateTimeSection({
 							<div className={eventUi.calendar}>
 								<div className={eventUi.calendarHead}>
 									<Button
-										aria-label='Предыдущий месяц'
+										aria-label={t(locale, 'events.previousMonth')}
 										className={eventUi.calendarNav}
 										onClick={() =>
 											setCalendarMonth(current => addMonths(current, -1))
@@ -388,7 +486,7 @@ export function DateTimeSection({
 										{calendarMonth.getFullYear()}
 									</strong>
 									<Button
-										aria-label='Следующий месяц'
+										aria-label={t(locale, 'events.nextMonth')}
 										className={eventUi.calendarNav}
 										onClick={() =>
 											setCalendarMonth(current => addMonths(current, 1))
@@ -452,7 +550,7 @@ export function DateTimeSection({
 						>
 							<div className={eventUi.timePicker}>
 								<div className={eventUi.timeColumn}>
-									<span className={eventUi.timeColumnLabel}>Часы</span>
+									<span className={eventUi.timeColumnLabel}>{t(locale, 'events.hours')}</span>
 									<ScrollArea className={eventUi.timeScroll}>
 										<div className={eventUi.timeOptions}>
 											{timeHours.map(hour => (
@@ -472,7 +570,7 @@ export function DateTimeSection({
 									</ScrollArea>
 								</div>
 								<div className={eventUi.timeColumn}>
-									<span className={eventUi.timeColumnLabel}>Минуты</span>
+									<span className={eventUi.timeColumnLabel}>{t(locale, 'events.minutes')}</span>
 									<ScrollArea className={eventUi.timeScroll}>
 										<div className={eventUi.timeOptions}>
 											{timeMinutes.map(minute => (
@@ -498,14 +596,16 @@ export function DateTimeSection({
 			</div>
 			<div className={eventUi.dateShortcuts}>
 				<Button
+					className={eventUi.shortcutButton}
 					onClick={() => setDateTimeFromDate(new Date())}
 					size='sm'
 					type='button'
 					variant='outline'
 				>
-					Сейчас
+					{t(locale, 'common.now')}
 				</Button>
 				<Button
+					className={eventUi.shortcutButton}
 					onClick={() => {
 						const nextDate = new Date()
 						nextDate.setMinutes(nextDate.getMinutes() + 15)
@@ -515,7 +615,7 @@ export function DateTimeSection({
 					type='button'
 					variant='outline'
 				>
-					Через 15 минут
+					{t(locale, 'events.in15Minutes')}
 				</Button>
 			</div>
 		</section>
@@ -535,11 +635,13 @@ export function EventParamsSection({
 	onActivityTypeChange,
 	onAddonChange,
 }: EventParamsSectionProps) {
+	const locale = useAppLocale()
+	const activityTabs = getActivityTabs(locale)
 	const [isAddonMenuOpen, setIsAddonMenuOpen] = useState(false)
 
 	return (
 		<section className={eventUi.panel}>
-			<SectionTitle number={3}>Дополнение</SectionTitle>
+			<SectionTitle number={3}>{t(locale, 'events.sectionAddon')}</SectionTitle>
 			<div className={eventUi.paramsGrid}>
 				<label>
 					<DropdownMenu
@@ -588,7 +690,7 @@ export function EventParamsSection({
 					</DropdownMenu>
 				</label>
 
-				<div className={eventUi.typeTabs} role='group' aria-label='Вид сбора'>
+				<div className={eventUi.typeTabs} role='group' aria-label={t(locale, 'events.activityTypeAria')}>
 					{activityTabs.map(tab => {
 						const Icon = tab.icon
 
@@ -600,7 +702,7 @@ export function EventParamsSection({
 								onClick={() => onActivityTypeChange(tab.type)}
 								type='button'
 							>
-								<Icon className='size-4' aria-hidden='true' />
+								<Icon className='size-4 shrink-0' aria-hidden='true' />
 								{tab.label}
 							</button>
 						)
@@ -626,21 +728,30 @@ export function InstancesSection({
 	selectedInstanceSlugs,
 	selectedInstances,
 }: InstancesSectionProps) {
+	const locale = useAppLocale()
+
 	return (
 		<section className={eventUi.panel}>
 			<div className={eventUi.panelHead}>
-				<div>
-					<SectionTitle number={4}>Инстансы</SectionTitle>
-					<p className={eventUi.copy}>
-						Выберите один или несколько инстансов соответствующего типа.
-					</p>
+				<div className='flex items-center gap-2'>
+					<SectionTitle number={4}>{t(locale, 'events.sectionInstances')}</SectionTitle>
+					<div className={eventUi.infoHintWrapper}>
+						<button
+							aria-label={t(locale, 'events.sectionInstances')}
+							className={eventUi.infoHintTrigger}
+							title={t(locale, 'events.sectionInstances')}
+							type='button'
+						>
+							<Info className='size-3.5' aria-hidden='true' />
+						</button>
+						<span className={eventUi.infoHintBubble} role='tooltip'>
+							{t(locale, 'events.instancesHint')}
+						</span>
+					</div>
 				</div>
-				<span className={eventUi.selectedCount}>
-					Выбрано: {selectedInstances.length}
-				</span>
 			</div>
 
-			<div className={eventUi.chipRow} aria-label='Выбранные инстансы'>
+			<div className={eventUi.chipRow} aria-label={t(locale, 'events.selectedInstancesAria')}>
 				{selectedInstances.map(instance => (
 					<button
 						className={eventUi.selectedChip}
@@ -704,13 +815,27 @@ export function RoleCompositionSection({
 	roleInputValues,
 	roleValidation,
 }: RoleCompositionSectionProps) {
+	const locale = useAppLocale()
+	const roleFields = getRoleFields(locale)
+
 	return (
 		<section className={eventUi.panel}>
-			<SectionTitle number={5}>Состав группы</SectionTitle>
-			<p className={eventUi.copy}>
-				Укажите минимальное и максимальное количество игроков по ролям через
-				тире или одним числом.
-			</p>
+			<div className='flex items-center gap-2'>
+				<SectionTitle number={5}>{t(locale, 'events.sectionRoles')}</SectionTitle>
+				<div className={eventUi.infoHintWrapper}>
+					<button
+						aria-label={t(locale, 'events.sectionRoles')}
+						className={eventUi.infoHintTrigger}
+						title={t(locale, 'events.sectionRoles')}
+						type='button'
+					>
+						<Info className='size-3.5' aria-hidden='true' />
+					</button>
+					<span className={eventUi.infoHintBubble} role='tooltip'>
+						{t(locale, 'events.roleHint')}
+					</span>
+				</div>
+			</div>
 
 			<div className={eventUi.roleGrid}>
 				{roleFields.map(role => {
@@ -722,14 +847,16 @@ export function RoleCompositionSection({
 								<span className={eventUi.roleIcon} aria-hidden='true'>
 									<Image alt='' height={38} src={role.imageSrc} width={38} />
 								</span>
-								<strong className='text-base font-extrabold text-white'>
+								<strong className='text-base font-semibold text-white'>
 									{role.label}
 								</strong>
 							</div>
-							<label className={eventUi.field}>
-								<span>Количество</span>
+							<div className={eventUi.field}>
 								<Input
 									aria-invalid={Boolean(roleError)}
+									aria-label={t(locale, 'events.countForRole', {
+										role: role.label,
+									})}
 									autoComplete='off'
 									className={eventUi.roleInput(Boolean(roleError))}
 									onChange={event =>
@@ -738,7 +865,7 @@ export function RoleCompositionSection({
 									placeholder={role.placeholder}
 									value={roleInputValues[role.key]}
 								/>
-							</label>
+							</div>
 						</div>
 					)
 				})}
@@ -764,16 +891,19 @@ export function PaidSlotsSection({
 	onPaidSlotsChange,
 	onPaidSlotsEnabledChange,
 }: PaidSlotsSectionProps) {
+	const locale = useAppLocale()
+
 	return (
 		<section className={eventUi.panel}>
 			<div className={eventUi.sectionRow}>
 				<div className='flex items-center gap-4 justify-start'>
-					<SectionTitle number={7}>Платные слоты</SectionTitle>
+					<SectionTitle number={7}>{t(locale, 'events.sectionPaidSlots')}</SectionTitle>
 					<Switch
-						aria-label='Включить платные слоты'
+						aria-label={t(locale, 'events.paidSlotsToggle')}
 						checked={draft.hasPaidSlots}
-						className={eventUi.paidSwitch}
+						className={cn(eventUi.paidSwitch, 'origin-left scale-[0.82]')}
 						onCheckedChange={onPaidSlotsEnabledChange}
+						thumbClassName={eventUi.paidSwitchThumb}
 					/>
 				</div>
 				<Badge className={eventUi.premiumBadge} variant='arcane'>
@@ -787,6 +917,7 @@ export function PaidSlotsSection({
 					<span className={eventUi.inputIcon}>
 						<UserRound className='size-4' aria-hidden='true' />
 						<Input
+							className={eventUi.embeddedInput}
 							disabled={!draft.hasPaidSlots}
 							min={0}
 							onChange={event =>
@@ -801,6 +932,7 @@ export function PaidSlotsSection({
 					<span className={eventUi.goldInputIcon}>
 						<Coins className='size-4' aria-hidden='true' />
 						<Input
+							className={eventUi.embeddedInput}
 							disabled={!draft.hasPaidSlots}
 							min={0}
 							onChange={event =>
@@ -829,56 +961,165 @@ export function UnrollSection({
 	onUnrollInputChange,
 	onUnrollTemplateChange,
 }: UnrollSectionProps) {
+	const locale = useAppLocale()
+	const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false)
+	const unrollRefreshKey = draft.unrollItemIds.join(',')
+	const isUnrollDisabled = !draft.hasUnroll
+	const selectedUnrollTemplate =
+		unrollTemplates.find(template => template.id === draft.unrollTemplateId) ?? null
+	const selectedUnrollTemplateLabel =
+		selectedUnrollTemplate?.label ?? t(locale, 'events.unrollTemplateNone')
+
+	useEffect(() => {
+		if (isUnrollDisabled) {
+			setIsTemplateMenuOpen(false)
+		}
+	}, [isUnrollDisabled])
+
 	return (
 		<section className={eventUi.panel}>
-			<SectionTitle number={6}>Анролл</SectionTitle>
-			<label className={eventUi.checkbox}>
-				<input
+			<WowheadTooltipLoader refreshKey={unrollRefreshKey} />
+			<div className='flex items-center gap-4 justify-start'>
+				<SectionTitle number={6}>{t(locale, 'events.sectionUnroll')}</SectionTitle>
+				<Switch
+					aria-label={t(locale, 'events.unrollToggle')}
 					checked={draft.hasUnroll}
-					onChange={event => onUnrollEnabledChange(event.currentTarget.checked)}
-					type='checkbox'
+					className={cn(eventUi.paidSwitch, 'origin-left scale-[0.82]')}
+					onCheckedChange={onUnrollEnabledChange}
+					thumbClassName={eventUi.paidSwitchThumb}
 				/>
-				Есть анролл
-			</label>
-
-			<label className={eventUi.stackField}>
-				<span>ID предметов</span>
-				<Input
-					disabled={!draft.hasUnroll}
-					onChange={event => onUnrollInputChange(event.currentTarget.value)}
-					value={draft.unrollInput}
-				/>
-			</label>
-
-			<div className={eventUi.chipRow}>
-				{draft.unrollItemIds.map(id => (
-					<span className={eventUi.idChip} key={id}>
-						<IdCard className='size-3.5' aria-hidden='true' />
-						ID: {id}
-					</span>
-				))}
 			</div>
 
-			<div className={eventUi.templateSplit}>
-				<span>или</span>
-			</div>
+			<div
+				aria-disabled={isUnrollDisabled}
+				className={cn(isUnrollDisabled && eventUi.unrollControlsDisabled)}
+			>
+				<label className={eventUi.stackField}>
+					<span>{t(locale, 'events.unrollItemIds')}</span>
+					<Input
+						className={eventUi.textInput}
+						disabled={isUnrollDisabled}
+						onChange={event => onUnrollInputChange(event.currentTarget.value)}
+						value={draft.unrollInput}
+					/>
+				</label>
 
-			<label className={eventUi.stackField}>
-				<span>Шаблон</span>
-				<select
-					className={eventUi.select}
-					disabled={!draft.hasUnroll}
-					onChange={event => onUnrollTemplateChange(event.currentTarget.value)}
-					value={draft.unrollTemplateId}
-				>
-					<option value='custom'>Без шаблона</option>
-					{unrollTemplates.map(template => (
-						<option key={template.id} value={template.id}>
-							{template.label}
-						</option>
+				<div className={eventUi.itemIconRow}>
+					{draft.unrollItemIds.map(id => (
+						<a
+							aria-disabled={isUnrollDisabled}
+							aria-label={t(locale, 'events.wowheadItem', { id })}
+							className={eventUi.itemIconLink}
+							data-wh-icon-size='medium'
+							data-wh-iconize-link='true'
+							data-wh-rename-link='false'
+							data-wowhead={`item=${id}${locale === 'ru' ? '&domain=ru' : ''}`}
+							href={
+								isUnrollDisabled
+									? undefined
+									: `https://www.wowhead.com/${locale === 'ru' ? 'ru/' : ''}item=${id}`
+							}
+							key={id}
+							rel={isUnrollDisabled ? undefined : 'noreferrer'}
+							tabIndex={isUnrollDisabled ? -1 : undefined}
+							target={isUnrollDisabled ? undefined : '_blank'}
+						>
+							<span className={eventUi.itemIconFallback} aria-hidden='true'>
+								<Package className='size-4' />
+							</span>
+							<span className='sr-only'>{t(locale, 'events.itemId', { id })}</span>
+						</a>
 					))}
-				</select>
-			</label>
+				</div>
+
+				<div className={eventUi.templateSplit}>
+					<span>{t(locale, 'events.or')}</span>
+				</div>
+
+				<div className={eventUi.stackField}>
+					<div className={eventUi.unrollTemplateHeader}>
+						<span>{t(locale, 'events.unrollTemplate')}</span>
+						<button
+							aria-label={t(locale, 'events.unrollTemplateEdit')}
+							className={eventUi.unrollTemplateEditButton}
+							disabled={isUnrollDisabled}
+							title={t(locale, 'events.unrollTemplateSoon')}
+							type='button'
+						>
+							<Settings className='size-4' aria-hidden='true' />
+						</button>
+					</div>
+					<DropdownMenu
+						onOpenChange={open => {
+							setIsTemplateMenuOpen(isUnrollDisabled ? false : open)
+						}}
+						open={isTemplateMenuOpen}
+					>
+						<DropdownMenuTrigger asChild>
+							<button
+								aria-label={t(locale, 'events.unrollTemplateSelect')}
+								className={eventUi.unrollTemplateTrigger}
+								disabled={isUnrollDisabled}
+								type='button'
+							>
+								<span className='truncate'>{selectedUnrollTemplateLabel}</span>
+								<ChevronDown className='size-4' aria-hidden='true' />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align='start'
+							className={eventUi.unrollTemplateDropdown}
+							sideOffset={6}
+						>
+							<ScrollArea className={eventUi.unrollTemplateScroll}>
+								<div className={eventUi.unrollTemplateOptions}>
+									<button
+										className={eventUi.unrollTemplateOption(
+											draft.unrollTemplateId === 'custom',
+										)}
+										onClick={() => {
+											onUnrollTemplateChange('custom')
+											setIsTemplateMenuOpen(false)
+										}}
+										type='button'
+									>
+										<span className='block truncate text-sm font-semibold text-white'>
+											{t(locale, 'events.unrollTemplateNone')}
+										</span>
+									</button>
+									{unrollTemplates.map(template => {
+										const isSelected = draft.unrollTemplateId === template.id
+
+										return (
+											<button
+												className={eventUi.unrollTemplateOption(isSelected)}
+												key={template.id}
+												onClick={() => {
+													onUnrollTemplateChange(template.id)
+													setIsTemplateMenuOpen(false)
+												}}
+												type='button'
+											>
+												<span className='grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
+													<span className='block truncate text-sm font-semibold text-white'>
+														{template.label}
+													</span>
+													{isSelected ? (
+														<Check
+															aria-hidden='true'
+															className='size-4 text-[#d7b6ff]'
+														/>
+													) : null}
+												</span>
+											</button>
+										)
+									})}
+								</div>
+							</ScrollArea>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+			</div>
 		</section>
 	)
 }
@@ -900,14 +1141,17 @@ export function EventPreviewCard({
 	selectedInstances,
 	selectedTemplate,
 }: EventPreviewCardProps) {
+	const locale = useAppLocale()
+	const activityTabs = getActivityTabs(locale)
+
 	return (
 		<section className={eventUi.previewCard}>
 			<div className={eventUi.previewHead}>
 				<span className={eventUi.previewIcon}>
 					<Dice5 className='size-5' aria-hidden='true' />
 				</span>
-				<h2 className='font-serif text-[1.18rem] font-bold leading-none text-white'>
-					Предпросмотр события
+				<h2 className='font-serif text-[1.12rem] font-semibold leading-none text-white'>
+					{t(locale, 'events.sectionPreview')}
 				</h2>
 			</div>
 
@@ -919,13 +1163,14 @@ export function EventPreviewCard({
 					src={previewInstance.artPath}
 					priority
 				/>
-				<span className={eventUi.previewCoverOverlay} aria-hidden='true' />
 				<div className={eventUi.previewCoverText}>
 					<strong className={eventUi.previewCoverTitle}>
 						{activityTabs.find(tab => tab.type === draft.activityType)?.label}
 					</strong>
 					<span className={eventUi.previewCoverValue}>
-						{selectedInstances.length} инст.
+						{t(locale, 'events.previewInstancesCount', {
+							count: selectedInstances.length,
+						})}
 					</span>
 				</div>
 			</div>
@@ -933,53 +1178,59 @@ export function EventPreviewCard({
 			<div className={eventUi.previewSummary}>
 				<div className={eventUi.previewSummaryItem}>
 					<UserRound className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Лидер</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewLeader')}</span>
 					<strong className={eventUi.previewSummaryValue}>
-						{leaderName || 'Не указан'}
+						{leaderName || t(locale, 'events.previewNotSet')}
 						{leaderRealm ? ` · ${leaderRealm}` : ''}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
 					<CalendarDays className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Дата и время</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewDateTime')}</span>
 					<strong className={eventUi.previewSummaryValue}>
-						{formatDate(draft.date)} в {draft.time}
+						{formatDate(draft.date)} {locale === 'ru' ? 'в' : 'at'} {draft.time}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
 					<MapPin className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Инстансы</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewInstances')}</span>
 					<strong className={eventUi.previewSummaryValue}>
-						{selectedInstances.length} выбрано
+						{t(locale, 'events.previewSelectedCount', {
+							count: selectedInstances.length,
+						})}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
 					<UsersRound className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Состав группы</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewComposition')}</span>
 					<strong className={eventUi.previewSummaryValue}>
-						Танки {formatRange(draft.roles.tank)} · Хиллеры{' '}
-						{formatRange(draft.roles.healer)} · Дамагеры{' '}
+						{t(locale, 'events.roleTanks')} {formatRange(draft.roles.tank)} · {t(locale, 'events.roleHealers')}{' '}
+						{formatRange(draft.roles.healer)} · {t(locale, 'events.roleDamage')}{' '}
 						{formatRange(draft.roles.damage)}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
 					<Coins className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Платные слоты</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewPaidSlots')}</span>
 					<strong className={eventUi.previewSummaryValue}>
 						{draft.hasPaidSlots
-							? `${draft.paidSlots} слота, ${formatGold(draft.paidSlotPrice)} золота`
-							: 'Нет'}
+							? locale === 'ru'
+								? `${draft.paidSlots} слота, ${formatGold(draft.paidSlotPrice, locale)} золота`
+								: `${draft.paidSlots} slots, ${formatGold(draft.paidSlotPrice, locale)} gold`
+							: t(locale, 'events.previewNo')}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
 					<Dice5 className='size-4' aria-hidden='true' />
-					<span className={eventUi.previewSummaryLabel}>Анролл</span>
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewUnroll')}</span>
 					<strong className={eventUi.previewSummaryValue}>
 						{draft.hasUnroll
-							? `${draft.unrollItemIds.length} ID${
+							? `${t(locale, 'events.previewUnrollIds', {
+									count: draft.unrollItemIds.length,
+								})}${
 									selectedTemplate ? ` · ${selectedTemplate.label}` : ''
 								}`
-							: 'Нет'}
+							: t(locale, 'events.previewNo')}
 					</strong>
 				</div>
 			</div>
@@ -996,9 +1247,12 @@ export function PublishTargetsBar({
 	onTargetToggle,
 	publishTargets,
 }: PublishTargetsBarProps) {
+	const locale = useAppLocale()
+	const publishTargetFields = getPublishTargetFields(locale)
+
 	return (
-		<section className={eventUi.publishBox} aria-label='Каналы публикации'>
-			<div className={eventUi.publishTargets} aria-label='Каналы публикации'>
+		<section className={eventUi.publishBox} aria-label={t(locale, 'events.publishChannelsAria')}>
+			<div className={eventUi.publishTargets} aria-label={t(locale, 'events.publishChannelsAria')}>
 				{publishTargetFields.map(target => {
 					const Icon = publishIconComponents[target.icon]
 					const isChecked = publishTargets[target.key]
@@ -1027,7 +1281,7 @@ export function PublishTargetsBar({
 				})}
 			</div>
 			<Button
-				aria-label='Настроить каналы публикации'
+				aria-label={t(locale, 'events.publishChannelsSettings')}
 				className={eventUi.publishSettings}
 				size='icon'
 				type='button'

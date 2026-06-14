@@ -1,6 +1,7 @@
 import Image from "next/image";
+import { t, type AppLocale } from "@/lib/i18n";
 
-export function RaidCheckHero() {
+export function RaidCheckHero({ locale }: { locale: AppLocale }) {
   return (
     <section className="raidcheck-hero" aria-labelledby="raidcheck-title">
       <Image
@@ -14,13 +15,9 @@ export function RaidCheckHero() {
       <div className="raidcheck-hero-overlay" aria-hidden="true" />
 
       <div className="raidcheck-hero-content">
-        <div className="eyebrow">Raid lockout intelligence</div>
-        <h1 id="raidcheck-title">Проверка кд рейда</h1>
-        <p>
-          Вставьте строку из аддона, выберите сложность и проверьте весь состав
-          перед стартом. RaidReminder покажет, кто уже убивал боссов на этой
-          неделе.
-        </p>
+        <div className="eyebrow">{t(locale, "raidcheck.heroEyebrow")}</div>
+        <h1 id="raidcheck-title">{t(locale, "raidcheck.title")}</h1>
+        <p>{t(locale, "raidcheck.heroCopy")}</p>
       </div>
     </section>
   );

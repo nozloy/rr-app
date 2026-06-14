@@ -15,7 +15,12 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { currentRaidInstances, type RaidDefinition } from "@/lib/raids";
+import { t, type AppLocale } from "@/lib/i18n";
+import {
+  currentRaidInstances,
+  getLocalizedRaidName,
+  type RaidDefinition,
+} from "@/lib/raids";
 
 const raidBySlug = new Map(currentRaidInstances.map((raid) => [raid.slug, raid]));
 
@@ -63,6 +68,43 @@ export const dashboardActions: DashboardAction[] = [
   },
 ];
 
+export function getDashboardSidebarStats(locale: AppLocale) {
+  return [
+    { label: t(locale, "dashboard.characters"), value: "auto", icon: Sparkles, tone: "silver" },
+    { label: t(locale, "dashboard.futureActivities"), value: "4", icon: Shield, tone: "violet" },
+    { label: t(locale, "dashboard.finishedWeek"), value: "8", icon: Trophy, tone: "gold" },
+    { label: t(locale, "dashboard.raidProgress"), value: "58%", icon: Flame, tone: "blue" },
+  ] as const;
+}
+
+export function getDashboardActions(locale: AppLocale): DashboardAction[] {
+  return [
+    {
+      href: "/banners/new",
+      icon: Swords,
+      label: t(locale, "dashboard.createBanner"),
+      variant: "primary",
+    },
+    {
+      icon: UsersRound,
+      label: t(locale, "dashboard.findGroup"),
+      variant: "outline",
+    },
+    {
+      href: "/raidcheck",
+      icon: Search,
+      label: t(locale, "dashboard.raidCheck"),
+      variant: "outline",
+    },
+    {
+      href: "/banners/import",
+      icon: Download,
+      label: t(locale, "dashboard.addonImport"),
+      variant: "outline",
+    },
+  ];
+}
+
 export const raidProgressCards = [
   {
     raid: dashboardRaid("march-on-queldanas", 0),
@@ -88,7 +130,25 @@ export const raidProgressCards = [
     total: 43,
     rewards: "2/12",
   },
+  {
+    raid: dashboardRaid("sporefall", 3),
+    normal: 1,
+    heroic: 0,
+    mythic: 0,
+    total: 25,
+    rewards: "1/1",
+  },
 ];
+
+export function getRaidProgressCards(locale: AppLocale) {
+  return raidProgressCards.map((card) => ({
+    ...card,
+    raid: {
+      ...card.raid,
+      name: getLocalizedRaidName(card.raid, locale),
+    },
+  }));
+}
 
 export const upcomingActivities = [
   {
@@ -109,7 +169,7 @@ export const upcomingActivities = [
     role: "DPS",
     party: "4/5",
     reward: "5 000",
-    icon: "/dungeons/Magisters_Terrace_styled_16x9.jpg",
+    icon: "/dungeons/Magisters_Terrace_styled_16x9.webp",
   },
   {
     title: "Провал снов (Mythic)",
@@ -148,7 +208,7 @@ export const pastActivities = [
     party: "5/5",
     reward: "5 000",
     status: "Завершено",
-    icon: "/dungeons/Pit_of_Saron_styled_16x9.jpg",
+    icon: "/dungeons/Pit_of_Saron_styled_16x9.webp",
   },
   {
     title: "Шпиль Бездны (Normal)",
@@ -204,7 +264,7 @@ export const achievements = [
     title: "Мифический ключник",
     text: "Пройдите 15 ключей 15+",
     date: "20.05.2026",
-    icon: "/dungeons/Nexus_Point_Xenas_styled_16x9.jpg",
+    icon: "/dungeons/Nexus_Point_Xenas_styled_16x9.webp",
   },
   {
     title: "Коллекционер зверей",

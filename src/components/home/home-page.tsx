@@ -4,22 +4,25 @@ import { HeroSection } from "@/components/home/hero-section";
 import { RaidSection } from "@/components/home/raid-section";
 import { SiteFooter } from "@/components/home/site-footer";
 import { AppHeader } from "@/components/shell/app-header";
+import { getRequestLocale } from "@/lib/i18n-server";
 
-export function HomePage() {
+export async function HomePage() {
+  const locale = await getRequestLocale();
+
   return (
     <main className="home-page" id="top">
       <div className="home-hero-shell">
         <AppHeader />
-        <HeroSection />
+        <HeroSection locale={locale} />
       </div>
 
       <div className="home-content">
-        <RaidSection />
-        <ActivityStrip />
-        <FeatureTiles />
+        <RaidSection locale={locale} />
+        <ActivityStrip locale={locale} />
+        <FeatureTiles locale={locale} />
       </div>
 
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </main>
   );
 }

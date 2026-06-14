@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ChevronRight, Gift } from "lucide-react";
-import { raidProgressCards } from "@/components/dashboard/data";
+import { getRaidProgressCards } from "@/components/dashboard/data";
+import { t, type AppLocale } from "@/lib/i18n";
 
 function ProgressLine({
   label,
@@ -24,13 +25,15 @@ function ProgressLine({
   );
 }
 
-export function RaidProgress() {
+export function RaidProgress({ locale }: { locale: AppLocale }) {
+  const raidProgressCards = getRaidProgressCards(locale);
+
   return (
     <section className="dashboard-panel dashboard-raid-progress">
       <div className="dashboard-panel-heading">
-        <h2>Прогресс в рейдах</h2>
+        <h2>{t(locale, "dashboard.raidProgressTitle")}</h2>
         <a href="#raid-progress">
-          Подробная статистика
+          {t(locale, "dashboard.detailedStats")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </a>
       </div>
@@ -48,9 +51,11 @@ export function RaidProgress() {
               <ProgressLine label="HEROIC" tone="heroic" value={heroic} />
               <ProgressLine label="MYTHIC" tone="mythic" value={mythic} />
               <div className="dashboard-raid-progress-footer">
-                <span>Общий прогресс: <strong>{total}%</strong></span>
                 <span>
-                  Награды: {rewards}
+                  {t(locale, "dashboard.overallProgress")}: <strong>{total}%</strong>
+                </span>
+                <span>
+                  {t(locale, "dashboard.rewards")}: {rewards}
                   <Gift className="size-4" aria-hidden="true" />
                 </span>
               </div>

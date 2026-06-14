@@ -5,10 +5,12 @@ import { Button, type ButtonProps } from "@/components/ui/button";
 
 type LoginButtonProps = Omit<ButtonProps, "children" | "onClick" | "type"> & {
   disabled?: boolean;
+  label?: string;
 };
 
 export function LoginButton({
   disabled = false,
+  label = "Войти через Battle.net",
   size = "lg",
   variant,
   ...props
@@ -23,7 +25,7 @@ export function LoginButton({
       {...props}
     >
       <span className="battle-net-login-icon" aria-hidden="true" />
-      Войти через Battle.net
+      {label}
     </Button>
   );
 }

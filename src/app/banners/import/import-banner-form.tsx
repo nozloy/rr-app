@@ -12,12 +12,20 @@ import {
 import { CopyImageButton } from "@/components/copy-image-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AddonExportParseError,
-  LEGACY_RAID_GOAL_LABEL,
+  getLegacyRaidGoalLabel,
   getImportedBannerDraftFromExport,
   getImportedBannerImageUrl,
   getImportedRaidDisplayMode,
@@ -26,17 +34,20 @@ import {
   type AddonRole,
   type ImportedBannerDraft,
 } from "@/lib/addon-export";
-import type { DungeonDefinition } from "@/lib/dungeons";
+import { getLocalizedDungeonName, type DungeonDefinition } from "@/lib/dungeons";
+import { t, type AppLocale } from "@/lib/i18n";
 import {
   getRaidArmorSummary,
   getRaidCompositionAnalysis,
   getRaidRecruitmentNeedsLabel,
 } from "@/lib/raid-composition";
+import { getLocalizedRaidName } from "@/lib/raids";
 import { formatItemLevel } from "@/lib/utils";
 
 type ImportBannerFormProps = {
   dungeons: DungeonDefinition[];
   initialExportString: string;
+  locale: AppLocale;
 };
 
 type InitialState = {
@@ -48,30 +59,40 @@ type ScannerControls = {
   stop: () => void;
 };
 
-const groupLabels: Record<AddonGroupType, string> = {
-  solo: "Соло",
-  party: "Группа",
-  raid: "Рейд",
-};
+function getGroupLabels(locale: AppLocale): Record<AddonGroupType, string> {
+  return {
+    solo: t(locale, "banners.groupTypeSolo"),
+    party: t(locale, "banners.groupTypeParty"),
+    raid: t(locale, "banners.groupTypeRaid"),
+  };
+}
 
-const roleLabels: Record<AddonRole, string> = {
-  TANK: "Танк",
-  HEALER: "Хилл",
-  DAMAGER: "ДД",
-  NONE: "Без роли",
-};
+function getRoleLabels(locale: AppLocale): Record<AddonRole, string> {
+  return {
+    TANK: t(locale, "banners.roleTank"),
+    HEALER: t(locale, "banners.roleHealer"),
+    DAMAGER: t(locale, "banners.roleDamage"),
+    NONE: t(locale, "banners.roleNone"),
+  };
+}
 
 const raidTankNeedOptions = [0, 1, 2];
 const raidHealerNeedOptions = Array.from({ length: 11 }, (_, index) => index);
+const formSelectTriggerClassName =
+  "min-h-10 border-input bg-[rgba(8,13,20,0.72)] text-foreground";
+const choiceCardClassName =
+  "flex min-h-14 cursor-pointer items-center gap-3 rounded-[0.9rem] border border-[var(--line)] bg-white/[0.03] px-[0.95rem] py-[0.85rem] text-[#dce5f0] transition-colors hover:border-slate-200/30 hover:bg-white/[0.055]";
+const choiceCheckboxClassName =
+  "border-slate-300/55 data-[state=checked]:border-slate-100 data-[state=checked]:bg-slate-100 data-[state=checked]:text-slate-950";
 
-function parseInitialExportString(value: string): InitialState {
+function parseInitialExportString(value: string, locale: AppLocale): InitialState {
   if (!value.trim()) {
     return { draft: null, error: null };
   }
 
   try {
     return {
-      draft: getImportedBannerDraftFromExport(parseAddonExportString(value)),
+      draft: getImportedBannerDraftFromExport(parseAddonExportString(value, locale)),
       error: null,
     };
   } catch (error) {
@@ -80,7 +101,7 @@ function parseInitialExportString(value: string): InitialState {
       error:
         error instanceof AddonExportParseError
           ? error.message
-          : "Не удалось прочитать строку экспорта.",
+          : t(locale, "addonExport.parseError"),
     };
   }
 }
@@ -95,8 +116,11 @@ function clampNumber(value: string, min: number, max: number, fallback: number) 
 export function ImportBannerForm({
   dungeons,
   initialExportString,
+  locale,
 }: ImportBannerFormProps) {
-  const initialState = parseInitialExportString(initialExportString);
+  const groupLabels = getGroupLabels(locale);
+  const roleLabels = getRoleLabels(locale);
+  const initialState = parseInitialExportString(initialExportString, locale);
   const [exportText, setExportText] = useState(initialExportString);
   const [draft, setDraft] = useState<ImportedBannerDraft | null>(
     initialState.draft,
@@ -109,7 +133,7 @@ export function ImportBannerForm({
 
   const applyImportText = useCallback((value: string) => {
     try {
-      const parsed = parseAddonExportString(value);
+      const parsed = parseAddonExportString(value, locale);
       setDraft(getImportedBannerDraftFromExport(parsed));
       setError(null);
       return true;
@@ -118,11 +142,11 @@ export function ImportBannerForm({
       setError(
         caughtError instanceof AddonExportParseError
           ? caughtError.message
-          : "Не удалось прочитать строку экспорта.",
+          : t(locale, "addonExport.parseError"),
       );
       return false;
     }
-  }, []);
+  }, [locale]);
 
   const stopScanner = useCallback(() => {
     scannerControlsRef.current?.stop();
@@ -138,20 +162,24 @@ export function ImportBannerForm({
       !navigator.mediaDevices?.getUserMedia
     ) {
       setScannerError(
-        "Камера недоступна в этом браузере. Вставьте строку вручную или откройте страницу в мобильном браузере.",
+        locale === "ru"
+          ? "Камера недоступна в этом браузере. Вставьте строку вручную или откройте страницу в мобильном браузере."
+          : "Camera is unavailable in this browser. Paste export manually or open the page on mobile.",
       );
       return;
     }
 
     if (!window.isSecureContext) {
       setScannerError(
-        "Сканирование QR работает только через HTTPS или localhost. Откройте защищенную версию страницы.",
+        locale === "ru"
+          ? "Сканирование QR работает только через HTTPS или localhost. Откройте защищенную версию страницы."
+          : "QR scanner works only over HTTPS or localhost. Open secure page URL.",
       );
       return;
     }
 
     setIsScanning(true);
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     if (!isScanning) {
@@ -201,7 +229,9 @@ export function ImportBannerForm({
       } catch {
         if (!canceled) {
           setScannerError(
-            "Камера недоступна. Разрешите доступ к камере в браузере/настройках и попробуйте еще раз.",
+            locale === "ru"
+              ? "Камера недоступна. Разрешите доступ к камере в браузере/настройках и попробуйте еще раз."
+              : "Camera is unavailable. Allow camera access in browser/settings and try again.",
           );
           setIsScanning(false);
         }
@@ -215,7 +245,7 @@ export function ImportBannerForm({
       scannerControlsRef.current?.stop();
       scannerControlsRef.current = null;
     };
-  }, [applyImportText, isScanning]);
+  }, [applyImportText, isScanning, locale]);
 
   function handleImport() {
     applyImportText(exportText);
@@ -230,7 +260,7 @@ export function ImportBannerForm({
   const selectedDungeon = draft
     ? dungeons.find((dungeon) => dungeon.slug === draft.dungeonSlug)
     : null;
-  const raidDisplayMode = draft ? getImportedRaidDisplayMode(draft) : null;
+  const raidDisplayMode = draft ? getImportedRaidDisplayMode(draft, locale) : null;
   const selectedRaid = raidDisplayMode?.raid ?? null;
   const isLegacyRaid = raidDisplayMode?.bannerVariant === "legacyRaid";
   const isCurrentRaid = raidDisplayMode?.bannerVariant === "currentRaid";
@@ -253,9 +283,14 @@ export function ImportBannerForm({
   const activityName =
     isLegacyRaid && raidDisplayMode
       ? raidDisplayMode.activityName
-      : selectedRaid?.name ?? selectedDungeon?.name ?? "Подземелье";
-  const characterNameLabel =
-    draft?.source.groupType === "raid" ? "Рейдлидер" : "Персонаж";
+      : selectedRaid
+        ? getLocalizedRaidName(selectedRaid, locale)
+        : selectedDungeon
+          ? getLocalizedDungeonName(selectedDungeon, locale)
+          : t(locale, "events.typeDungeon");
+  const characterNameLabel = draft?.source.groupType === "raid"
+    ? (locale === "ru" ? "Рейдлидер" : "Raid leader")
+    : (locale === "ru" ? "Персонаж" : "Character");
   const showCharacterMetaControls = !isLegacyRaid;
   const showMythicPlusControls = !isLegacyRaid && !isCurrentRaid;
   const showRaidNeedsControls = isCurrentRaid;
@@ -266,27 +301,28 @@ export function ImportBannerForm({
         <CardContent className="space-y-7 p-6">
           <div className="space-y-4">
             <div>
-              <div className="eyebrow">Источник</div>
-              <h2 className="section-title mt-3">Данные из аддона</h2>
+              <div className="eyebrow">{t(locale, "banners.source")}</div>
+              <h2 className="section-title mt-3">{t(locale, "banners.addonData")}</h2>
               <p className="subtle mt-3 mb-0 leading-7">
-                Вставьте строку как есть. После распознавания черновик можно
-                спокойно поправить вручную.
+                {locale === "ru"
+                  ? "Вставьте строку как есть. После распознавания черновик можно спокойно поправить вручную."
+                  : "Paste export as-is. After parsing, you can safely edit draft fields."}
               </p>
             </div>
 
             <label className="grid gap-2">
-              <span className="field-label">Строка RaidReminder</span>
+              <span className="field-label">{t(locale, "banners.exportString")}</span>
               <Textarea
                 className="min-h-40 resize-y font-mono text-sm"
                 onChange={(event) => setExportText(event.currentTarget.value)}
-                placeholder="RR1?name=... или RRQ1?..."
+                placeholder={locale === "ru" ? "RR1?name=... или RRQ1?..." : "RR1?name=... or RRQ1?..."}
                 value={exportText}
               />
             </label>
 
             <div className="action-row">
               <Button onClick={handleImport} type="button">
-                Импортировать
+                {t(locale, "banners.importButton")}
               </Button>
               <Button
                 onClick={() => {
@@ -299,7 +335,7 @@ export function ImportBannerForm({
                 type="button"
                 variant="outline"
               >
-                Очистить
+                {t(locale, "banners.clearButton")}
               </Button>
               <Button
                 onClick={isScanning ? stopScanner : startScanner}
@@ -307,7 +343,7 @@ export function ImportBannerForm({
                 variant="outline"
               >
                 <Camera className="size-4" aria-hidden="true" />
-                {isScanning ? "Остановить сканер" : "Сканировать QR"}
+                {isScanning ? t(locale, "banners.stopScanner") : t(locale, "banners.scanQr")}
               </Button>
             </div>
 
@@ -329,11 +365,13 @@ export function ImportBannerForm({
 
           {draft ? (
             <div className="grid gap-6 border-t border-border pt-7">
-              <div>
-                <div className="eyebrow">Черновик</div>
-                <h2 className="section-title mt-3">Проверьте данные</h2>
+                <div>
+                <div className="eyebrow">{t(locale, "banners.draft")}</div>
+                <h2 className="section-title mt-3">{t(locale, "banners.checkData")}</h2>
                 <p className="field-hint mt-2">
-                  Эти значения попадут в превью и итоговый баннер.
+                  {locale === "ru"
+                    ? "Эти значения попадут в превью и итоговый баннер."
+                    : "These values are used for preview and final banner."}
                 </p>
               </div>
 
@@ -349,7 +387,7 @@ export function ImportBannerForm({
                 </label>
 
                 <label className="grid gap-2">
-                  <span className="field-label">Реалм</span>
+                  <span className="field-label">{t(locale, "common.realm")}</span>
                   <Input
                     onChange={(event) =>
                       updateDraft({ realm: event.currentTarget.value })
@@ -361,7 +399,7 @@ export function ImportBannerForm({
                 {showCharacterMetaControls ? (
                   <>
                     <label className="grid gap-2">
-                      <span className="field-label">Класс</span>
+                      <span className="field-label">{locale === "ru" ? "Класс" : "Class"}</span>
                       <Input
                         onChange={(event) =>
                           updateDraft({ className: event.currentTarget.value })
@@ -371,7 +409,7 @@ export function ImportBannerForm({
                     </label>
 
                     <label className="grid gap-2">
-                      <span className="field-label">Спек</span>
+                      <span className="field-label">{locale === "ru" ? "Спек" : "Spec"}</span>
                       <Input
                         onChange={(event) =>
                           updateDraft({ spec: event.currentTarget.value || null })
@@ -405,24 +443,26 @@ export function ImportBannerForm({
                 {showMythicPlusControls ? (
                   <>
                     <label className="grid gap-2">
-                      <span className="field-label">Подземелье</span>
-                      <select
-                        className="native-select"
-                        onChange={(event) =>
-                          updateDraft({ dungeonSlug: event.currentTarget.value })
-                        }
+                      <span className="field-label">{t(locale, "events.typeDungeon")}</span>
+                      <Select
+                        onValueChange={(value) => updateDraft({ dungeonSlug: value })}
                         value={draft.dungeonSlug}
                       >
+                        <SelectTrigger className={formSelectTriggerClassName}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
                         {dungeons.map((dungeon) => (
-                          <option key={dungeon.slug} value={dungeon.slug}>
-                            {dungeon.name}
-                          </option>
+                          <SelectItem key={dungeon.slug} value={dungeon.slug}>
+                            {getLocalizedDungeonName(dungeon, locale)}
+                          </SelectItem>
                         ))}
-                      </select>
+                        </SelectContent>
+                      </Select>
                     </label>
 
                     <label className="grid gap-2">
-                      <span className="field-label">Уровень ключа</span>
+                      <span className="field-label">{locale === "ru" ? "Уровень ключа" : "Keystone level"}</span>
                       <Input
                         max={30}
                         min={2}
@@ -443,27 +483,31 @@ export function ImportBannerForm({
                     </label>
 
                     <label className="grid gap-2">
-                      <span className="field-label">Сколько ДД уже есть</span>
-                      <select
-                        className="native-select"
-                        onChange={(event) =>
+                      <span className="field-label">{locale === "ru" ? "Сколько ДД уже есть" : "DPS already filled"}</span>
+                      <Select
+                        onValueChange={(value) =>
                           updateDraft({
                             dpsFilled: clampNumber(
-                              event.currentTarget.value,
+                              value,
                               0,
                               3,
                               0,
                             ),
                           })
                         }
-                        value={draft.dpsFilled}
+                        value={String(draft.dpsFilled)}
                       >
+                        <SelectTrigger className={formSelectTriggerClassName}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
                         {[0, 1, 2, 3].map((value) => (
-                          <option key={value} value={value}>
+                          <SelectItem key={value} value={String(value)}>
                             {value}
-                          </option>
+                          </SelectItem>
                         ))}
-                      </select>
+                        </SelectContent>
+                      </Select>
                     </label>
                   </>
                 ) : null}
@@ -471,59 +515,68 @@ export function ImportBannerForm({
                 {showRaidNeedsControls ? (
                   <div className="grid gap-5 rounded-3xl border border-border bg-background/35 p-5 md:col-span-2 md:grid-cols-2">
                     <div className="md:col-span-2">
-                      <div className="eyebrow">Нужно в рейд</div>
+                      <div className="eyebrow">{locale === "ru" ? "Нужно в рейд" : "Raid needs"}</div>
                       <p className="field-hint mt-2">
-                        Эти значения задаются вручную и не считаются из состава
-                        аддона.
+                        {locale === "ru"
+                          ? "Эти значения задаются вручную и не считаются из состава аддона."
+                          : "These values are manual and not inferred from addon roster."}
                       </p>
                     </div>
 
                     <label className="grid gap-2">
-                      <span className="field-label">Танков нужно</span>
-                      <select
-                        className="native-select"
-                        onChange={(event) =>
+                      <span className="field-label">{locale === "ru" ? "Танков нужно" : "Tanks needed"}</span>
+                      <Select
+                        onValueChange={(value) =>
                           updateDraft({
                             raidTankNeeded: clampNumber(
-                              event.currentTarget.value,
+                              value,
                               0,
                               2,
                               0,
                             ),
                           })
                         }
-                        value={draft.raidTankNeeded}
+                        value={String(draft.raidTankNeeded)}
                       >
+                        <SelectTrigger className={formSelectTriggerClassName}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
                         {raidTankNeedOptions.map((value) => (
-                          <option key={value} value={value}>
+                          <SelectItem key={value} value={String(value)}>
                             {value}
-                          </option>
+                          </SelectItem>
                         ))}
-                      </select>
+                        </SelectContent>
+                      </Select>
                     </label>
 
                     <label className="grid gap-2">
-                      <span className="field-label">Хилов нужно</span>
-                      <select
-                        className="native-select"
-                        onChange={(event) =>
+                      <span className="field-label">{locale === "ru" ? "Хилов нужно" : "Healers needed"}</span>
+                      <Select
+                        onValueChange={(value) =>
                           updateDraft({
                             raidHealerNeeded: clampNumber(
-                              event.currentTarget.value,
+                              value,
                               0,
                               10,
                               0,
                             ),
                           })
                         }
-                        value={draft.raidHealerNeeded}
+                        value={String(draft.raidHealerNeeded)}
                       >
+                        <SelectTrigger className={formSelectTriggerClassName}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
                         {raidHealerNeedOptions.map((value) => (
-                          <option key={value} value={value}>
+                          <SelectItem key={value} value={String(value)}>
                             {value}
-                          </option>
+                          </SelectItem>
                         ))}
-                      </select>
+                        </SelectContent>
+                      </Select>
                     </label>
                   </div>
                 ) : null}
@@ -531,56 +584,50 @@ export function ImportBannerForm({
 
               {showMythicPlusControls ? (
                 <div className="choice-grid">
-                  <label className="check-card">
-                    <input
+                  <label className={choiceCardClassName}>
+                    <Checkbox
+                      className={choiceCheckboxClassName}
                       checked={draft.tankFilled}
-                      onChange={(event) =>
-                        updateDraft({ tankFilled: event.currentTarget.checked })
-                      }
-                      type="checkbox"
+                      onCheckedChange={(checked) => updateDraft({ tankFilled: checked === true })}
                     />
-                    <span>Танк уже есть</span>
+                    <span>{locale === "ru" ? "Танк уже есть" : "Tank filled"}</span>
                   </label>
-                  <label className="check-card">
-                    <input
+                  <label className={choiceCardClassName}>
+                    <Checkbox
+                      className={choiceCheckboxClassName}
                       checked={draft.healerFilled}
-                      onChange={(event) =>
-                        updateDraft({ healerFilled: event.currentTarget.checked })
-                      }
-                      type="checkbox"
+                      onCheckedChange={(checked) => updateDraft({ healerFilled: checked === true })}
                     />
-                    <span>Хилл уже есть</span>
+                    <span>{locale === "ru" ? "Хилл уже есть" : "Healer filled"}</span>
                   </label>
-                  <label className="check-card">
-                    <input
+                  <label className={choiceCardClassName}>
+                    <Checkbox
+                      className={choiceCheckboxClassName}
                       checked={draft.hasBloodlust}
-                      onChange={(event) =>
-                        updateDraft({ hasBloodlust: event.currentTarget.checked })
-                      }
-                      type="checkbox"
+                      onCheckedChange={(checked) => updateDraft({ hasBloodlust: checked === true })}
                     />
-                    <span>Есть БЛ</span>
+                    <span>{locale === "ru" ? "Есть БЛ" : "Bloodlust covered"}</span>
                   </label>
-                  <label className="check-card">
-                    <input
+                  <label className={choiceCardClassName}>
+                    <Checkbox
+                      className={choiceCheckboxClassName}
                       checked={draft.hasBattleRes}
-                      onChange={(event) =>
-                        updateDraft({ hasBattleRes: event.currentTarget.checked })
-                      }
-                      type="checkbox"
+                      onCheckedChange={(checked) => updateDraft({ hasBattleRes: checked === true })}
                     />
-                    <span>Есть БР</span>
+                    <span>{locale === "ru" ? "Есть БР" : "Battle res covered"}</span>
                   </label>
                 </div>
               ) : isLegacyRaid ? (
                 <p className="status-note">
-                  Collection-run: в баннере останется только цель сбора без
-                  требований к составу и экипировке.
+                  {locale === "ru"
+                    ? "Collection-run: в баннере останется только цель сбора без требований к составу и экипировке."
+                    : "Collection run: banner keeps only gathering goal, without roster and gear requirements."}
                 </p>
               ) : (
                 <p className="status-note">
-                  Рейдовые роли задаются вручную, а классы и бафы считаются из
-                  состава аддона.
+                  {locale === "ru"
+                    ? "Рейдовые роли задаются вручную, а классы и бафы считаются из состава аддона."
+                    : "Raid role needs are manual, while classes and buffs are inferred from addon roster."}
                 </p>
               )}
             </div>
@@ -594,8 +641,8 @@ export function ImportBannerForm({
           {draft ? (
             <div className="space-y-5">
               <div>
-                <div className="eyebrow">Предпросмотр</div>
-                <h2 className="section-title mt-3">Итоговый PNG</h2>
+                <div className="eyebrow">{t(locale, "banners.preview")}</div>
+                <h2 className="section-title mt-3">{t(locale, "banners.resultPng")}</h2>
                 <p className="subtle mt-3 mb-0">
                   {draft.characterName} · {activityName}
                   {draft.source.groupType === "raid"
@@ -612,7 +659,9 @@ export function ImportBannerForm({
                   <span className="chip">Legacy</span>
                 ) : (
                   <>
-                    <span className="chip">{draft.source.groupSize} игроков</span>
+                    <span className="chip">
+                      {draft.source.groupSize} {locale === "ru" ? "игроков" : "players"}
+                    </span>
                     {draft.source.instanceType ? (
                       <span className="chip">{draft.source.instanceType}</span>
                     ) : null}
@@ -621,7 +670,7 @@ export function ImportBannerForm({
                     ) : null}
                     {draft.source.selectedRaidDifficultyName ? (
                       <span className="chip chip-needed">
-                        Выбрано: {draft.source.selectedRaidDifficultyName}
+                        {locale === "ru" ? "Выбрано" : "Selected"}: {draft.source.selectedRaidDifficultyName}
                       </span>
                     ) : null}
                     {isCurrentRaid ? (
@@ -633,7 +682,7 @@ export function ImportBannerForm({
                               : "chip"
                           }
                         >
-                          Танков нужно: {draft.raidTankNeeded}
+                          {locale === "ru" ? "Танков нужно" : "Tanks needed"}: {draft.raidTankNeeded}
                         </span>
                         <span
                           className={
@@ -642,7 +691,7 @@ export function ImportBannerForm({
                               : "chip"
                           }
                         >
-                          Хилов нужно: {draft.raidHealerNeeded}
+                          {locale === "ru" ? "Хилов нужно" : "Healers needed"}: {draft.raidHealerNeeded}
                         </span>
                       </>
                     ) : null}
@@ -654,16 +703,21 @@ export function ImportBannerForm({
                 <Card className="quiet-card">
                   <CardContent className="p-4 text-sm">
                     {draft.source.keyMapName && !isLegacyRaid ? (
-                      <div>Ключ из аддона: {draft.source.keyMapName}</div>
+                      <div>{locale === "ru" ? "Ключ из аддона" : "Key from addon"}: {draft.source.keyMapName}</div>
                     ) : null}
                     {draft.source.instanceName || isLegacyRaid ? (
                       <div className={isLegacyRaid ? "" : "subtle mt-1"}>
-                        {isLegacyRaid ? "Рейд" : "Текущий инстанс"}:{" "}
+                        {isLegacyRaid
+                          ? t(locale, "events.typeRaid")
+                          : locale === "ru"
+                            ? "Текущий инстанс"
+                            : "Current instance"}
+                        :{" "}
                         {draft.source.instanceName ?? activityName}
                       </div>
                     ) : null}
                     {isLegacyRaid ? (
-                      <div className="subtle mt-2">{LEGACY_RAID_GOAL_LABEL}</div>
+                      <div className="subtle mt-2">{getLegacyRaidGoalLabel(locale)}</div>
                     ) : null}
                   </CardContent>
                 </Card>
@@ -700,14 +754,14 @@ export function ImportBannerForm({
                   </div>
 
                   <div className="subtle">
-                    Броня: {getRaidArmorSummary(raidAnalysis)}
+                    {t(locale, "banners.armor")}: {getRaidArmorSummary(raidAnalysis)}
                   </div>
 
                   {raidAnalysis.classNeeds.length > 0 ? (
                     <div className="chip-row">
                       {raidAnalysis.classNeeds.map((need) => (
                         <span className="chip chip-needed" key={need.classFile}>
-                          Нужно: {need.label} x{need.missing}
+                          {locale === "ru" ? "Нужно" : "Need"}: {need.label} x{need.missing}
                           {need.reasons.length > 0
                             ? ` (${need.reasons.join(", ")})`
                             : ""}
@@ -734,7 +788,7 @@ export function ImportBannerForm({
                         ))
                       ) : (
                         <span className="chip chip-filled">
-                          Все рейдовые бафы закрыты
+                          {locale === "ru" ? "Все рейдовые бафы закрыты" : "All raid buffs are covered"}
                         </span>
                       )}
                     </div>
@@ -762,7 +816,7 @@ export function ImportBannerForm({
                         href={imageUrl}
                       >
                         <DownloadCloud className="size-4" aria-hidden="true" />
-                        Скачать PNG
+                        {t(locale, "common.downloadPng")}
                       </a>
                     </Button>
                   </div>
@@ -770,14 +824,18 @@ export function ImportBannerForm({
               ) : (
                 <p className="status-note warn">
                   {draft.source.groupType === "raid"
-                    ? "Не удалось сформировать рейдовый PNG из текущего экспорта."
-                    : "В экспорте нет Mythic+ ключа. Укажите уровень ключа в черновике, чтобы включить PNG-превью."}
+                    ? locale === "ru"
+                      ? "Не удалось сформировать рейдовый PNG из текущего экспорта."
+                      : "Failed to build raid PNG from current export."
+                    : locale === "ru"
+                      ? "В экспорте нет Mythic+ ключа. Укажите уровень ключа в черновике, чтобы включить PNG-превью."
+                      : "Export has no Mythic+ key. Set keystone level in draft to enable PNG preview."}
                 </p>
               )}
 
               <p className="subtle m-0 text-sm">
                 {isLegacyRaid
-                  ? LEGACY_RAID_GOAL_LABEL
+                  ? getLegacyRaidGoalLabel(locale)
                   : `ilvl ${formatItemLevel(draft.itemLevel)} · ${draft.className}${
                       draft.spec ? ` · ${draft.spec}` : ""
                     }`}
@@ -787,10 +845,13 @@ export function ImportBannerForm({
             <div className="preview-placeholder">
               <div className="max-w-sm">
                 <ImageIcon className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
-                <h2 className="section-title mt-4">Здесь появится баннер</h2>
+                <h2 className="section-title mt-4">
+                  {locale === "ru" ? "Здесь появится баннер" : "Banner will appear here"}
+                </h2>
                 <p className="subtle mt-3 mb-0 leading-7">
-                  Вставьте строку или включите сканер QR. Когда экспорт
-                  распознается, здесь появится черновик и PNG-превью.
+                  {locale === "ru"
+                    ? "Вставьте строку или включите сканер QR. Когда экспорт распознается, здесь появится черновик и PNG-превью."
+                    : "Paste export string or enable QR scanner. Parsed draft and PNG preview will appear here."}
                 </p>
               </div>
             </div>

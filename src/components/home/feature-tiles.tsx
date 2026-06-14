@@ -1,8 +1,12 @@
-import { featureTiles } from "@/components/home/data";
+import { getFeatureTiles } from "@/components/home/data";
+import type { AppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 
-export function FeatureTiles() {
+export function FeatureTiles({ locale }: { locale: AppLocale }) {
+  const featureTiles = getFeatureTiles(locale);
+
   return (
-    <section className="home-feature-grid" id="features" aria-label="Преимущества">
+    <section className="home-feature-grid" id="features" aria-label={t(locale, "home.featuresAria")}>
       {featureTiles.map((feature) => {
         const Icon = feature.icon;
 

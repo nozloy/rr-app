@@ -1,16 +1,16 @@
-export function HeroSection() {
+import type { AppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+
+export function HeroSection({ locale }: { locale: AppLocale }) {
   return (
     <section className="home-hero" aria-labelledby="home-hero-title">
       <div className="home-hero-copy">
         <h1 id="home-hero-title">
-          Планируй рейды
+          {t(locale, "home.heroTitleLine1")}
           <br />
-          и сборы без хаоса
+          {t(locale, "home.heroTitleLine2")}
         </h1>
-        <p>
-          Создавай сборы на рейды, ключи, фарм маунтов, ресурсов и достижений.
-          Назначай роли, время старта и при необходимости стоимость слота в золоте.
-        </p>
+        <p>{t(locale, "home.heroCopy")}</p>
       </div>
     </section>
   );

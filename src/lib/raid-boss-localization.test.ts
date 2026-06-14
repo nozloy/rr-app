@@ -1,8 +1,8 @@
 import { localizeRaidBossName } from '@/lib/raid-boss-localization'
-import { describe, it } from 'node:test'
-import { expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 const midnightBosses = [
+	['Rotmire', 'Гнилотоп'],
 	['Imperator Averzian', 'Император Аверзиан'],
 	['Vorasius', 'Ненасытникус'],
 	['Fallen-King Salhadaar', 'Падший король Салхадаар'],

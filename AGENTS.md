@@ -34,6 +34,14 @@ For ordinary code changes, prefer lightweight validation:
 
 - Static review of changed files
 
+## UI Guidelines
+
+- Prefer shadcn/ui components for visible UI patterns instead of building custom equivalents from scratch.
+- If a list, panel, sidebar, dropdown, or any other container is expected to scroll, wrap it in shadcn `ScrollArea`.
+- Prefer Tailwind utility classes in `className` for styling.
+- Use `src/app/globals.css` only when Tailwind cannot express the style cleanly or when a rule is repeated widely enough to justify a shared global definition.
+- Keep each UI module in its own `.tsx` file. A module is a distinct UI section, panel, or feature block, such as "Event Preview" or "Paid Slots". Modules may compose shared reusable components for common controls, layout primitives, and repeated UI pieces.
+
 Before running any expensive command, explain why it is needed and ask for confirmation.
 
 ## When build is allowed

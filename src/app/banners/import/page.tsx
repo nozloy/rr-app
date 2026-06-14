@@ -5,6 +5,8 @@ import { AppHeader } from "@/components/shell/app-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { currentSeasonDungeons } from "@/lib/dungeons";
+import { t } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n-server";
 import type { PageSearchParams } from "@/lib/banner-params";
 
 type ImportBannerPageProps = {
@@ -15,27 +17,49 @@ function getFirstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const importSteps = [
-  {
-    title: "Вставьте строку",
-    text: "Подходит для быстрых Discord-постов и ручного копирования из игры.",
-    icon: ClipboardPaste,
-  },
-  {
-    title: "Сканируйте QR",
-    text: "Удобно, если аддон открыт на другом экране или у рейд-лида.",
-    icon: ScanLine,
-  },
-  {
-    title: "Проверьте черновик",
-    text: "Перед PNG можно поправить роль, ключ, ilvl и недостающие бафы.",
-    icon: SlidersHorizontal,
-  },
-];
+function getImportSteps(locale: "ru" | "en") {
+  return locale === "ru"
+    ? [
+        {
+          title: "Вставьте строку",
+          text: "Подходит для быстрых Discord-постов и ручного копирования из игры.",
+          icon: ClipboardPaste,
+        },
+        {
+          title: "Сканируйте QR",
+          text: "Удобно, если аддон открыт на другом экране или у рейд-лида.",
+          icon: ScanLine,
+        },
+        {
+          title: "Проверьте черновик",
+          text: "Перед PNG можно поправить роль, ключ, ilvl и недостающие бафы.",
+          icon: SlidersHorizontal,
+        },
+      ]
+    : [
+        {
+          title: "Paste export",
+          text: "Great for fast Discord posts and manual in-game copy.",
+          icon: ClipboardPaste,
+        },
+        {
+          title: "Scan QR",
+          text: "Useful when addon is open on another display or at raid lead.",
+          icon: ScanLine,
+        },
+        {
+          title: "Review draft",
+          text: "Before PNG, adjust role, key level, ilvl, and missing buffs.",
+          icon: SlidersHorizontal,
+        },
+      ];
+}
 
 export default async function ImportBannerPage({
   searchParams,
 }: ImportBannerPageProps) {
+  const locale = await getRequestLocale();
+  const importSteps = getImportSteps(locale);
   const query = await searchParams;
   const initialExportString = getFirstParam(query.data) ?? "";
 
@@ -48,19 +72,21 @@ export default async function ImportBannerPage({
             <div className="panel-heading">
               <div className="max-w-3xl space-y-4">
                 <div className="eyebrow">Addon import</div>
-                <h1 className="section-title">Баннер из строки RaidReminder</h1>
+                <h1 className="section-title">{t(locale, "banners.importTitle")}</h1>
                 <p className="lead-copy m-0 max-w-3xl">
-                  Вставьте <code className="code-inline">RR1?...</code> или
-                  отсканируйте QR <code className="code-inline">RRQ1?...</code> из
-                  аддона. Экспорт станет редактируемым черновиком без Battle.net-логина.
+                  {locale === "ru"
+                    ? "Вставьте RR1?... или отсканируйте QR RRQ1?... из аддона. Экспорт станет редактируемым черновиком без Battle.net-логина."
+                    : "Paste RR1?... or scan RRQ1?... from the addon. Export becomes an editable draft without Battle.net login."}
                 </p>
               </div>
               <div className="action-row">
                 <Button asChild variant="outline">
-                  <Link href="/">На главную</Link>
+                  <Link href="/">{t(locale, "common.home")}</Link>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href="/banners/new">Конструктор с логином</Link>
+                  <Link href="/banners/new">
+                    {locale === "ru" ? "Конструктор с логином" : "Builder with login"}
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -88,6 +114,7 @@ export default async function ImportBannerPage({
         <ImportBannerForm
           dungeons={currentSeasonDungeons}
           initialExportString={initialExportString}
+          locale={locale}
         />
       </main>
     </>

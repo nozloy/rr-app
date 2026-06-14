@@ -2,9 +2,13 @@ import {
 	formatDate,
 	formatRange,
 	getCalendarDays,
+	getDungeonOptions,
+	getRaidOptions,
+	getSeasonDungeonOptions,
 	parseItemIds,
 	parseRoleRangeInput,
 } from './create-event-utils'
+import { currentExpansionDungeons, currentSeasonDungeons } from '@/lib/dungeons'
 
 describe('create event utils', () => {
 	it('parses single role counts as fixed ranges', () => {
@@ -51,6 +55,43 @@ describe('create event utils', () => {
 		expect(days[0].getDay()).toBe(1)
 		expect(days.some(day => day.getMonth() === 4 && day.getDate() === 29)).toBe(
 			true,
+		)
+	})
+
+	it('returns all current season dungeons for the season activity tab', () => {
+		const options = getSeasonDungeonOptions()
+
+		expect(options).toHaveLength(currentSeasonDungeons.length)
+		expect(options.every(option => option.activityType === 'season')).toBe(true)
+		expect(new Set(options.map(option => option.slug))).toEqual(
+			new Set(currentSeasonDungeons.map(dungeon => dungeon.slug)),
+		)
+	})
+
+	it('returns all Midnight expansion dungeons for the dungeon addon tab', () => {
+		const options = getDungeonOptions('Midnight')
+
+		expect(options).toHaveLength(8)
+		expect(options.every(option => option.activityType === 'dungeon')).toBe(true)
+		expect(new Set(options.map(option => option.slug))).toEqual(
+			new Set(currentExpansionDungeons.map(dungeon => dungeon.slug)),
+		)
+	})
+
+	it('uses english raid abbreviations for midnight raid short labels', () => {
+		const options = getRaidOptions('Midnight')
+
+		expect(options.find(option => option.slug === 'march-on-queldanas')?.shortName).toBe(
+			'MQD',
+		)
+		expect(options.find(option => option.slug === 'the-dreamrift')?.shortName).toBe(
+			'DR',
+		)
+		expect(options.find(option => option.slug === 'the-voidspire')?.shortName).toBe(
+			'VS',
+		)
+		expect(options.find(option => option.slug === 'sporefall')?.shortName).toBe(
+			'SF',
 		)
 	})
 })

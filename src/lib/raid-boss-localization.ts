@@ -2,7 +2,11 @@ export type RaidCheckLocale = 'en' | 'ru'
 
 export const DEFAULT_RAID_CHECK_LOCALE: RaidCheckLocale = 'ru'
 
-type MidnightRaidSlug = 'march-on-queldanas' | 'the-dreamrift' | 'the-voidspire'
+type MidnightRaidSlug =
+	| 'march-on-queldanas'
+	| 'the-dreamrift'
+	| 'the-voidspire'
+	| 'sporefall'
 
 type RaidBossNameEntry = {
 	id?: number
@@ -13,6 +17,15 @@ type RaidBossNameEntry = {
 }
 
 const raidBossNameCatalog: RaidBossNameEntry[] = [
+	{
+		raidSlug: 'sporefall',
+		names: {
+			en: 'Rotmire',
+			ru: 'Гнилотоп',
+		},
+		provisional: true,
+		sourceNames: ['Rotmire'],
+	},
 	{
 		raidSlug: 'the-voidspire',
 		names: {

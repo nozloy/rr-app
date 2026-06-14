@@ -3,37 +3,39 @@ import type { Character } from "@prisma/client";
 import { ChevronRight, Cross, Shield, Swords, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { t, type AppLocale } from "@/lib/i18n";
 import { formatItemLevel } from "@/lib/utils";
 
 type CharacterRosterProps = {
   characters: Character[];
+  locale: AppLocale;
 };
 
 function getCharacterImage(character: Character) {
   return character.avatarUrl ?? character.thumbnailUrl ?? null;
 }
 
-function getRole(character: Character) {
+function getRole(character: Character, locale: AppLocale) {
   const value = `${character.className} ${character.activeSpec ?? ""}`.toLowerCase();
 
   if (/(защит|protection|blood|guardian|brewmaster|vengeance)/i.test(value)) {
-    return { label: "Танк", icon: Shield, tone: "tank" };
+    return { label: locale === "ru" ? "Танк" : "Tank", icon: Shield, tone: "tank" };
   }
 
   if (/(свет|holy|discipline|restoration|mistweaver|preservation|хил|лекар)/i.test(value)) {
-    return { label: "Хилер", icon: Cross, tone: "healer" };
+    return { label: locale === "ru" ? "Хилер" : "Healer", icon: Cross, tone: "healer" };
   }
 
   return { label: "DPS", icon: Swords, tone: "dps" };
 }
 
-export function CharacterRoster({ characters }: CharacterRosterProps) {
+export function CharacterRoster({ characters, locale }: CharacterRosterProps) {
   return (
     <section className="dashboard-panel dashboard-character-panel">
       <div className="dashboard-panel-heading">
-        <h2>Мои персонажи</h2>
+        <h2>{t(locale, "dashboard.myCharacters")}</h2>
         <a href="#characters">
-          Все персонажи
+          {t(locale, "dashboard.allCharacters")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </a>
       </div>
@@ -41,15 +43,15 @@ export function CharacterRoster({ characters }: CharacterRosterProps) {
       {characters.length === 0 ? (
         <div className="dashboard-empty-state">
           <UsersRound className="size-8" aria-hidden="true" />
-          <strong>Персонажи пока не подтянуты</strong>
-          <span>Запустите синхронизацию в боковой панели.</span>
+          <strong>{t(locale, "dashboard.noCharacters")}</strong>
+          <span>{t(locale, "dashboard.runSyncHint")}</span>
         </div>
       ) : (
         <ScrollArea className="dashboard-character-scroll">
           <div className="dashboard-character-list" id="characters">
             {characters.map((character) => {
               const avatar = getCharacterImage(character);
-              const role = getRole(character);
+              const role = getRole(character, locale);
               const RoleIcon = role.icon;
 
               return (
@@ -69,7 +71,7 @@ export function CharacterRoster({ characters }: CharacterRosterProps) {
                   <div className="dashboard-character-main">
                     <strong>{character.name}</strong>
                     <span>
-                      {character.className} · {character.activeSpec ?? "Спек не определён"}
+                      {character.className} · {character.activeSpec ?? t(locale, "dashboard.specUnknown")}
                     </span>
                   </div>
 
@@ -83,7 +85,7 @@ export function CharacterRoster({ characters }: CharacterRosterProps) {
                   </Badge>
                   <span className="dashboard-character-faction">{character.factionName}</span>
                   <span className={character.isActive ? "dashboard-online" : "dashboard-offline"}>
-                    {character.isActive ? "В игре" : "Оффлайн"}
+                    {character.isActive ? t(locale, "dashboard.online") : t(locale, "dashboard.offline")}
                   </span>
                 </article>
               );

@@ -1,20 +1,22 @@
 import { RefreshCw, ShieldCheck } from "lucide-react";
+import { t, type AppLocale } from "@/lib/i18n";
 
 type DashboardHeroProps = {
   displayName: string;
+  locale: AppLocale;
 };
 
-export function DashboardHero({ displayName }: DashboardHeroProps) {
+export function DashboardHero({ displayName, locale }: DashboardHeroProps) {
   return (
     <section className="dashboard-hero">
       <h1>
-        Добро пожаловать, <span>{displayName}</span>
+        {t(locale, "dashboard.welcome", { name: displayName })}
       </h1>
       <p>
         <ShieldCheck className="size-4" aria-hidden="true" />
-        Battle.net подключен
+        {t(locale, "dashboard.battleNetConnected")}
         <span>•</span>
-        Данные синхронизированы 2 мин. назад
+        {t(locale, "dashboard.syncedAgo")}
         <RefreshCw className="size-4" aria-hidden="true" />
       </p>
     </section>

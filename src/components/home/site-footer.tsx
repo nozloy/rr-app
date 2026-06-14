@@ -1,19 +1,27 @@
-import { footerLinks, socialLinks } from "@/components/home/data";
+import {
+  getFooterLinks,
+  getSocialLinks,
+} from "@/components/home/data";
 import { BrandLockup } from "@/components/home/brand-lockup";
+import type { AppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 
-export function SiteFooter() {
+export function SiteFooter({ locale }: { locale: AppLocale }) {
+  const footerLinks = getFooterLinks(locale);
+  const socialLinks = getSocialLinks(locale);
+
   return (
     <footer className="home-footer">
       <div className="home-footer-brand">
         <BrandLockup compact />
         <p>
-          Планируйте идеальные рейды, ключи и фарм.
+          {t(locale, "home.footerCopyLine1")}
           <br />
-          Мы берем хаос на себя.
+          {t(locale, "home.footerCopyLine2")}
         </p>
       </div>
 
-      <nav className="home-footer-links" aria-label="Дополнительная навигация">
+      <nav className="home-footer-links" aria-label={t(locale, "home.footerNavAria")}>
         {footerLinks.map((link) => (
           <a href="#top" key={link}>
             {link}
@@ -21,7 +29,7 @@ export function SiteFooter() {
         ))}
       </nav>
 
-      <div className="home-footer-social" aria-label="Социальные каналы">
+      <div className="home-footer-social" aria-label={t(locale, "home.footerSocialAria")}>
         {socialLinks.map((social) => {
           const Icon = social.icon;
 
@@ -36,7 +44,7 @@ export function SiteFooter() {
       <p className="home-footer-copy">
         © 2026 Raid Reminder
         <br />
-        Все права защищены
+        {t(locale, "home.footerRights")}
       </p>
     </footer>
   );

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
+import { LocaleProvider } from "@/components/shell/locale-provider";
+import { getRequestLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
@@ -17,14 +19,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+
   return (
-    <html lang="ru" className={cn("font-mono", jetbrainsMono.variable)}>
-      <body>{children}</body>
+    <html lang={locale} className={cn("font-sans", jetbrainsMono.variable)}>
+      <body>
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

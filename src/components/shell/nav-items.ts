@@ -4,6 +4,7 @@ import {
   SearchCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { t, type AppLocale } from "@/lib/i18n";
 
 export type HeaderNavItem = {
   href: string;
@@ -11,24 +12,40 @@ export type HeaderNavItem = {
   label: string;
 };
 
-export const headerNavItems: HeaderNavItem[] = [
-  { href: "/", icon: Home, label: "Главная" },
-  { href: "/raidcheck", icon: SearchCheck, label: "Проверить кд" },
-];
+export function getHeaderNavItems(locale: AppLocale): HeaderNavItem[] {
+  return [
+    { href: "/", icon: Home, label: t(locale, "header.home") },
+    {
+      href: "/raidcheck",
+      icon: SearchCheck,
+      label: t(locale, "header.raidCheck"),
+    },
+  ];
+}
 
-export const authenticatedHeaderNavItems: HeaderNavItem[] = [
-  { href: "/events/new", icon: CalendarPlus, label: "Создать рейд" },
-];
+export function getAuthenticatedHeaderNavItems(
+  locale: AppLocale,
+): HeaderNavItem[] {
+  return [
+    {
+      href: "/events/new",
+      icon: CalendarPlus,
+      label: t(locale, "header.createRaid"),
+    },
+  ];
+}
 
-export const accountMenuItems = [
-  {
-    href: "/events/new",
-    icon: CalendarPlus,
-    label: "Создать рейд",
-  },
-  {
-    href: "/raidcheck",
-    icon: SearchCheck,
-    label: "Проверить кд рейда",
-  },
-];
+export function getAccountMenuItems(locale: AppLocale): HeaderNavItem[] {
+  return [
+    {
+      href: "/events/new",
+      icon: CalendarPlus,
+      label: t(locale, "header.createRaid"),
+    },
+    {
+      href: "/raidcheck",
+      icon: SearchCheck,
+      label: t(locale, "header.raidCheck"),
+    },
+  ];
+}

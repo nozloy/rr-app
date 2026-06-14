@@ -22,14 +22,32 @@ MANIFEST = ROOT / "scripts" / "raid_reference_sources.json"
 REFERENCE_DIR = ROOT / "tmp" / "raid-reference-images"
 OUT_DIR = ROOT / "public" / "raids"
 SIZE = (1920, 1080)
-MIDNIGHT_REFERENCE_SLUGS = {"march-on-queldanas", "the-dreamrift", "the-voidspire"}
+MIDNIGHT_REFERENCE_SLUGS = {
+    "march-on-queldanas",
+    "the-dreamrift",
+    "the-voidspire",
+    "sporefall",
+}
+PNG_STYLED_SLUGS = {
+    "vault-of-the-incarnates",
+    "aberrus-the-shadowed-crucible",
+    "amirdrassil-the-dreams-hope",
+    "nerubar-palace",
+    "liberation-of-undermine",
+    "manaforge-omega",
+    "march-on-queldanas",
+    "the-dreamrift",
+    "the-voidspire",
+    "sporefall",
+}
 MIDNIGHT_STYLE_REFERENCE_PATHS = [
     OUT_DIR / "march_on_queldanas.jpg",
     OUT_DIR / "the_dreamrift.png",
     OUT_DIR / "the_voidspire.png",
-    OUT_DIR / "march_on_queldanas_styled_16x9.jpg",
-    OUT_DIR / "the_dreamrift_styled_16x9.jpg",
-    OUT_DIR / "the_voidspire_styled_16x9.jpg",
+    OUT_DIR / "march_on_queldanas_styled_16x9.png",
+    OUT_DIR / "the_dreamrift_styled_16x9.png",
+    OUT_DIR / "the_voidspire_styled_16x9.png",
+    OUT_DIR / "sporefall_styled_16x9.png",
 ]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 RaidReminderAssetBuilder/1.0",
@@ -266,7 +284,8 @@ def build_assets(
         if selected_slugs is not None and slug not in selected_slugs:
             continue
 
-        out_path = OUT_DIR / f"{slug.replace('-', '_')}_styled_16x9.jpg"
+        extension = "png" if slug in PNG_STYLED_SLUGS else "jpg"
+        out_path = OUT_DIR / f"{slug.replace('-', '_')}_styled_16x9.{extension}"
         reference_path = REFERENCE_DIR / f"{slug}.jpg"
 
         if slug in MIDNIGHT_REFERENCE_SLUGS and not include_current:
@@ -290,7 +309,10 @@ def build_assets(
         if force or not out_path.exists():
             with Image.open(reference_path) as source:
                 final = apply_banner_style(cover_crop(source, SIZE))
-            final.save(out_path, "JPEG", quality=90, optimize=True, progressive=True)
+            if extension == "png":
+                final.save(out_path, "PNG", optimize=True)
+            else:
+                final.save(out_path, "JPEG", quality=90, optimize=True, progressive=True)
 
         results.append({
             "slug": slug,

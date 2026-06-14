@@ -1,10 +1,13 @@
 'use client'
 
 import { useMemo, useReducer } from 'react'
+import { useAppLocale } from '@/components/shell/locale-provider'
+import { t } from '@/lib/i18n'
 import {
 	defaultRoleRanges,
-	openWorldActivities,
-	roleFields,
+	getOpenWorldActivitiesForAddon,
+	getRoleFields,
+	resolveEventAddon,
 	unrollTemplates,
 } from './create-event-data'
 import type {
@@ -21,6 +24,7 @@ import {
 	formatRange,
 	getDungeonOptions,
 	getRaidOptions,
+	getSeasonDungeonOptions,
 	parseItemIds,
 	parseRoleRangeInput,
 	toDateInputValue,
@@ -50,7 +54,7 @@ type CreateEventDraftAction =
 	  }
 	| { type: 'toggle-instance'; slug: string }
 	| { type: 'remove-instance'; slug: string }
-	| { type: 'set-addon'; addon: string }
+	| { type: 'set-addon'; addon: string; selectedInstanceSlugs: string[] }
 	| { type: 'set-date'; date: string }
 	| { type: 'set-date-time'; date: Date }
 	| { type: 'set-time-part'; part: 'hour' | 'minute'; value: string }
@@ -79,13 +83,26 @@ function clearStatus(state: CreateEventDraftState): CreateEventDraftState {
 	}
 }
 
+function getInstanceOptionsByType(addon: string, locale: 'ru' | 'en') {
+	const resolvedAddon = resolveEventAddon(addon)
+
+	return {
+		dungeon: getDungeonOptions(resolvedAddon, locale),
+		season: getSeasonDungeonOptions(locale),
+		'open-world': getOpenWorldActivitiesForAddon(resolvedAddon, locale),
+		raid: getRaidOptions(resolvedAddon, locale),
+	}
+}
+
 function createInitialState({
 	characters,
 	defaultDate,
 	displayName,
 	raidSlugs,
 }: CreateEventFormProps & { raidSlugs: string[] }): CreateEventDraftState {
-	const defaultTemplate = unrollTemplates[0]
+	const defaultTemplate = unrollTemplates[0] ?? null
+	const defaultUnrollItemIds = defaultTemplate?.itemIds ?? ['249343']
+	const defaultUnrollTemplateId = defaultTemplate?.id ?? 'custom'
 
 	return {
 		draft: {
@@ -113,9 +130,9 @@ function createInitialState({
 			},
 			selectedInstanceSlugs: raidSlugs,
 			time: '20:30',
-			unrollInput: defaultTemplate.itemIds.join(', '),
-			unrollItemIds: defaultTemplate.itemIds,
-			unrollTemplateId: defaultTemplate.id,
+			unrollInput: defaultUnrollItemIds.join(', '),
+			unrollItemIds: defaultUnrollItemIds,
+			unrollTemplateId: defaultUnrollTemplateId,
 		},
 		roleInputValues: {
 			damage: formatRange(defaultRoleRanges.damage),
@@ -231,6 +248,7 @@ function createEventDraftReducer(
 				draft: {
 					...current.draft,
 					addon: action.addon,
+					selectedInstanceSlugs: action.selectedInstanceSlugs,
 				},
 			}
 		case 'set-date':
@@ -366,22 +384,22 @@ export function useCreateEventDraft({
 	defaultDate,
 	displayName,
 }: CreateEventFormProps) {
-	const raidOptions = useMemo(() => getRaidOptions(), [])
-	const dungeonOptions = useMemo(() => getDungeonOptions(), [])
-	const instanceOptionsByType = useMemo(
-		() => ({
-			dungeon: dungeonOptions,
-			'open-world': openWorldActivities,
-			raid: raidOptions,
-		}),
-		[dungeonOptions, raidOptions],
+	const locale = useAppLocale()
+	const roleFields = useMemo(() => getRoleFields(locale), [locale])
+	const initialRaidSlugs = useMemo(
+		() => getRaidOptions('Midnight', locale).map(option => option.slug),
+		[locale],
 	)
 	const [state, dispatch] = useReducer(
 		createEventDraftReducer,
-		{ characters, defaultDate, displayName, raidSlugs: raidOptions.map(option => option.slug) },
+		{ characters, defaultDate, displayName, raidSlugs: initialRaidSlugs },
 		createInitialState,
 	)
 	const { draft, roleInputValues, statusMessage } = state
+	const instanceOptionsByType = useMemo(
+		() => getInstanceOptionsByType(draft.addon, locale),
+		[draft.addon, locale],
+	)
 	const selectedCharacter =
 		characters.find(character => character.id === draft.characterId) ??
 		characters[0] ??
@@ -390,15 +408,18 @@ export function useCreateEventDraft({
 	const selectedInstances = instanceOptions.filter(instance =>
 		draft.selectedInstanceSlugs.includes(instance.slug),
 	)
+	const fallbackOpenWorldInstance =
+		instanceOptionsByType['open-world'][0] ??
+		getOpenWorldActivitiesForAddon('Midnight', locale)[0]
 	const previewInstance =
-		selectedInstances[0] ?? instanceOptions[0] ?? openWorldActivities[0]
+		selectedInstances[0] ?? instanceOptions[0] ?? fallbackOpenWorldInstance
 	const selectedTemplate =
 		unrollTemplates.find(template => template.id === draft.unrollTemplateId) ??
 		null
 	const roleValidation = {
-		damage: parseRoleRangeInput(roleInputValues.damage),
-		healer: parseRoleRangeInput(roleInputValues.healer),
-		tank: parseRoleRangeInput(roleInputValues.tank),
+		damage: parseRoleRangeInput(roleInputValues.damage, locale),
+		healer: parseRoleRangeInput(roleInputValues.healer, locale),
+		tank: parseRoleRangeInput(roleInputValues.tank, locale),
 	}
 	const roleErrors = roleFields
 		.map(role => {
@@ -446,8 +467,16 @@ export function useCreateEventDraft({
 					type: 'set-activity-type',
 				})
 			},
-			setAddon: (addon: string) =>
-				dispatch({ addon, type: 'set-addon' }),
+			setAddon: (addon: string) => {
+				const nextOptionsByType = getInstanceOptionsByType(addon, locale)
+				const nextOptions = nextOptionsByType[draft.activityType]
+
+				dispatch({
+					addon,
+					selectedInstanceSlugs: nextOptions[0] ? [nextOptions[0].slug] : [],
+					type: 'set-addon',
+				})
+			},
 			setCharacter: (characterId: string) =>
 				dispatch({ characterId, type: 'set-character' }),
 			setDate: (date: string) => dispatch({ date, type: 'set-date' }),
@@ -489,8 +518,8 @@ export function useCreateEventDraft({
 				dispatch({
 					message:
 						action === 'publish'
-							? 'Событие подготовлено к публикации локально. Серверное сохранение появится в следующей версии.'
-							: 'Шаблон собран локально. В этой версии он не записывается в базу.',
+							? t(locale, 'events.statusPublishReady')
+							: t(locale, 'events.statusTemplateReady'),
 					type: 'submit',
 				})
 			},

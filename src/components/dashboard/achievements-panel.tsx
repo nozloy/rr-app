@@ -1,14 +1,15 @@
 import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 import { achievements } from "@/components/dashboard/data";
+import { t, type AppLocale } from "@/lib/i18n";
 
-export function AchievementsPanel() {
+export function AchievementsPanel({ locale }: { locale: AppLocale }) {
   return (
     <section className="dashboard-panel dashboard-achievements-panel">
       <div className="dashboard-panel-heading">
-        <h2>Последние достижения</h2>
+        <h2>{t(locale, "dashboard.achievements")}</h2>
         <a href="#achievements">
-          Все достижения
+          {t(locale, "dashboard.allAchievements")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </a>
       </div>

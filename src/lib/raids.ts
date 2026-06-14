@@ -1,3 +1,10 @@
+import type { AppLocale } from "@/lib/i18n";
+
+export type RaidLocalizedNames = {
+  en: string;
+  ru: string;
+};
+
 export type RaidDefinition = {
   slug: string;
   name: string;
@@ -5,10 +12,26 @@ export type RaidDefinition = {
   expansion: string;
   artPath: string;
   aliases: string[];
+  names?: RaidLocalizedNames;
 };
 
+const pngRaidSlugs = new Set([
+  "vault-of-the-incarnates",
+  "aberrus-the-shadowed-crucible",
+  "amirdrassil-the-dreams-hope",
+  "nerubar-palace",
+  "liberation-of-undermine",
+  "manaforge-omega",
+  "march-on-queldanas",
+  "the-dreamrift",
+  "the-voidspire",
+  "sporefall",
+]);
+
 function raidArtPath(slug: string) {
-  return `/raids/${slug.replaceAll("-", "_")}_styled_16x9.jpg`;
+  const extension = pngRaidSlugs.has(slug) ? "png" : "jpg";
+
+  return `/raids/${slug.replaceAll("-", "_")}_styled_16x9.${extension}`;
 }
 
 export const legacyRaidInstances: RaidDefinition[] = [
@@ -398,51 +421,105 @@ export const legacyRaidInstances: RaidDefinition[] = [
   },
   {
     slug: "vault-of-the-incarnates",
-    name: "Vault of the Incarnates",
-    shortName: "VotI",
+    name: "Хранилище Воплощений",
+    shortName: "Хранилище",
     expansion: "Dragonflight",
     artPath: raidArtPath("vault-of-the-incarnates"),
-    aliases: ["VotI", "Хранилище Воплощений", "Raszageth"],
+    names: {
+      en: "Vault of the Incarnates",
+      ru: "Хранилище Воплощений",
+    },
+    aliases: [
+      "VotI",
+      "Vault of the Incarnates",
+      "Хранилище Воплощений",
+      "Raszageth",
+    ],
   },
   {
     slug: "aberrus-the-shadowed-crucible",
-    name: "Aberrus, the Shadowed Crucible",
-    shortName: "Aberrus",
+    name: "Аберрий, Затененное Горнило",
+    shortName: "Аберрий",
     expansion: "Dragonflight",
     artPath: raidArtPath("aberrus-the-shadowed-crucible"),
-    aliases: ["Aberrus", "Аберрий", "Shadowed Crucible", "Sarkareth"],
+    names: {
+      en: "Aberrus, the Shadowed Crucible",
+      ru: "Аберрий, Затененное Горнило",
+    },
+    aliases: [
+      "Aberrus",
+      "Aberrus, the Shadowed Crucible",
+      "Аберрий",
+      "Затененное Горнило",
+      "Shadowed Crucible",
+      "Sarkareth",
+    ],
   },
   {
     slug: "amirdrassil-the-dreams-hope",
-    name: "Amirdrassil, the Dream's Hope",
-    shortName: "Amirdrassil",
+    name: "Амирдрассил, Надежда Сна",
+    shortName: "Амирдрассил",
     expansion: "Dragonflight",
     artPath: raidArtPath("amirdrassil-the-dreams-hope"),
-    aliases: ["Amirdrassil", "Амирдрассил", "Dream's Hope", "Fyrakk"],
+    names: {
+      en: "Amirdrassil, the Dream's Hope",
+      ru: "Амирдрассил, Надежда Сна",
+    },
+    aliases: [
+      "Amirdrassil",
+      "Amirdrassil, the Dream's Hope",
+      "Амирдрассил",
+      "Надежда Сна",
+      "Dream's Hope",
+      "Fyrakk",
+    ],
   },
   {
     slug: "nerubar-palace",
-    name: "Nerub-ar Palace",
-    shortName: "Nerub-ar",
+    name: "Неруб'арский дворец",
+    shortName: "Неруб'ар",
     expansion: "The War Within",
     artPath: raidArtPath("nerubar-palace"),
-    aliases: ["Nerub'ar Palace", "Nerubar Palace", "Неруб'арский дворец", "Queen Ansurek"],
+    names: {
+      en: "Nerub'ar Palace",
+      ru: "Неруб'арский дворец",
+    },
+    aliases: [
+      "Nerub-ar Palace",
+      "Nerub'ar Palace",
+      "Nerubar Palace",
+      "Неруб'арский дворец",
+      "Queen Ansurek",
+    ],
   },
   {
     slug: "liberation-of-undermine",
-    name: "Liberation of Undermine",
-    shortName: "Undermine",
+    name: "Освобождение Нижней Шахты",
+    shortName: "Нижняя Шахта",
     expansion: "The War Within",
     artPath: raidArtPath("liberation-of-undermine"),
-    aliases: ["Освобождение Нижней Шахты", "Undermine", "Gallywix"],
+    names: {
+      en: "Liberation of Undermine",
+      ru: "Освобождение Нижней Шахты",
+    },
+    aliases: [
+      "Liberation of Undermine",
+      "Освобождение Нижней Шахты",
+      "Undermine",
+      "Gallywix",
+    ],
   },
   {
     slug: "manaforge-omega",
-    name: "Manaforge Omega",
-    shortName: "Omega",
+    name: "Манагорн Омега",
+    shortName: "Манагорн",
     expansion: "The War Within",
     artPath: raidArtPath("manaforge-omega"),
-    aliases: ["Manaforge: Omega", "Манагорн Омега", "Dimensius"],
+    names: {
+      en: "Manaforge Omega",
+      ru: "Манагорн Омега",
+    },
+    aliases: ["Manaforge Omega", "Manaforge: Omega", "Манагорн Омега", "Dimensius"],
   },
 ];
 
@@ -450,26 +527,50 @@ export const currentRaidInstances: RaidDefinition[] = [
   {
     slug: "march-on-queldanas",
     name: "Марш на Кель'Данас",
-    shortName: "Кель'Данас",
+    shortName: "MQD",
     expansion: "Midnight",
     artPath: raidArtPath("march-on-queldanas"),
+    names: {
+      en: "March on Quel'Danas",
+      ru: "Марш на Кель'Данас",
+    },
     aliases: ["Марш на Кельданас", "March on Quel'Danas", "March on Queldanas"],
   },
   {
     slug: "the-dreamrift",
     name: "Провал снов",
-    shortName: "Провал",
+    shortName: "DR",
     expansion: "Midnight",
     artPath: raidArtPath("the-dreamrift"),
+    names: {
+      en: "The Dreamrift",
+      ru: "Провал снов",
+    },
     aliases: ["Провалснов", "The Dreamrift", "Dreamrift"],
   },
   {
     slug: "the-voidspire",
     name: "Шпиль Бездны",
-    shortName: "Бездны",
+    shortName: "VS",
     expansion: "Midnight",
     artPath: raidArtPath("the-voidspire"),
+    names: {
+      en: "The Voidspire",
+      ru: "Шпиль Бездны",
+    },
     aliases: ["Шпильбездны", "The Voidspire", "Voidspire"],
+  },
+  {
+    slug: "sporefall",
+    name: "Споропад",
+    shortName: "SF",
+    expansion: "Midnight",
+    artPath: raidArtPath("sporefall"),
+    names: {
+      en: "Sporefall",
+      ru: "Споропад",
+    },
+    aliases: ["Споропад", "Sporefall", "Rotmire", "Гнилотоп"],
   },
 ];
 
@@ -487,7 +588,14 @@ function normalizeRaidName(value: string) {
 }
 
 function getRaidCandidates(raid: RaidDefinition) {
-  return [raid.name, raid.shortName, raid.slug, ...raid.aliases];
+  return [
+    raid.name,
+    raid.names?.ru ?? "",
+    raid.names?.en ?? "",
+    raid.shortName,
+    raid.slug,
+    ...raid.aliases,
+  ];
 }
 
 function findRaidByName(
@@ -541,4 +649,11 @@ export function getRaidByName(name: string | null | undefined) {
 
 export function getKnownRaidByName(name: string | null | undefined) {
   return findRaidByName(allRaidInstances, name);
+}
+
+export function getLocalizedRaidName(
+  raid: Pick<RaidDefinition, "name" | "names">,
+  locale: AppLocale,
+) {
+  return raid.names?.[locale] ?? raid.name;
 }

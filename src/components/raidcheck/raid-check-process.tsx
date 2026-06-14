@@ -1,9 +1,12 @@
-import { raidCheckSteps } from "@/components/raidcheck/data";
+import { getRaidCheckSteps } from "@/components/raidcheck/data";
 import { Card, CardContent } from "@/components/ui/card";
+import type { AppLocale } from "@/lib/i18n";
 
-export function RaidCheckProcess() {
+export function RaidCheckProcess({ locale }: { locale: AppLocale }) {
+  const raidCheckSteps = getRaidCheckSteps(locale);
+
   return (
-    <section className="raidcheck-process" aria-label="Как работает проверка">
+    <section className="raidcheck-process" aria-label={locale === "ru" ? "Как работает проверка" : "How check works"}>
       {raidCheckSteps.map((step) => {
         const Icon = step.icon;
 

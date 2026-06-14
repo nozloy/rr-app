@@ -1,7 +1,7 @@
 'use client'
 
-import { Crown, Save, Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Save, Sparkles } from 'lucide-react'
+import { useAppLocale } from '@/components/shell/locale-provider'
 import { Button } from '@/components/ui/button'
 import {
 	DateTimeSection,
@@ -17,10 +17,12 @@ import {
 import type { CreateEventFormProps } from './create-event-types'
 import { eventUi } from './create-event-ui'
 import { useCreateEventDraft } from './use-create-event-draft'
+import { t } from '@/lib/i18n'
 
 export type { EventCharacterOption } from './create-event-types'
 
 export function CreateEventForm(props: CreateEventFormProps) {
+	const locale = useAppLocale()
 	const {
 		canPublish,
 		canSubmit,
@@ -44,14 +46,9 @@ export function CreateEventForm(props: CreateEventFormProps) {
 		<div className={eventUi.shell}>
 			<section className={eventUi.hero}>
 				<div>
-					<Badge className={eventUi.premiumBadge} variant='success'>
-						<Crown className='size-3.5' aria-hidden='true' />
-						Премиум активен
-					</Badge>
-					<h1 className={eventUi.heroTitle}>Создание нового события</h1>
+					<h1 className={eventUi.heroTitle}>{t(locale, 'events.heroTitle')}</h1>
 					<p className={eventUi.heroCopy}>
-						Создайте рейд, подземелье или активность в открытом мире и соберите
-						группу с нужным составом.
+						{t(locale, 'events.heroCopy')}
 					</p>
 				</div>
 			</section>
@@ -139,7 +136,7 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						type='button'
 					>
 						<Sparkles className='size-5' aria-hidden='true' />
-						Опубликовать событие
+						{t(locale, 'events.publishEvent')}
 					</Button>
 					<Button
 						className={eventUi.actionSecondary}
@@ -150,15 +147,14 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						variant='outline'
 					>
 						<Save className='size-5' aria-hidden='true' />
-						Сохранить как шаблон
+						{t(locale, 'events.saveAsTemplate')}
 					</Button>
 
 					{statusMessage ? (
 						<p className={eventUi.statusNote}>{statusMessage}</p>
 					) : (
 						<p className={eventUi.previewFootnote}>
-							Шаблоны доступны в разделе активностей после подключения
-							серверного сохранения.
+							{t(locale, 'events.templatesFootnote')}
 						</p>
 					)}
 				</aside>

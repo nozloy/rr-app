@@ -9,15 +9,18 @@ import { MythicOverview } from "@/components/dashboard/mythic-overview";
 import { RaidProgress } from "@/components/dashboard/raid-progress";
 import { WeekCalendar } from "@/components/dashboard/week-calendar";
 import { AppHeader } from "@/components/shell/app-header";
+import type { AppLocale } from "@/lib/i18n";
 
 type DashboardPageViewProps = {
   characters: Character[];
   displayName: string;
+  locale: AppLocale;
 };
 
 export function DashboardPageView({
   characters,
   displayName,
+  locale,
 }: DashboardPageViewProps) {
   const activeCharacters = characters.filter((character) => character.isActive);
   const topCharacter = activeCharacters[0] ?? characters[0] ?? null;
@@ -32,7 +35,7 @@ export function DashboardPageView({
       <AppHeader user={headerUser} />
 
       <div className="dashboard-hero-band">
-        <DashboardHero displayName={preferredName} />
+        <DashboardHero displayName={preferredName} locale={locale} />
       </div>
 
       <div className="dashboard-shell">
@@ -40,20 +43,21 @@ export function DashboardPageView({
           activeCount={activeCharacters.length}
           characters={characters}
           displayName={preferredName}
+          locale={locale}
           topCharacter={topCharacter}
         />
 
         <div className="dashboard-main-grid">
-          <CharacterRoster characters={characters} />
-          <RaidProgress />
-          <ActivityList kind="upcoming" />
-          <ActivityList kind="past" />
+          <CharacterRoster characters={characters} locale={locale} />
+          <RaidProgress locale={locale} />
+          <ActivityList kind="upcoming" locale={locale} />
+          <ActivityList kind="past" locale={locale} />
           <div className="dashboard-right-stack">
-            <WeekCalendar />
-            <MythicOverview />
+            <WeekCalendar locale={locale} />
+            <MythicOverview locale={locale} />
           </div>
-          <AchievementsPanel />
-          <AccountFeed />
+          <AchievementsPanel locale={locale} />
+          <AccountFeed locale={locale} />
         </div>
       </div>
     </main>

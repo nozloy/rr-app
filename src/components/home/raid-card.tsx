@@ -2,12 +2,16 @@ import Image from "next/image";
 import { CalendarDays, Crown, Link2, UsersRound } from "lucide-react";
 import type { FeaturedRaid } from "@/components/home/data";
 import { DifficultyBadge } from "@/components/home/difficulty-badge";
+import { Button } from "@/components/ui/button";
+import type { AppLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 
 type RaidCardProps = {
+  locale: AppLocale;
   raid: FeaturedRaid;
 };
 
-export function RaidCard({ raid }: RaidCardProps) {
+export function RaidCard({ locale, raid }: RaidCardProps) {
   return (
     <article className="home-raid-card">
       <div className="home-raid-image">
@@ -21,7 +25,7 @@ export function RaidCard({ raid }: RaidCardProps) {
       </div>
       <div className="home-raid-content">
         <h3>{raid.title}</h3>
-        <div className="home-difficulty-row" aria-label="Доступные сложности">
+        <div className="home-difficulty-row" aria-label={t(locale, "home.raidDifficulties")}>
           {raid.difficulties.map((difficulty) => (
             <DifficultyBadge key={difficulty} value={difficulty} />
           ))}
@@ -33,16 +37,22 @@ export function RaidCard({ raid }: RaidCardProps) {
           </span>
           <span>
             <Crown className="size-4" aria-hidden="true" />
-            Лидер: {raid.leader}
+            {t(locale, "home.raidLeader")}: {raid.leader}
           </span>
           <span>
             <UsersRound className="size-4" aria-hidden="true" />
             {raid.party}
           </span>
         </div>
-        <button className="home-raid-link" type="button" aria-label={`Открыть рейд ${raid.title}`}>
+        <Button
+          aria-label={t(locale, "home.raidOpenAria", { name: raid.title })}
+          className="home-raid-link"
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
           <Link2 className="size-5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </article>
   );

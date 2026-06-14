@@ -397,5 +397,12 @@
     "source": "Wowhead",
     "pageUrl": "https://www.wowhead.com/guide/midnight/raids/march-on-quel-danas-overview-location-rewards-bosses",
     "imageUrl": "https://wow.zamimg.com/uploads/guide/header/fcfbc7d789bd78e9aa578cb8f3bf7d3c707ee39a.jpg"
+  },
+  {
+    "slug": "sporefall",
+    "name": "Sporefall",
+    "source": "Wowhead",
+    "pageUrl": "https://www.wowhead.com/guide/midnight/raids/sporefall-overview-location-rewards-boss",
+    "imageUrl": "https://wow.zamimg.com/uploads/guide/header/675a1121b7a2db0b8c36a74176c6b4f8b20bcb95.jpg"
   }
 ]

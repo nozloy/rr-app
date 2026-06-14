@@ -8,6 +8,7 @@ import {
   getBattleNetAccount,
   getValidAccessToken,
 } from "@/lib/blizzard-api";
+import type { AppLocale } from "@/lib/i18n";
 import { mapBlizzardCharacterToNormalized } from "@/lib/blizzard-mappers";
 import { prisma } from "@/lib/prisma";
 
@@ -36,6 +37,7 @@ async function loadOptionalCharacterResource<T>(
 
 export async function syncCharactersForUser(
   userId: string,
+  locale: AppLocale = "ru",
 ): Promise<CharacterSyncResult> {
   const account = await getBattleNetAccount(userId);
 
@@ -46,7 +48,10 @@ export async function syncCharactersForUser(
       updatedCount: 0,
       failedCount: 0,
       totalCount: 0,
-      message: "Сначала подключите Battle.net.",
+      message:
+        locale === "ru"
+          ? "Сначала подключите Battle.net."
+          : "Connect Battle.net first.",
     };
   }
 
@@ -166,7 +171,9 @@ export async function syncCharactersForUser(
             failedCount,
             totalCount: summaries.length,
             message:
-              "Battle.net отклонил запрос. Подключите аккаунт заново и повторите синхронизацию.",
+              locale === "ru"
+                ? "Battle.net отклонил запрос. Подключите аккаунт заново и повторите синхронизацию."
+                : "Battle.net rejected request. Reconnect account and retry sync.",
           };
         }
 
@@ -201,8 +208,12 @@ export async function syncCharactersForUser(
       totalCount: summaries.length,
       message:
         summaries.length > 0
-          ? `Синхронизация завершена: ${summaries.length} персонажей обработано.`
-          : "Персонажи не найдены в профиле Battle.net.",
+          ? locale === "ru"
+            ? `Синхронизация завершена: ${summaries.length} персонажей обработано.`
+            : `Sync completed: ${summaries.length} characters processed.`
+          : locale === "ru"
+            ? "Персонажи не найдены в профиле Battle.net."
+            : "No characters found in Battle.net profile.",
     };
   } catch (error) {
     if (error instanceof BattleNetAuthError) {
@@ -213,7 +224,9 @@ export async function syncCharactersForUser(
         failedCount: 0,
         totalCount: 0,
         message:
-          "Battle.net требует повторного входа. Переподключите аккаунт и запустите обновление ещё раз.",
+          locale === "ru"
+            ? "Battle.net требует повторного входа. Переподключите аккаунт и запустите обновление ещё раз."
+            : "Battle.net requires re-login. Reconnect account and run sync again.",
       };
     }
 
@@ -223,7 +236,10 @@ export async function syncCharactersForUser(
       updatedCount: 0,
       failedCount: 0,
       totalCount: 0,
-      message: "Не удалось обновить персонажей.",
+      message:
+        locale === "ru"
+          ? "Не удалось обновить персонажей."
+          : "Failed to sync characters.",
     };
   }
 }

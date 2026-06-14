@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 
-export type EventActivityType = 'raid' | 'dungeon' | 'open-world'
+export type EventActivityType = 'raid' | 'dungeon' | 'season' | 'open-world'
 
 export type EventCharacterOption = {
 	activeSpec?: string | null

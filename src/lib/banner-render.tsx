@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import type { ReactElement } from "react";
+import { t, type AppLocale } from "@/lib/i18n";
 import type { PartyNeedsSummary } from "@/lib/party-slots";
 import { formatItemLevel } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export type BannerRenderCharacter = {
 export type BannerVariant = "mythicPlus" | "currentRaid" | "legacyRaid";
 
 export type BannerRenderInput = {
+  locale?: AppLocale;
   backgroundImage?: string;
   bannerVariant?: BannerVariant;
   character: BannerRenderCharacter;
@@ -47,14 +49,20 @@ export type BannerRaidDetails = {
   }[];
 };
 
-export function getPartySummary(party: PartyNeedsSummary) {
+export function getPartySummary(
+  party: PartyNeedsSummary,
+  locale: AppLocale = "ru",
+) {
+  const tankLabel = t(locale, "party.tank");
+  const healerLabel = t(locale, "party.healer");
+  const damageLabel = t(locale, "party.damage");
   const parts = [
-    party.tankNeeded === 0 ? "Танк" : null,
-    party.healerNeeded === 0 ? "Хилл" : null,
-    party.dpsNeeded < 3 ? `ДД x${3 - party.dpsNeeded}` : null,
+    party.tankNeeded === 0 ? tankLabel : null,
+    party.healerNeeded === 0 ? healerLabel : null,
+    party.dpsNeeded < 3 ? `${damageLabel} x${3 - party.dpsNeeded}` : null,
   ].filter(Boolean);
 
-  return parts.length > 0 ? parts.join(" • ") : "Слоты не отмечены";
+  return parts.length > 0 ? parts.join(" • ") : t(locale, "party.missingRoles");
 }
 
 export function getBannerRenderVisibility(
@@ -71,6 +79,7 @@ export function getBannerRenderVisibility(
 }
 
 export function renderBannerImage({
+  locale = "ru",
   backgroundImage,
   bannerVariant = "mythicPlus",
   character,
@@ -78,12 +87,12 @@ export function renderBannerImage({
   keystoneLevel,
   needsLabel,
   party,
-  activityLabel = "Mythic+ LFG",
+  activityLabel = t(locale, "banners.mythicLfg"),
   compositionLabel,
-  needsHeading = "Нужно в группу",
+  needsHeading = t(locale, "banners.needsInGroup"),
   raidDetails,
   topBadgeLabel,
-  partySummary = getPartySummary(party),
+  partySummary = getPartySummary(party, locale),
 }: BannerRenderInput): ReactElement {
   const visibility = getBannerRenderVisibility(bannerVariant);
   const hasRaidDetails = visibility.showRaidDetails && Boolean(raidDetails);
@@ -351,7 +360,7 @@ export function renderBannerImage({
                   color: "#98dfff",
                 }}
               >
-                Состав
+                {t(locale, "banners.composition")}
               </div>
               <div
                 style={{
@@ -367,15 +376,17 @@ export function renderBannerImage({
         </div>
 
         {visibility.showPartySummary ? (
-          <div
-            style={{
-              display: "flex",
-              gap: "24px",
-              fontSize: hasRaidDetails ? 19 : 22,
-              color: "rgba(232, 243, 255, 0.84)",
-            }}
-          >
-            <div style={{ display: "flex" }}>Сейчас: {partySummary}</div>
+            <div
+              style={{
+                display: "flex",
+                gap: "24px",
+                fontSize: hasRaidDetails ? 19 : 22,
+                color: "rgba(232, 243, 255, 0.84)",
+              }}
+            >
+            <div style={{ display: "flex" }}>
+              {t(locale, "banners.current")}: {partySummary}
+            </div>
           </div>
         ) : null}
 
@@ -411,7 +422,7 @@ export function renderBannerImage({
                   color: "#98dfff",
                 }}
               >
-                Броня
+                {t(locale, "banners.armor")}
               </div>
               <div
                 style={{
@@ -463,7 +474,7 @@ export function renderBannerImage({
                   justifyContent: "flex-start",
                 }}
               >
-                Нужные бафы
+                {t(locale, "banners.requiredBuffs")}
               </div>
               {raidDetails.missingBuffs.length > 0 ? (
                 <div
@@ -516,7 +527,7 @@ export function renderBannerImage({
                     color: "#eef7ff",
                   }}
                 >
-                  Все закрыты
+                  {t(locale, "banners.allBuffsCovered")}
                 </div>
               )}
             </div>

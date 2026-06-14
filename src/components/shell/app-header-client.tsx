@@ -8,13 +8,15 @@ import {
   LogOut,
   Menu,
 } from "lucide-react";
+import { LocaleSwitch } from "@/components/shell/locale-switch";
+import { useAppLocale } from "@/components/shell/locale-provider";
 import { LoginButton } from "@/components/login-button";
 import { LogoutButton } from "@/components/logout-button";
 import { BrandLockup } from "@/components/shell/brand-lockup";
 import {
-  accountMenuItems,
-  authenticatedHeaderNavItems,
-  headerNavItems,
+  getAccountMenuItems,
+  getAuthenticatedHeaderNavItems,
+  getHeaderNavItems,
 } from "@/components/shell/nav-items";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type AppHeaderUser = {
@@ -73,7 +76,11 @@ export function AppHeaderClient({
   envReady,
   user,
 }: AppHeaderClientProps) {
+  const locale = useAppLocale();
   const pathname = usePathname() ?? "/";
+  const headerNavItems = getHeaderNavItems(locale);
+  const authenticatedHeaderNavItems = getAuthenticatedHeaderNavItems(locale);
+  const accountMenuItems = getAccountMenuItems(locale);
   const mainNavItems = user
     ? [...headerNavItems, ...authenticatedHeaderNavItems]
     : headerNavItems;
@@ -87,7 +94,7 @@ export function AppHeaderClient({
         textClassName="app-header-brand-text"
       />
 
-      <nav className="app-header-nav" aria-label="Основная навигация">
+      <nav className="app-header-nav" aria-label={t(locale, "header.navigation")}>
         {mainNavItems.map((item) => (
           <Link
             className={cn(isActivePath(pathname, item.href) && "is-active")}
@@ -100,10 +107,11 @@ export function AppHeaderClient({
       </nav>
 
       <div className="app-header-actions">
+        <LocaleSwitch />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              aria-label="Открыть навигацию"
+              aria-label={t(locale, "header.openNavigation")}
               className="app-header-mobile-trigger"
               size="icon"
               type="button"
@@ -116,7 +124,7 @@ export function AppHeaderClient({
             align="end"
             className="app-header-dropdown app-header-mobile-menu"
           >
-            <DropdownMenuLabel>Навигация</DropdownMenuLabel>
+            <DropdownMenuLabel>{t(locale, "header.navigation")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {mainNavItems.map((item) => {
               const Icon = item.icon;
@@ -144,6 +152,7 @@ export function AppHeaderClient({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
+                  aria-label={t(locale, "header.accountMenuLabel")}
                   className="app-header-account-trigger"
                   type="button"
                   variant="outline"
@@ -160,7 +169,7 @@ export function AppHeaderClient({
                 className="app-header-dropdown app-header-account-menu"
               >
                 <DropdownMenuLabel className="app-header-account-label">
-                  <span>Battle.net</span>
+                  <span>{t(locale, "header.battleNetLabel")}</span>
                   <strong>{user.displayName}</strong>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -190,7 +199,7 @@ export function AppHeaderClient({
                     variant="ghost"
                   >
                     <LogOut className="size-4" aria-hidden="true" />
-                    Выйти
+                    {t(locale, "header.logout")}
                   </LogoutButton>
                 </div>
               </DropdownMenuContent>
@@ -201,6 +210,7 @@ export function AppHeaderClient({
             className="app-header-login-button"
             disabled={!envReady}
             size="lg"
+            label={t(locale, "header.signInWithBattleNet")}
           />
         )}
       </div>

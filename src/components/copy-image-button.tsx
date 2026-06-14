@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { Copy } from "lucide-react";
+import { useAppLocale } from "@/components/shell/locale-provider";
 import { Button } from "@/components/ui/button";
+import { t } from "@/lib/i18n";
 
 type CopyImageButtonProps = {
   imageUrl: string;
 };
 
 export function CopyImageButton({ imageUrl }: CopyImageButtonProps) {
+  const locale = useAppLocale();
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
 
   async function handleCopy() {
@@ -32,16 +35,16 @@ export function CopyImageButton({ imageUrl }: CopyImageButtonProps) {
     <div className="flex flex-col gap-2">
       <Button onClick={handleCopy} type="button">
         <Copy className="size-4" aria-hidden="true" />
-        Скопировать PNG
+        {t(locale, "banners.copyPng")}
       </Button>
       {status === "success" ? (
         <span className="text-sm text-[#dff9e7]" role="status">
-          Изображение скопировано.
+          {t(locale, "banners.copySuccess")}
         </span>
       ) : null}
       {status === "error" ? (
         <span className="text-sm text-[#fecaca]" role="status">
-          Браузер не дал записать PNG. Используйте скачивание.
+          {t(locale, "banners.copyError")}
         </span>
       ) : null}
     </div>

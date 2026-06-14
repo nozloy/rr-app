@@ -2,21 +2,26 @@ import Image from "next/image";
 import { ChevronRight, Coins, Swords, UsersRound } from "lucide-react";
 import { pastActivities, upcomingActivities } from "@/components/dashboard/data";
 import { Badge } from "@/components/ui/badge";
+import { t, type AppLocale } from "@/lib/i18n";
 
 type ActivityListProps = {
   kind: "past" | "upcoming";
+  locale: AppLocale;
 };
 
-export function ActivityList({ kind }: ActivityListProps) {
+export function ActivityList({ kind, locale }: ActivityListProps) {
   const items = kind === "upcoming" ? upcomingActivities : pastActivities;
-  const title = kind === "upcoming" ? "Будущие активности" : "Прошлые активности";
+  const title =
+    kind === "upcoming"
+      ? t(locale, "dashboard.upcoming")
+      : t(locale, "dashboard.past");
 
   return (
     <section className="dashboard-panel dashboard-activity-panel">
       <div className="dashboard-panel-heading">
         <h2>{title}</h2>
         <a href="#activity">
-          Все
+          {t(locale, "dashboard.all")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </a>
       </div>

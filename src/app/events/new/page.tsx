@@ -5,6 +5,8 @@ import {
 } from "@/components/events/create-event-form";
 import styles from "@/components/events/create-event-form.module.css";
 import { AppHeader } from "@/components/shell/app-header";
+import { t } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -28,6 +30,7 @@ function getTomorrowInputDate() {
 }
 
 export default async function NewEventPage() {
+  const locale = await getRequestLocale();
   const session = await requireSession();
   const characters: EventCharacterOption[] = await prisma.character.findMany({
     where: {
@@ -48,7 +51,8 @@ export default async function NewEventPage() {
   });
 
   const topCharacter = characters[0] ?? null;
-  const displayName = topCharacter?.name ?? session.user.name ?? "Игрок";
+  const displayName =
+    topCharacter?.name ?? session.user.name ?? t(locale, "header.playerFallback");
   const headerUser = {
     avatarUrl:
       topCharacter?.avatarUrl ??

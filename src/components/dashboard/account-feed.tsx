@@ -1,13 +1,14 @@
 import { ChevronRight } from "lucide-react";
 import { accountFeed } from "@/components/dashboard/data";
+import { t, type AppLocale } from "@/lib/i18n";
 
-export function AccountFeed() {
+export function AccountFeed({ locale }: { locale: AppLocale }) {
   return (
     <section className="dashboard-panel dashboard-feed-panel">
       <div className="dashboard-panel-heading">
-        <h2>Активность аккаунта</h2>
+        <h2>{t(locale, "dashboard.accountActivity")}</h2>
         <a href="#feed">
-          Вся история
+          {t(locale, "dashboard.fullHistory")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </a>
       </div>

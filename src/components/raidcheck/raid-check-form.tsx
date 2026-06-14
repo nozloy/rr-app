@@ -23,6 +23,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { raidCheckAction } from "@/actions/raid-check";
+import { useAppLocale } from "@/components/shell/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,12 +41,13 @@ import {
   parseAddonExportString,
   type AddonExportData,
 } from "@/lib/addon-export";
+import { t } from "@/lib/i18n";
 import {
   ALL_SEASON_RAIDS_VALUE,
   getDefaultRaidCheckDifficultyID,
   getRaidCheckDifficultyOptions,
 } from "@/lib/raid-check-core";
-import { currentRaidInstances, getRaidByName } from "@/lib/raids";
+import { currentRaidInstances, getLocalizedRaidName, getRaidByName } from "@/lib/raids";
 import type {
   RaidCheckCharacterResult,
   RaidCheckResult,
@@ -64,12 +66,14 @@ type ImportPreview =
       options: [];
     };
 
-const statusLabels: Record<RaidCheckCharacterResult["status"], string> = {
-  clean: "Чистые",
-  error: "Ошибка проверки",
-  locked: "Есть убийства",
-  not_found: "Не найден",
-};
+function getStatusLabels(locale: "ru" | "en") {
+  return {
+    clean: t(locale, "raidcheck.statusClean"),
+    error: t(locale, "raidcheck.statusError"),
+    locked: t(locale, "raidcheck.statusLocked"),
+    not_found: t(locale, "raidcheck.statusNotFound"),
+  } satisfies Record<RaidCheckCharacterResult["status"], string>;
+}
 
 const statusIcons = {
   clean: CheckCircle2,
@@ -87,13 +91,13 @@ const issueStatusPriority: Record<RaidCheckCharacterResult["status"], number> = 
   clean: 3,
 };
 
-function getPreview(exportText: string): ImportPreview {
+function getPreview(exportText: string, locale: "ru" | "en"): ImportPreview {
   if (!exportText.trim()) {
     return { status: "idle", message: null, options: [] };
   }
 
   try {
-    const exportData = parseAddonExportString(exportText);
+    const exportData = parseAddonExportString(exportText, locale);
     return {
       status: "ready",
       exportData,
@@ -106,14 +110,14 @@ function getPreview(exportText: string): ImportPreview {
       message:
         error instanceof AddonExportParseError
           ? error.message
-          : "Не удалось прочитать строку экспорта.",
+          : t(locale, "raidcheck.previewParseError"),
       options: [],
     };
   }
 }
 
-function formatKillTime(timestamp: number) {
-  return new Intl.DateTimeFormat("ru-RU", {
+function formatKillTime(timestamp: number, locale: "ru" | "en") {
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(timestamp));
@@ -210,19 +214,21 @@ function RaidCheckInfoTooltip({
 
   return (
     <>
-      <button
+      <Button
         aria-describedby={isOpen ? tooltipId : undefined}
         aria-label={label}
         className="raidcheck-info"
+        size="icon"
         onBlur={() => setIsOpen(false)}
         onFocus={openTooltip}
         onMouseEnter={openTooltip}
         onMouseLeave={() => setIsOpen(false)}
         ref={triggerRef}
         type="button"
+        variant="ghost"
       >
         <Info className="size-4" aria-hidden="true" />
-      </button>
+      </Button>
       {isOpen && typeof document !== "undefined"
         ? createPortal(
             <div
@@ -241,9 +247,16 @@ function RaidCheckInfoTooltip({
   );
 }
 
-function RaidCheckStatus({ row }: { row: RaidCheckCharacterResult }) {
+function RaidCheckStatus({
+  row,
+  locale,
+}: {
+  row: RaidCheckCharacterResult;
+  locale: "ru" | "en";
+}) {
   const hasKills = row.killedBosses.length > 0;
   const Icon = statusIcons[row.status];
+  const statusLabels = getStatusLabels(locale);
 
   return (
     <div className="raidcheck-status-cell">
@@ -252,7 +265,7 @@ function RaidCheckStatus({ row }: { row: RaidCheckCharacterResult }) {
         {statusLabels[row.status]}
       </span>
       {hasKills ? (
-        <RaidCheckInfoTooltip label={`Подробности кд: ${row.name}`}>
+        <RaidCheckInfoTooltip label={`${t(locale, "raidcheck.lockout")}: ${row.name}`}>
           {row.killedBosses.map((boss) => (
             <span
               className="raidcheck-tooltip-row"
@@ -260,13 +273,13 @@ function RaidCheckStatus({ row }: { row: RaidCheckCharacterResult }) {
             >
               <span>{boss.name}</span>
               {boss.lastKillTimestamp > 0 ? (
-                <span>{formatKillTime(boss.lastKillTimestamp)}</span>
+                <span>{formatKillTime(boss.lastKillTimestamp, locale)}</span>
               ) : null}
             </span>
           ))}
         </RaidCheckInfoTooltip>
       ) : row.error ? (
-        <RaidCheckInfoTooltip label={`Ошибка проверки: ${row.name}`}>
+        <RaidCheckInfoTooltip label={`${t(locale, "raidcheck.statusError")}: ${row.name}`}>
           <span>{row.error}</span>
         </RaidCheckInfoTooltip>
       ) : null}
@@ -275,9 +288,11 @@ function RaidCheckStatus({ row }: { row: RaidCheckCharacterResult }) {
 }
 
 function RaidCheckTableRow({
+  locale,
   priority,
   row,
 }: {
+  locale: "ru" | "en";
   priority: "clean" | "issue";
   row: RaidCheckCharacterResult;
 }) {
@@ -295,18 +310,24 @@ function RaidCheckTableRow({
         </div>
       </td>
       <td>
-        <RaidCheckStatus row={row} />
+        <RaidCheckStatus locale={locale} row={row} />
       </td>
     </tr>
   );
 }
 
-function RaidCheckImportSummary({ preview }: { preview: ImportPreview }) {
+function RaidCheckImportSummary({
+  preview,
+  locale,
+}: {
+  preview: ImportPreview;
+  locale: "ru" | "en";
+}) {
   if (preview.status !== "ready") {
     return (
       <div className="raidcheck-import-empty">
         <ShieldCheck className="size-5" aria-hidden="true" />
-        <span>Ожидаю строку экспорта</span>
+        <span>{t(locale, "raidcheck.waitingExport")}</span>
       </div>
     );
   }
@@ -317,26 +338,26 @@ function RaidCheckImportSummary({ preview }: { preview: ImportPreview }) {
   return (
     <div className="raidcheck-import-summary">
       <div className="raidcheck-summary-card" data-tone={isRaidExport ? "green" : "gold"}>
-        <span>Тип</span>
-        <strong>{isRaidExport ? "Рейд" : "Не рейд"}</strong>
+        <span>{t(locale, "raidcheck.type")}</span>
+        <strong>{isRaidExport ? t(locale, "raidcheck.raid") : t(locale, "raidcheck.notRaid")}</strong>
         <Badge variant={isRaidExport ? "success" : "warning"}>
-          {isRaidExport ? "Готово" : "Проверьте источник"}
+          {isRaidExport ? t(locale, "raidcheck.ready") : t(locale, "raidcheck.checkSource")}
         </Badge>
       </div>
       <div className="raidcheck-summary-card" data-tone="blue">
-        <span>Инстанс</span>
-        <strong>{preview.exportData.instanceName ?? "Не определен"}</strong>
-        <Badge variant="arcane">Каталог рейдов</Badge>
+        <span>{t(locale, "raidcheck.instance")}</span>
+        <strong>{preview.exportData.instanceName ?? t(locale, "raidcheck.notDetected")}</strong>
+        <Badge variant="arcane">{t(locale, "raidcheck.raidCatalog")}</Badge>
       </div>
       <div className="raidcheck-summary-card" data-tone={hasFullRoster ? "green" : "gold"}>
-        <span>Состав</span>
+        <span>{t(locale, "raidcheck.roster")}</span>
         <strong>
           {hasFullRoster
-            ? `${preview.exportData.roster.length} игроков`
-            : "Только автор"}
+            ? `${preview.exportData.roster.length} ${locale === "ru" ? "игроков" : "players"}`
+            : t(locale, "raidcheck.authorOnly")}
         </strong>
         <Badge variant={hasFullRoster ? "success" : "warning"}>
-          {hasFullRoster ? "Roster найден" : "Нужен новый аддон"}
+          {hasFullRoster ? t(locale, "raidcheck.rosterFound") : t(locale, "raidcheck.needNewAddon")}
         </Badge>
       </div>
     </div>
@@ -344,6 +365,7 @@ function RaidCheckImportSummary({ preview }: { preview: ImportPreview }) {
 }
 
 export function RaidCheckForm() {
+  const locale = useAppLocale();
   const exportTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [exportText, setExportText] = useState("");
   const [selectedDifficultyID, setSelectedDifficultyID] = useState("15");
@@ -353,7 +375,7 @@ export function RaidCheckForm() {
   const [result, setResult] = useState<RaidCheckResult | null>(null);
   const [showAllCleanRows, setShowAllCleanRows] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const preview = useMemo(() => getPreview(exportText), [exportText]);
+  const preview = useMemo(() => getPreview(exportText, locale), [exportText, locale]);
   const resultStats = getResultStats(result);
   const resultRows = useMemo(
     () => (result?.status === "success" ? result.rows : []),
@@ -399,7 +421,7 @@ export function RaidCheckForm() {
       const nextResult = await raidCheckAction({
         exportText,
         difficultyID: Number.parseInt(selectedDifficultyID, 10),
-        locale: "ru",
+        locale,
         raidSlug: selectedRaidSlug,
       });
       setShowAllCleanRows(false);
@@ -416,18 +438,17 @@ export function RaidCheckForm() {
           <form className="raidcheck-form" onSubmit={handleSubmit}>
             <div className="raidcheck-panel-heading">
               <div>
-                <div className="eyebrow">Источник</div>
-                <h2>Строка из аддона</h2>
+                <div className="eyebrow">{t(locale, "raidcheck.source")}</div>
+                <h2>{t(locale, "raidcheck.addonString")}</h2>
               </div>
             </div>
 
             <p className="raidcheck-copy">
-              Используйте свежую строку из <code className="code-inline">/rr</code>.
-              Для проверки всего рейда нужен обновленный аддон с полным roster.
+              {t(locale, "raidcheck.useFreshExport")} <code className="code-inline">/rr</code>.
             </p>
 
             <label className="raidcheck-field">
-              <span className="field-label">Строка RaidReminder</span>
+              <span className="field-label">{t(locale, "raidcheck.addonString")}</span>
               <ScrollArea className="raidcheck-textarea-scroll">
                 <Textarea
                   className="raidcheck-textarea"
@@ -448,10 +469,10 @@ export function RaidCheckForm() {
               <p className="status-note error">{preview.message}</p>
             ) : null}
 
-            <RaidCheckImportSummary preview={preview} />
+            <RaidCheckImportSummary locale={locale} preview={preview} />
 
             <label className="raidcheck-field">
-              <span className="field-label">Рейд для проверки</span>
+              <span className="field-label">{t(locale, "raidcheck.raidToCheck")}</span>
               <Select
                 disabled={preview.status !== "ready"}
                 onValueChange={(value) => {
@@ -462,18 +483,18 @@ export function RaidCheckForm() {
                 value={selectedRaidSlug}
               >
                 <SelectTrigger className="raidcheck-select">
-                  <SelectValue placeholder="Выберите актуальный рейд" />
+                  <SelectValue placeholder={t(locale, "raidcheck.chooseCurrentRaid")} />
                 </SelectTrigger>
                 <SelectContent className="raidcheck-select-content">
                   <SelectItem value={ALL_SEASON_RAIDS_VALUE}>
                     <span className="raidcheck-premium-option">
-                      <span>Все рейды сезона</span>
-                      <span className="raidcheck-premium-tag">Premium</span>
+                      <span>{t(locale, "raidcheck.allSeasonRaids")}</span>
+                      <span className="raidcheck-premium-tag">{t(locale, "raidcheck.summaryPremium")}</span>
                     </span>
                   </SelectItem>
                   {currentRaidInstances.map((raid) => (
                     <SelectItem key={raid.slug} value={raid.slug}>
-                      {raid.name}
+                      {getLocalizedRaidName(raid, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -481,7 +502,7 @@ export function RaidCheckForm() {
             </label>
 
             <label className="raidcheck-field">
-              <span className="field-label">Сложность</span>
+              <span className="field-label">{t(locale, "raidcheck.difficulty")}</span>
               <Select
                 disabled={preview.status !== "ready"}
                 onValueChange={(value) => {
@@ -492,7 +513,7 @@ export function RaidCheckForm() {
                 value={selectedDifficultyID}
               >
                 <SelectTrigger className="raidcheck-select">
-                  <SelectValue placeholder="Сначала вставьте строку" />
+                  <SelectValue placeholder={t(locale, "raidcheck.pasteFirst")} />
                 </SelectTrigger>
                 <SelectContent className="raidcheck-select-content">
                   {(preview.status === "ready" ? preview.options : []).map(
@@ -517,7 +538,7 @@ export function RaidCheckForm() {
               ) : (
                 <Search className="size-4" aria-hidden="true" />
               )}
-              Проверить кд
+              {t(locale, "raidcheck.submit")}
             </Button>
           </form>
         </CardContent>
@@ -527,8 +548,8 @@ export function RaidCheckForm() {
         <CardContent className="raidcheck-panel-content">
           <div className="raidcheck-panel-heading">
             <div>
-              <div className="eyebrow">Результат</div>
-              <h2>Таблица кд</h2>
+              <div className="eyebrow">{t(locale, "raidcheck.result")}</div>
+              <h2>{t(locale, "raidcheck.resultTable")}</h2>
             </div>
           </div>
 
@@ -538,27 +559,26 @@ export function RaidCheckForm() {
             </p>
           ) : (
             <p className="raidcheck-copy">
-              После проверки здесь появится список участников рейда и статус
-              каждого персонажа.
+              {t(locale, "raidcheck.resultEmpty")}
             </p>
           )}
 
           {resultStats ? (
             <div className="raidcheck-result-stats">
               <div data-tone="blue">
-                <span>Всего</span>
+                <span>{t(locale, "raidcheck.total")}</span>
                 <strong>{resultStats.total}</strong>
               </div>
               <div data-tone="green">
-                <span>Чистые</span>
+                <span>{t(locale, "raidcheck.clean")}</span>
                 <strong>{resultStats.clean}</strong>
               </div>
               <div data-tone="gold">
-                <span>С кд</span>
+                <span>{t(locale, "raidcheck.locked")}</span>
                 <strong>{resultStats.locked}</strong>
               </div>
               <div data-tone="red">
-                <span>Ошибки</span>
+                <span>{t(locale, "raidcheck.issues")}</span>
                 <strong>{resultStats.issues}</strong>
               </div>
             </div>
@@ -576,18 +596,22 @@ export function RaidCheckForm() {
           ) : null}
 
           {result?.status === "success" ? (
-            <div className="raidcheck-table-wrap">
+            <ScrollArea
+              className="rounded-lg border border-[#6f9ee1]/20 bg-[rgba(3,13,27,0.52)]"
+              scrollbarOrientation="horizontal"
+            >
               <table className="raidcheck-table">
                 <thead>
                   <tr>
-                    <th>Игрок / сервер</th>
-                    <th>КД</th>
+                    <th>{t(locale, "raidcheck.playerRealm")}</th>
+                    <th>{t(locale, "raidcheck.lockout")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {issueRows.map((row) => (
                     <RaidCheckTableRow
                       key={`${row.name}-${row.realm}-issue`}
+                      locale={locale}
                       priority="issue"
                       row={row}
                     />
@@ -595,7 +619,7 @@ export function RaidCheckForm() {
                   {issueRows.length > 0 && cleanRows.length > 0 ? (
                     <tr className="raidcheck-table-divider">
                       <td colSpan={2}>
-                        <span>Остальные без кд</span>
+                        <span>{t(locale, "raidcheck.othersClean")}</span>
                         <strong>{cleanRows.length}</strong>
                       </td>
                     </tr>
@@ -603,6 +627,7 @@ export function RaidCheckForm() {
                   {visibleCleanRows.map((row) => (
                     <RaidCheckTableRow
                       key={`${row.name}-${row.realm}-clean`}
+                      locale={locale}
                       priority="clean"
                       row={row}
                     />
@@ -618,21 +643,18 @@ export function RaidCheckForm() {
                     variant="outline"
                   >
                     {showAllCleanRows
-                      ? "Свернуть чистых игроков"
-                      : `Показать остальных чистых (${hiddenCleanRows})`}
+                      ? t(locale, "raidcheck.collapseClean")
+                      : t(locale, "raidcheck.showClean", { count: hiddenCleanRows })}
                   </Button>
                 </div>
               ) : null}
-            </div>
+            </ScrollArea>
           ) : (
             <div className="raidcheck-empty-result">
               <div className="raidcheck-empty-glow" aria-hidden="true" />
               <Search className="size-9" aria-hidden="true" />
-              <h3>Готов к проверке</h3>
-              <p>
-                Вставьте строку из аддона, выберите сложность и запустите
-                проверку. Запросы к Blizzard выполняются на сервере.
-              </p>
+              <h3>{t(locale, "raidcheck.readyToCheck")}</h3>
+              <p>{t(locale, "raidcheck.readyToCheckCopy")}</p>
               <div className="raidcheck-empty-pills">
                 <span>Normal</span>
                 <span>Heroic</span>

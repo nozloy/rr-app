@@ -108,7 +108,14 @@ export function getEuWeeklyResetStart(now = new Date()) {
 }
 
 function getRaidNames(raid: RaidDefinition) {
-  return [raid.name, raid.shortName, raid.slug, ...raid.aliases].map(
+  return [
+    raid.name,
+    raid.names?.ru ?? "",
+    raid.names?.en ?? "",
+    raid.shortName,
+    raid.slug,
+    ...raid.aliases,
+  ].map(
     normalizeRaidCheckText,
   );
 }

@@ -1,5 +1,11 @@
-import { currentSeasonDungeons } from '@/lib/dungeons'
-import { currentRaidInstances } from '@/lib/raids'
+import {
+	allDungeonInstances,
+	currentSeasonDungeons,
+	getLocalizedDungeonName,
+} from '@/lib/dungeons'
+import { getLocalizedRaidName, allRaidInstances } from '@/lib/raids'
+import { t, type AppLocale } from '@/lib/i18n'
+import { resolveEventAddon, type EventAddon } from './create-event-data'
 import type {
 	EventCharacterOption,
 	EventInstanceOption,
@@ -15,25 +21,75 @@ export function getInitial(value: string) {
 	return value.trim().slice(0, 1).toUpperCase() || 'R'
 }
 
-export function getRaidOptions(): EventInstanceOption[] {
-	return currentRaidInstances.map(raid => ({
-		activityType: 'raid',
-		artPath: raid.artPath,
-		name: raid.name,
-		shortName: raid.shortName,
-		slug: raid.slug,
-		tag: 'РЕЙД',
-	}))
+const raidExpansionByAddon: Record<EventAddon, string> = {
+	Dragonflight: 'Dragonflight',
+	Midnight: 'Midnight',
+	'The War Within': 'The War Within',
 }
 
-export function getDungeonOptions(): EventInstanceOption[] {
-	return currentSeasonDungeons.map(dungeon => ({
+const dungeonSlugsByAddon: Record<EventAddon, string[]> = {
+	Dragonflight: ['algethar-academy'],
+	Midnight: [
+		'magisters-terrace',
+		'maisara-caverns',
+		'nexus-point-xenas',
+		'windrunner-spire',
+		'blinding-vale',
+		'den-of-nalorakk',
+		'murder-row',
+		'voidscar-arena',
+	],
+	'The War Within': ['seat-of-the-triumvirate', 'skyreach', 'pit-of-saron'],
+}
+
+export function getRaidOptions(
+	addon: string = 'Midnight',
+	locale: AppLocale = 'ru',
+): EventInstanceOption[] {
+	const resolvedAddon = resolveEventAddon(addon)
+	const expansion = raidExpansionByAddon[resolvedAddon]
+
+	return allRaidInstances
+		.filter(raid => raid.expansion === expansion)
+		.map(raid => ({
+		activityType: 'raid',
+		artPath: raid.artPath,
+		name: getLocalizedRaidName(raid, locale),
+		shortName: raid.shortName,
+		slug: raid.slug,
+		tag: t(locale, 'events.typeRaid').toUpperCase(),
+		}))
+}
+
+export function getDungeonOptions(
+	addon: string = 'Midnight',
+	locale: AppLocale = 'ru',
+): EventInstanceOption[] {
+	const resolvedAddon = resolveEventAddon(addon)
+	const allowedSlugs = new Set(dungeonSlugsByAddon[resolvedAddon])
+
+	return allDungeonInstances
+		.filter(dungeon => allowedSlugs.has(dungeon.slug))
+		.map(dungeon => ({
 		activityType: 'dungeon',
 		artPath: dungeon.artPath,
-		name: dungeon.name,
+		name: getLocalizedDungeonName(dungeon, locale),
 		shortName: dungeon.shortName,
 		slug: dungeon.slug,
-		tag: 'ПОДЗЕМЕЛЬЕ',
+		tag: t(locale, 'events.typeDungeon').toUpperCase(),
+		}))
+}
+
+export function getSeasonDungeonOptions(
+	locale: AppLocale = 'ru',
+): EventInstanceOption[] {
+	return currentSeasonDungeons.map(dungeon => ({
+		activityType: 'season',
+		artPath: dungeon.artPath,
+		name: getLocalizedDungeonName(dungeon, locale),
+		shortName: dungeon.shortName,
+		slug: dungeon.slug,
+		tag: t(locale, 'events.typeDungeon').toUpperCase(),
 	}))
 }
 
@@ -113,8 +169,8 @@ export function getCalendarDays(monthDate: Date) {
 	})
 }
 
-export function formatGold(value: number) {
-	return new Intl.NumberFormat('ru-RU').format(value)
+export function formatGold(value: number, locale: AppLocale = 'ru') {
+	return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US').format(value)
 }
 
 export function formatRange(range: RoleRange) {
@@ -123,12 +179,15 @@ export function formatRange(range: RoleRange) {
 		: `${range.min}-${range.max}`
 }
 
-export function parseRoleRangeInput(value: string): RoleValidationResult {
+export function parseRoleRangeInput(
+	value: string,
+	locale: AppLocale = 'ru',
+): RoleValidationResult {
 	const normalized = value.trim().replace(/[–—]/g, '-').replace(/\s+/g, '')
 
 	if (!normalized) {
 		return {
-			error: 'Заполните количество.',
+			error: t(locale, 'events.roleErrorEmpty'),
 			range: null,
 		}
 	}
@@ -137,7 +196,7 @@ export function parseRoleRangeInput(value: string): RoleValidationResult {
 
 	if (!match) {
 		return {
-			error: 'Используйте формат 2 или 10-12.',
+			error: t(locale, 'events.roleErrorFormat'),
 			range: null,
 		}
 	}
@@ -147,14 +206,14 @@ export function parseRoleRangeInput(value: string): RoleValidationResult {
 
 	if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) {
 		return {
-			error: 'Укажите корректные цифры.',
+			error: t(locale, 'events.roleErrorNumbers'),
 			range: null,
 		}
 	}
 
 	if (min > max) {
 		return {
-			error: 'Минимум не может быть больше максимума.',
+			error: t(locale, 'events.roleErrorMinMax'),
 			range: null,
 		}
 	}

@@ -24,8 +24,10 @@ import {
   DEFAULT_RAID_CHECK_LOCALE,
   type RaidCheckLocale,
 } from "@/lib/raid-boss-localization";
+import { t } from "@/lib/i18n";
 import {
   currentRaidInstances,
+  getLocalizedRaidName,
   getRaidByName,
   getRaidBySlug,
   type RaidDefinition,
@@ -71,7 +73,11 @@ export type RaidCheckInput = {
   raidSlug?: string | null;
 };
 
-function errorResult(message: string): RaidCheckResult {
+function tr(locale: RaidCheckLocale, key: string, params?: Record<string, string | number>) {
+  return t(locale, key, params);
+}
+
+function errorResult(locale: RaidCheckLocale, message: string): RaidCheckResult {
   return {
     status: "error",
     message,
@@ -136,32 +142,34 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-function getResultRaidMeta(raids: RaidDefinition[]) {
+function getResultRaidMeta(raids: RaidDefinition[], locale: RaidCheckLocale) {
   if (raids.length === 1) {
     return {
-      raidName: raids[0].name,
+      raidName: getLocalizedRaidName(raids[0], locale),
       raidSlug: raids[0].slug,
     };
   }
 
   return {
-    raidName: "Все рейды сезона",
+    raidName: tr(locale, "raidcheck.allSeasonRaids"),
     raidSlug: ALL_SEASON_RAIDS_VALUE,
   };
 }
 
 function buildUnavailableResult({
   error = null,
+  locale,
   member,
   raids,
   status,
 }: {
   error?: string | null;
   member: AddonRosterMember;
+  locale: RaidCheckLocale;
   raids: RaidDefinition[];
   status?: RaidCheckCharacterStatus;
 }): RaidCheckCharacterResult {
-  const raidMeta = getResultRaidMeta(raids);
+  const raidMeta = getResultRaidMeta(raids, locale);
 
   return {
     ...member,
@@ -192,8 +200,9 @@ async function checkCharacterForRaids({
 
     if (!realmSlug) {
       return buildUnavailableResult({
-        error: "Реалм не найден.",
+        error: tr(locale, "errors.notFound"),
         member,
+        locale,
         raids,
         status: "not_found",
       });
@@ -214,11 +223,11 @@ async function checkCharacterForRaids({
         locale,
       }).map((boss) => ({
         ...boss,
-        raidName: raid.name,
+        raidName: getLocalizedRaidName(raid, locale),
         raidSlug: raid.slug,
       })),
     );
-    const raidMeta = getResultRaidMeta(raids);
+    const raidMeta = getResultRaidMeta(raids, locale);
 
     return {
       ...member,
@@ -230,8 +239,9 @@ async function checkCharacterForRaids({
   } catch (error) {
     if (error instanceof BlizzardApiRequestError && error.status === 404) {
       return buildUnavailableResult({
-        error: "Персонаж не найден.",
+        error: tr(locale, "errors.notFound"),
         member,
+        locale,
         raids,
         status: "not_found",
       });
@@ -241,8 +251,9 @@ async function checkCharacterForRaids({
       error:
         error instanceof Error
           ? error.message
-          : "Не удалось проверить персонажа.",
+          : tr(locale, "errors.unknown"),
       member,
+      locale,
       raids,
       status: "error",
     });
@@ -258,12 +269,13 @@ export async function checkRaidLockoutsForExport({
   let exportData: ReturnType<typeof parseAddonExportString>;
 
   try {
-    exportData = parseAddonExportString(exportText);
+    exportData = parseAddonExportString(exportText, locale);
   } catch (error) {
     return errorResult(
+      locale,
       error instanceof AddonExportParseError
         ? error.message
-        : "Не удалось прочитать строку экспорта.",
+        : tr(locale, "raidcheck.previewParseError"),
     );
   }
 
@@ -275,7 +287,12 @@ export async function checkRaidLockoutsForExport({
 
   if (raidSlug && !checksAllSeasonRaids && !selectedRaid) {
     return {
-      ...errorResult("Выбранный рейд не найден в актуальном каталоге."),
+      ...errorResult(
+        locale,
+        locale === "ru"
+          ? "Выбранный рейд не найден в актуальном каталоге."
+          : "Selected raid was not found in the current catalog.",
+      ),
       difficultyOptions,
       defaultDifficultyID,
     };
@@ -287,7 +304,12 @@ export async function checkRaidLockoutsForExport({
     (exportData.groupType !== "raid" || !exportData.instanceName)
   ) {
     return {
-      ...errorResult("Выберите актуальный рейд или вставьте строку /rr, сделанную в рейде."),
+      ...errorResult(
+        locale,
+        locale === "ru"
+          ? "Выберите актуальный рейд или вставьте строку /rr, сделанную в рейде."
+          : "Choose a current raid or paste /rr export created in a raid.",
+      ),
       difficultyOptions,
       defaultDifficultyID,
     };
@@ -296,7 +318,12 @@ export async function checkRaidLockoutsForExport({
   const raid = selectedRaid ?? getRaidByName(exportData.instanceName);
   if (!checksAllSeasonRaids && !raid) {
     return {
-      ...errorResult("Текущий рейд из строки аддона не найден в каталоге."),
+      ...errorResult(
+        locale,
+        locale === "ru"
+          ? "Текущий рейд из строки аддона не найден в каталоге."
+          : "Raid from addon export was not found in the catalog.",
+      ),
       difficultyOptions,
       defaultDifficultyID,
       raidName: exportData.instanceName,
@@ -310,7 +337,12 @@ export async function checkRaidLockoutsForExport({
       : [];
   if (raids.length === 0) {
     return {
-      ...errorResult("В каталоге нет рейдов сезона для проверки."),
+      ...errorResult(
+        locale,
+        locale === "ru"
+          ? "В каталоге нет рейдов сезона для проверки."
+          : "No season raids found in the catalog.",
+      ),
       difficultyOptions,
       defaultDifficultyID,
     };
@@ -322,20 +354,28 @@ export async function checkRaidLockoutsForExport({
     ...(exportData.groupType !== "raid"
       ? checksAllSeasonRaids
         ? [
-            "Строка сделана не в рейде. Проверяем все рейды сезона по найденному составу или экспортирующему персонажу.",
+            locale === "ru"
+              ? "Строка сделана не в рейде. Проверяем все рейды сезона по найденному составу или экспортирующему персонажу."
+              : "Export was created outside of raid. Checking all season raids using roster or exporter character.",
           ]
         : [
-            "Строка сделана не в рейде. Проверяем выбранный рейд вручную по найденному составу или экспортирующему персонажу.",
+            locale === "ru"
+              ? "Строка сделана не в рейде. Проверяем выбранный рейд вручную по найденному составу или экспортирующему персонажу."
+              : "Export was created outside of raid. Checking manually selected raid using roster or exporter character.",
           ]
       : []),
     ...(selectedRaid && exportData.instanceName && getRaidByName(exportData.instanceName)?.slug !== selectedRaid.slug
       ? [
-          `Рейд выбран вручную: ${selectedRaid.name}. Инстанс из строки: ${exportData.instanceName}.`,
+          locale === "ru"
+            ? `Рейд выбран вручную: ${getLocalizedRaidName(selectedRaid, locale)}. Инстанс из строки: ${exportData.instanceName}.`
+            : `Raid selected manually: ${getLocalizedRaidName(selectedRaid, locale)}. Instance from export: ${exportData.instanceName}.`,
         ]
       : []),
     ...(usedFallbackRoster
       ? [
-          "В строке нет полного состава рейда. Проверьте, что аддон обновлен; сейчас проверен только экспортирующий персонаж.",
+          locale === "ru"
+            ? "В строке нет полного состава рейда. Проверьте, что аддон обновлен; сейчас проверен только экспортирующий персонаж."
+            : "Full raid roster is missing in export. Ensure addon is updated; only exporter character was checked.",
         ]
       : []),
   ];
@@ -365,7 +405,9 @@ export async function checkRaidLockoutsForExport({
     return {
       status: "success",
       message: null,
-      raidName: checksAllSeasonRaids ? "Все рейды сезона" : raids[0].name,
+      raidName: checksAllSeasonRaids
+        ? tr(locale, "raidcheck.allSeasonRaids")
+        : getLocalizedRaidName(raids[0], locale),
       difficulty,
       difficultyOptions,
       defaultDifficultyID,
@@ -377,13 +419,16 @@ export async function checkRaidLockoutsForExport({
   } catch (error) {
     return {
       ...errorResult(
+        locale,
         error instanceof BattleNetAuthError
-          ? "Battle.net отклонил серверный OAuth-запрос. Проверьте client id/secret."
+          ? tr(locale, "errors.unauthorized")
           : error instanceof Error
             ? error.message
-            : "Не удалось выполнить проверку.",
+            : tr(locale, "errors.unknown"),
       ),
-      raidName: checksAllSeasonRaids ? "Все рейды сезона" : raids[0].name,
+      raidName: checksAllSeasonRaids
+        ? tr(locale, "raidcheck.allSeasonRaids")
+        : getLocalizedRaidName(raids[0], locale),
       difficulty,
       difficultyOptions,
       defaultDifficultyID,

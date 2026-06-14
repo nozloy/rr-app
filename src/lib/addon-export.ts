@@ -1,5 +1,7 @@
 import { currentSeasonDungeons, getDungeonBySlug } from "@/lib/dungeons";
+import { t, type AppLocale } from "@/lib/i18n";
 import {
+  getLocalizedRaidName,
   getKnownRaidByName,
   getRaidByName,
   type RaidDefinition,
@@ -94,6 +96,14 @@ export const LEGACY_RAID_ACTIVITY_NAME = "Legacy raid";
 export const LEGACY_RAID_GOAL_LABEL =
   "Идем за ачивами, маунтами и трансмогом";
 
+export function getLegacyRaidActivityName(locale: AppLocale) {
+  return t(locale, "addonExport.legacyRaidName");
+}
+
+export function getLegacyRaidGoalLabel(locale: AppLocale) {
+  return t(locale, "addonExport.legacyRaidGoal");
+}
+
 const VALID_GROUP_TYPES = new Set<AddonGroupType>(["solo", "party", "raid"]);
 const VALID_ROLES = new Set<AddonRole>(["TANK", "HEALER", "DAMAGER", "NONE"]);
 const COMPACT_GROUP_TYPES: Record<string, AddonGroupType> = {
@@ -141,11 +151,17 @@ const BATTLE_RES_CLASSES = new Set([
 
 export class AddonExportParseError extends Error {}
 
-function requireString(params: URLSearchParams, key: string) {
+function requireString(
+  params: URLSearchParams,
+  key: string,
+  locale: AppLocale,
+) {
   const value = params.get(key)?.trim();
 
   if (!value) {
-    throw new AddonExportParseError(`В строке экспорта нет поля ${key}.`);
+    throw new AddonExportParseError(
+      t(locale, "addonExport.missingField", { field: key }),
+    );
   }
 
   return value;
@@ -318,7 +334,13 @@ function inferDungeonSlug(exportData: AddonExportData) {
 
   const normalizedSource = normalizeSearchText(sourceName);
   const matchedDungeon = currentSeasonDungeons.find((dungeon) => {
-    const names = [dungeon.name, dungeon.shortName, dungeon.slug];
+    const names = [
+      dungeon.name,
+      dungeon.names.ru,
+      dungeon.names.en,
+      dungeon.shortName,
+      dungeon.slug,
+    ];
     return names.some((name) => normalizeSearchText(name) === normalizedSource);
   });
 
@@ -348,13 +370,14 @@ function getBannerCharacterName(exportData: AddonExportData) {
 
 export function getImportedRaidDisplayMode(
   draft: Pick<ImportedBannerDraft, "source">,
+  locale: AppLocale = "ru",
 ): ImportedRaidDisplayMode {
   if (draft.source.groupType !== "raid") {
     return {
       bannerVariant: "mythicPlus",
       raid: null,
       displayRaid: null,
-      activityName: draft.source.keyMapName ?? LEGACY_RAID_ACTIVITY_NAME,
+      activityName: draft.source.keyMapName ?? getLegacyRaidActivityName(locale),
       isLegacyRaid: false,
     };
   }
@@ -367,7 +390,7 @@ export function getImportedRaidDisplayMode(
       bannerVariant: "currentRaid",
       raid,
       displayRaid: raid,
-      activityName: raid.name,
+      activityName: getLocalizedRaidName(raid, locale),
       isLegacyRaid: false,
     };
   }
@@ -377,21 +400,28 @@ export function getImportedRaidDisplayMode(
     raid: null,
     displayRaid,
     activityName:
-      displayRaid?.name ?? draft.source.instanceName ?? LEGACY_RAID_ACTIVITY_NAME,
+      (displayRaid ? getLocalizedRaidName(displayRaid, locale) : null) ??
+      draft.source.instanceName ??
+      getLegacyRaidActivityName(locale),
     isLegacyRaid: true,
   };
 }
 
-function parseFullAddonExport(params: URLSearchParams): AddonExportData {
-  const classFile = normalizeClassFile(requireString(params, "classFile"));
+function parseFullAddonExport(
+  params: URLSearchParams,
+  locale: AppLocale,
+): AddonExportData {
+  const classFile = normalizeClassFile(
+    requireString(params, "classFile", locale),
+  );
   const itemLevel = optionalInt(params, "ilvl", 0, 999) ?? 0;
   const groupSize = optionalInt(params, "groupSize", 1, 40) ?? 1;
   const dungeonSlug = optionalString(params, "dungeonSlug") ?? undefined;
 
   return {
-    playerName: requireString(params, "name"),
+    playerName: requireString(params, "name", locale),
     raidLeaderName: optionalString(params, "raidLeaderName"),
-    realm: requireString(params, "realm"),
+    realm: requireString(params, "realm", locale),
     classFile,
     className: optionalString(params, "className") ?? classFile,
     spec: optionalString(params, "spec"),
@@ -433,14 +463,17 @@ function parseFullAddonExport(params: URLSearchParams): AddonExportData {
   };
 }
 
-function parseCompactAddonExport(params: URLSearchParams): AddonExportData {
-  const classFile = parseCompactClassFile(requireString(params, "c"));
+function parseCompactAddonExport(
+  params: URLSearchParams,
+  locale: AppLocale,
+): AddonExportData {
+  const classFile = parseCompactClassFile(requireString(params, "c", locale));
   const itemLevel = optionalInt(params, "i", 0, 999) ?? 0;
 
   return {
-    playerName: requireString(params, "n"),
+    playerName: requireString(params, "n", locale),
     raidLeaderName: optionalString(params, "l"),
-    realm: requireString(params, "r"),
+    realm: requireString(params, "r", locale),
     classFile,
     className: optionalString(params, "cl") ?? classFile,
     spec: optionalString(params, "s"),
@@ -464,28 +497,31 @@ function parseCompactAddonExport(params: URLSearchParams): AddonExportData {
   };
 }
 
-export function parseAddonExportString(input: string): AddonExportData {
+export function parseAddonExportString(
+  input: string,
+  locale: AppLocale = "ru",
+): AddonExportData {
   const trimmed = input.trim();
 
   if (trimmed.length > MAX_ADDON_EXPORT_LENGTH) {
-    throw new AddonExportParseError("Строка экспорта слишком длинная.");
+    throw new AddonExportParseError(t(locale, "addonExport.tooLong"));
   }
 
   if (trimmed.startsWith(ADDON_EXPORT_PREFIX)) {
     return parseFullAddonExport(
       new URLSearchParams(trimmed.slice(ADDON_EXPORT_PREFIX.length)),
+      locale,
     );
   }
 
   if (trimmed.startsWith(ADDON_QR_EXPORT_PREFIX)) {
     return parseCompactAddonExport(
       new URLSearchParams(trimmed.slice(ADDON_QR_EXPORT_PREFIX.length)),
+      locale,
     );
   }
 
-  throw new AddonExportParseError(
-    "Вставьте строку, которая начинается с RR1? или RRQ1?.",
-  );
+  throw new AddonExportParseError(t(locale, "addonExport.invalidPrefix"));
 }
 
 export function getImportedBannerDraftFromExport(

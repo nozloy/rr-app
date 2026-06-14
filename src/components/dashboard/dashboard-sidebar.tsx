@@ -2,16 +2,21 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Character } from "@prisma/client";
 import { ChevronRight, LogOut, ShieldAlert } from "lucide-react";
-import { dashboardActions, dashboardSidebarStats } from "@/components/dashboard/data";
+import {
+  getDashboardActions,
+  getDashboardSidebarStats,
+} from "@/components/dashboard/data";
 import { DashboardSyncCard } from "@/components/dashboard/dashboard-sync-card";
 import { LogoutButton } from "@/components/logout-button";
 import { Button } from "@/components/ui/button";
+import { t, type AppLocale } from "@/lib/i18n";
 import { formatItemLevel } from "@/lib/utils";
 
 type DashboardSidebarProps = {
   activeCount: number;
   characters: Character[];
   displayName: string;
+  locale: AppLocale;
   topCharacter?: Character | null;
 };
 
@@ -27,8 +32,11 @@ export function DashboardSidebar({
   activeCount,
   characters,
   displayName,
+  locale,
   topCharacter,
 }: DashboardSidebarProps) {
+  const dashboardActions = getDashboardActions(locale);
+  const dashboardSidebarStats = getDashboardSidebarStats(locale);
   const profileImage = getCharacterImage(topCharacter);
   const profileName = topCharacter?.name ?? displayName;
 
@@ -51,7 +59,7 @@ export function DashboardSidebar({
 
         <div className="dashboard-profile-badge">
           <span>Battle.net</span>
-          <strong>Подключен</strong>
+          <strong>{t(locale, "dashboard.battleNetConnected")}</strong>
         </div>
 
         <div className="dashboard-profile-faction" aria-hidden="true">
@@ -60,11 +68,11 @@ export function DashboardSidebar({
 
         <h2>{profileName}</h2>
         <p>
-          Регион: Европа
+          {t(locale, "dashboard.regionEurope")}
           <br />
           {topCharacter
-            ? `Realm: ${topCharacter.realm}`
-            : `Активных персонажей: ${activeCount}`}
+            ? t(locale, "dashboard.realm", { realm: topCharacter.realm })
+            : t(locale, "dashboard.activeCharacters", { count: activeCount })}
         </p>
 
         <div className="dashboard-sidebar-stats">
@@ -73,14 +81,20 @@ export function DashboardSidebar({
             const value = stat.value === "auto" ? characters.length : stat.value;
 
             return (
-              <button className="dashboard-sidebar-stat" data-tone={stat.tone} key={stat.label} type="button">
+              <Button
+                className="dashboard-sidebar-stat"
+                data-tone={stat.tone}
+                key={stat.label}
+                type="button"
+                variant="ghost"
+              >
                 <Icon className="size-6" aria-hidden="true" />
                 <span>
                   <small>{stat.label}</small>
                   <strong>{value}</strong>
                 </span>
                 <ChevronRight className="size-4" aria-hidden="true" />
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -119,16 +133,20 @@ export function DashboardSidebar({
           })}
         </div>
 
-        <DashboardSyncCard />
+        <DashboardSyncCard locale={locale} />
 
         <div className="dashboard-sidebar-footer">
           <span>
-            Топ ilvl:{" "}
-            <strong>{topCharacter ? formatItemLevel(topCharacter.itemLevel) : "н/д"}</strong>
+            {t(locale, "dashboard.topIlvl")}:{" "}
+            <strong>
+              {topCharacter
+                ? formatItemLevel(topCharacter.itemLevel)
+                : t(locale, "dashboard.unknown")}
+            </strong>
           </span>
           <LogoutButton className="dashboard-logout-button" size="sm">
             <LogOut className="size-4" aria-hidden="true" />
-            Выйти
+            {t(locale, "dashboard.logout")}
           </LogoutButton>
         </div>
       </section>

@@ -8,13 +8,14 @@ import {
   type SyncActionState,
 } from "@/actions/dashboard";
 import { Button } from "@/components/ui/button";
+import { t, type AppLocale } from "@/lib/i18n";
 
 const initialState: SyncActionState = {
   status: "idle",
   message: "",
 };
 
-export function DashboardSyncCard() {
+export function DashboardSyncCard({ locale }: { locale: AppLocale }) {
   const [state, action, isPending] = useActionState(
     syncCharactersAction,
     initialState,
@@ -25,11 +26,13 @@ export function DashboardSyncCard() {
       <div className="dashboard-sync-copy">
         <RefreshCw className="size-5" aria-hidden="true" />
         <div>
-          <span>Синхронизация</span>
+          <span>{t(locale, "dashboard.sync")}</span>
           <strong>
-            {state.status === "success" ? "Данные обновлены" : "Данные актуальны"}
+            {state.status === "success"
+              ? t(locale, "dashboard.dataUpdated")
+              : t(locale, "dashboard.dataCurrent")}
           </strong>
-          <small>{state.message || "2 мин. назад"}</small>
+          <small>{state.message || (locale === "ru" ? "2 мин. назад" : "2 min ago")}</small>
         </div>
       </div>
 
@@ -40,7 +43,7 @@ export function DashboardSyncCard() {
           ) : (
             <CheckCircle2 className="size-4" aria-hidden="true" />
           )}
-          {isPending ? "Обновляем..." : "Синхронизировать"}
+          {isPending ? t(locale, "dashboard.syncing") : t(locale, "dashboard.syncNow")}
         </Button>
       </form>
 
@@ -51,7 +54,7 @@ export function DashboardSyncCard() {
           type="button"
           variant="outline"
         >
-          Переподключить Battle.net
+          {t(locale, "dashboard.reconnectBattleNet")}
         </Button>
       ) : null}
     </div>

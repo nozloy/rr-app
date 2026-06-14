@@ -1,5 +1,7 @@
 import { AppHeaderClient, type AppHeaderUser } from "@/components/shell/app-header-client";
 import { hasRequiredRuntimeEnv } from "@/lib/env";
+import { getRequestLocale } from "@/lib/i18n-server";
+import { t } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/lib/session";
 
@@ -10,6 +12,7 @@ type AppHeaderProps = {
 
 async function getHeaderUser(): Promise<AppHeaderUser | null> {
   const session = await getOptionalSession();
+  const locale = await getRequestLocale();
 
   if (!session?.user?.id) {
     return null;
@@ -34,7 +37,10 @@ async function getHeaderUser(): Promise<AppHeaderUser | null> {
       topCharacter?.thumbnailUrl ??
       session.user.image ??
       null,
-    displayName: topCharacter?.name ?? session.user.name ?? "Игрок",
+    displayName:
+      topCharacter?.name ??
+      session.user.name ??
+      t(locale, "header.playerFallback"),
   };
 }
 
