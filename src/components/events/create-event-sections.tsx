@@ -14,6 +14,7 @@ import {
 	Dice5,
 	Info,
 	MapPin,
+	Minus,
 	Package,
 	Plus,
 	Settings,
@@ -442,11 +443,23 @@ export function DateTimeSection({
 		setCalendarMonth(getMonthStart(nextDate))
 	}
 
+	function setDateTimeWithOffset(minutes: number) {
+		const nextDate = new Date()
+		nextDate.setMinutes(nextDate.getMinutes() + minutes)
+		setDateTimeFromDate(nextDate)
+	}
+
+	function setTodayEvening() {
+		const nextDate = new Date()
+		nextDate.setHours(20, 30, 0, 0)
+		setDateTimeFromDate(nextDate)
+	}
+
 	return (
 		<section className={eventUi.panel}>
 			<SectionTitle number={2}>{t(locale, 'events.sectionDateTime')}</SectionTitle>
-			<div className={eventUi.inlineFields}>
-				<div className={eventUi.stackField}>
+			<div className={eventUi.dateTimeRow}>
+				<div className={eventUi.dateTimeField}>
 					<DropdownMenu
 						open={isDateCalendarOpen}
 						onOpenChange={setIsDateCalendarOpen}
@@ -527,7 +540,7 @@ export function DateTimeSection({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
-				<label className={eventUi.stackField}>
+				<label className={eventUi.dateTimeField}>
 					<DropdownMenu
 						open={isTimePickerOpen}
 						onOpenChange={setIsTimePickerOpen}
@@ -593,30 +606,44 @@ export function DateTimeSection({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</label>
-			</div>
-			<div className={eventUi.dateShortcuts}>
-				<Button
-					className={eventUi.shortcutButton}
-					onClick={() => setDateTimeFromDate(new Date())}
-					size='sm'
-					type='button'
-					variant='outline'
-				>
-					{t(locale, 'common.now')}
-				</Button>
-				<Button
-					className={eventUi.shortcutButton}
-					onClick={() => {
-						const nextDate = new Date()
-						nextDate.setMinutes(nextDate.getMinutes() + 15)
-						setDateTimeFromDate(nextDate)
-					}}
-					size='sm'
-					type='button'
-					variant='outline'
-				>
-					{t(locale, 'events.in15Minutes')}
-				</Button>
+				<div className={eventUi.dateShortcuts}>
+					<Button
+						className={eventUi.shortcutButton}
+						onClick={() => setDateTimeFromDate(new Date())}
+						size='sm'
+						type='button'
+						variant='outline'
+					>
+						{t(locale, 'common.now')}
+					</Button>
+					<Button
+						className={eventUi.shortcutButton}
+						onClick={() => setDateTimeWithOffset(15)}
+						size='sm'
+						type='button'
+						variant='outline'
+					>
+						{t(locale, 'events.in15MinutesShort')}
+					</Button>
+					<Button
+						className={eventUi.shortcutButton}
+						onClick={() => setDateTimeWithOffset(30)}
+						size='sm'
+						type='button'
+						variant='outline'
+					>
+						{t(locale, 'events.in30MinutesShort')}
+					</Button>
+					<Button
+						className={eventUi.shortcutButton}
+						onClick={setTodayEvening}
+						size='sm'
+						type='button'
+						variant='outline'
+					>
+						{t(locale, 'events.todayEvening')}
+					</Button>
+				</div>
 			</div>
 		</section>
 	)
@@ -818,6 +845,19 @@ export function RoleCompositionSection({
 	const locale = useAppLocale()
 	const roleFields = getRoleFields(locale)
 
+	function adjustRoleRange(role: EventRole, offset: number) {
+		const currentRange = roleValidation[role].range
+
+		if (!currentRange) {
+			return
+		}
+
+		const min = Math.max(0, currentRange.min + offset)
+		const max = Math.max(min, currentRange.max + offset)
+
+		onRoleRangeInputChange(role, formatRange({ min, max }))
+	}
+
 	return (
 		<section className={eventUi.panel}>
 			<div className='flex items-center gap-2'>
@@ -840,6 +880,9 @@ export function RoleCompositionSection({
 			<div className={eventUi.roleGrid}>
 				{roleFields.map(role => {
 					const roleError = roleValidation[role.key].error
+					const roleRange = roleValidation[role.key].range
+					const canAdjustRole = Boolean(roleRange)
+					const canDecreaseRole = Boolean(roleRange && roleRange.max > 0)
 
 					return (
 						<div className={eventUi.roleCard} key={role.key}>
@@ -851,7 +894,20 @@ export function RoleCompositionSection({
 									{role.label}
 								</strong>
 							</div>
-							<div className={eventUi.field}>
+							<div className={eventUi.roleStepper(Boolean(roleError))}>
+								<Button
+									aria-label={t(locale, 'events.decreaseRoleCount', {
+										role: role.label,
+									})}
+									className={eventUi.roleStepButton}
+									disabled={!canDecreaseRole}
+									onClick={() => adjustRoleRange(role.key, -1)}
+									size='icon'
+									type='button'
+									variant='ghost'
+								>
+									<Minus className='size-4' aria-hidden='true' />
+								</Button>
 								<Input
 									aria-invalid={Boolean(roleError)}
 									aria-label={t(locale, 'events.countForRole', {
@@ -865,6 +921,19 @@ export function RoleCompositionSection({
 									placeholder={role.placeholder}
 									value={roleInputValues[role.key]}
 								/>
+								<Button
+									aria-label={t(locale, 'events.increaseRoleCount', {
+										role: role.label,
+									})}
+									className={eventUi.roleStepButton}
+									disabled={!canAdjustRole}
+									onClick={() => adjustRoleRange(role.key, 1)}
+									size='icon'
+									type='button'
+									variant='ghost'
+								>
+									<Plus className='size-4' aria-hidden='true' />
+								</Button>
 							</div>
 						</div>
 					)
@@ -896,8 +965,10 @@ export function PaidSlotsSection({
 	return (
 		<section className={eventUi.panel}>
 			<div className={eventUi.sectionRow}>
-				<div className='flex items-center gap-4 justify-start'>
-					<SectionTitle number={7}>{t(locale, 'events.sectionPaidSlots')}</SectionTitle>
+				<div className='flex flex-wrap items-center justify-start gap-4'>
+					<SectionTitle number={6}>
+						{t(locale, 'events.sectionPaidSlots')}
+					</SectionTitle>
 					<Switch
 						aria-label={t(locale, 'events.paidSlotsToggle')}
 						checked={draft.hasPaidSlots}
@@ -905,11 +976,11 @@ export function PaidSlotsSection({
 						onCheckedChange={onPaidSlotsEnabledChange}
 						thumbClassName={eventUi.paidSwitchThumb}
 					/>
+					<Badge className={eventUi.premiumBadge} variant='arcane'>
+						<Crown className='size-3' aria-hidden='true' />
+						Premium
+					</Badge>
 				</div>
-				<Badge className={eventUi.premiumBadge} variant='arcane'>
-					<Crown className='size-3' aria-hidden='true' />
-					Premium
-				</Badge>
 			</div>
 
 			<div className={eventUi.paidSlotsControls}>
@@ -979,15 +1050,21 @@ export function UnrollSection({
 	return (
 		<section className={eventUi.panel}>
 			<WowheadTooltipLoader refreshKey={unrollRefreshKey} />
-			<div className='flex items-center gap-4 justify-start'>
-				<SectionTitle number={6}>{t(locale, 'events.sectionUnroll')}</SectionTitle>
-				<Switch
-					aria-label={t(locale, 'events.unrollToggle')}
-					checked={draft.hasUnroll}
-					className={cn(eventUi.paidSwitch, 'origin-left scale-[0.82]')}
-					onCheckedChange={onUnrollEnabledChange}
-					thumbClassName={eventUi.paidSwitchThumb}
-				/>
+			<div className={eventUi.sectionRow}>
+				<div className='flex flex-wrap items-center justify-start gap-4'>
+					<SectionTitle number={7}>{t(locale, 'events.sectionUnroll')}</SectionTitle>
+					<Switch
+						aria-label={t(locale, 'events.unrollToggle')}
+						checked={draft.hasUnroll}
+						className={cn(eventUi.paidSwitch, 'origin-left scale-[0.82]')}
+						onCheckedChange={onUnrollEnabledChange}
+						thumbClassName={eventUi.paidSwitchThumb}
+					/>
+					<Badge className={eventUi.premiumBadge} variant='arcane'>
+						<Crown className='size-3' aria-hidden='true' />
+						Premium
+					</Badge>
+				</div>
 			</div>
 
 			<div

@@ -65,21 +65,20 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						selectedCharacter={selectedCharacter}
 					/>
 
-					<div className={eventUi.topGrid}>
-						<DateTimeSection
-							date={draft.date}
-							onDateChange={dispatchers.setDate}
-							onDateTimeChange={dispatchers.setDateTime}
-							onTimePartChange={dispatchers.setTimePart}
-							time={draft.time}
-						/>
-						<EventParamsSection
-							activityType={draft.activityType}
-							addon={draft.addon}
-							onActivityTypeChange={dispatchers.setActivityType}
-							onAddonChange={dispatchers.setAddon}
-						/>
-					</div>
+					<DateTimeSection
+						date={draft.date}
+						onDateChange={dispatchers.setDate}
+						onDateTimeChange={dispatchers.setDateTime}
+						onTimePartChange={dispatchers.setTimePart}
+						time={draft.time}
+					/>
+
+					<EventParamsSection
+						activityType={draft.activityType}
+						addon={draft.addon}
+						onActivityTypeChange={dispatchers.setActivityType}
+						onAddonChange={dispatchers.setAddon}
+					/>
 
 					<InstancesSection
 						instanceOptions={instanceOptions}
@@ -89,21 +88,27 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						selectedInstances={selectedInstances}
 					/>
 
-					<div className={eventUi.bottomGrid}>
-						<RoleCompositionSection
-							hasRoleError={hasRoleError}
-							onRoleRangeInputChange={dispatchers.updateRoleRangeInput}
-							roleErrors={roleErrors}
-							roleInputValues={roleInputValues}
-							roleValidation={roleValidation}
-						/>
-						<UnrollSection
-							draft={draft}
-							onUnrollEnabledChange={dispatchers.setUnrollEnabled}
-							onUnrollInputChange={dispatchers.updateUnrollInput}
-							onUnrollTemplateChange={dispatchers.selectUnrollTemplate}
-						/>
-					</div>
+					<RoleCompositionSection
+						hasRoleError={hasRoleError}
+						onRoleRangeInputChange={dispatchers.updateRoleRangeInput}
+						roleErrors={roleErrors}
+						roleInputValues={roleInputValues}
+						roleValidation={roleValidation}
+					/>
+
+					<PaidSlotsSection
+						draft={draft}
+						onPaidSlotPriceChange={dispatchers.setPaidSlotPrice}
+						onPaidSlotsChange={dispatchers.setPaidSlots}
+						onPaidSlotsEnabledChange={dispatchers.setPaidSlotsEnabled}
+					/>
+
+					<UnrollSection
+						draft={draft}
+						onUnrollEnabledChange={dispatchers.setUnrollEnabled}
+						onUnrollInputChange={dispatchers.updateUnrollInput}
+						onUnrollTemplateChange={dispatchers.selectUnrollTemplate}
+					/>
 				</div>
 
 				<aside className={eventUi.previewStack}>
@@ -114,13 +119,6 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						previewInstance={previewInstance}
 						selectedInstances={selectedInstances}
 						selectedTemplate={selectedTemplate}
-					/>
-
-					<PaidSlotsSection
-						draft={draft}
-						onPaidSlotPriceChange={dispatchers.setPaidSlotPrice}
-						onPaidSlotsChange={dispatchers.setPaidSlots}
-						onPaidSlotsEnabledChange={dispatchers.setPaidSlotsEnabled}
 					/>
 
 					<PublishTargetsBar

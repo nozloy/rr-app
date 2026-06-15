@@ -32,8 +32,6 @@ export const eventUi = {
 		fieldSurface,
 		'grid h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-4 text-left font-medium text-white hover:bg-[rgba(3,13,27,0.72)] hover:text-white [&_svg]:text-event-copy-strong',
 	),
-	bottomGrid:
-		'grid gap-3 min-[1041px]:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]',
 	calendar:
 		'grid gap-3 rounded-lg border border-event-panel-border bg-[#061327] p-3',
 	calendarDay: (isSelected: boolean, isOutside: boolean) =>
@@ -102,10 +100,13 @@ export const eventUi = {
 		'grid size-6 place-items-center rounded-full border border-event-panel-border bg-[rgba(3,13,27,0.62)] text-event-copy transition-colors hover:border-event-cyan/55 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-event-cyan/45',
 	infoHintBubble:
 		'pointer-events-none invisible absolute left-0 top-[calc(100%+0.45rem)] z-20 w-[min(24rem,calc(100vw-3rem))] rounded-md border border-event-panel-border bg-[#061327] px-3 py-2 text-xs leading-relaxed text-[#d9e8ff] opacity-0 shadow-[0_14px_34px_rgba(0,0,0,0.45)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
+	dateTimeField: 'grid min-w-0 gap-2',
+	dateTimeRow:
+		'mt-3 grid items-center gap-3 min-[1180px]:grid-cols-[minmax(15rem,0.9fr)_minmax(12rem,0.72fr)_minmax(30rem,1.6fr)] min-[761px]:grid-cols-2 max-[760px]:grid-cols-1',
 	dateShortcuts:
-		'mt-3 flex flex-wrap gap-2',
+		'grid min-w-0 grid-cols-2 gap-2 min-[1180px]:grid-cols-4 min-[761px]:col-span-2 min-[1180px]:col-span-1',
 	shortcutButton:
-		'rounded-lg border-event-panel-border-strong bg-transparent font-medium text-[#eaf2ff] hover:border-event-cyan/55 hover:bg-[#0c1f40] hover:text-white',
+		'h-12 min-w-0 rounded-lg border-event-panel-border-strong bg-transparent px-2 text-sm font-medium text-[#eaf2ff] hover:border-event-cyan/55 hover:bg-[#0c1f40] hover:text-white',
 	dateTrigger: cn(
 		fieldSurface,
 		'grid h-12 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-4 text-left font-medium text-white hover:bg-[rgba(3,13,27,0.72)] hover:text-white [&_span]:justify-self-start [&_svg]:text-event-copy-strong',
@@ -147,20 +148,21 @@ export const eventUi = {
 	instanceTag:
 		'w-fit rounded border border-event-cyan/55 bg-event-cyan/12 px-1.5 py-0.5 text-[0.66rem] font-semibold uppercase leading-none tracking-[0.02em] text-event-cyan',
 	layout:
-		'grid items-start gap-4 min-[1321px]:grid-cols-[minmax(0,1fr)_minmax(380px,460px)]',
+		'grid items-start gap-4 min-[1321px]:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]',
 	main: 'grid gap-3',
 	panel: cn(panelSurface, 'min-w-0 rounded-lg p-[0.9rem]'),
 	panelHead:
 		'flex items-center justify-between gap-3 max-[760px]:items-start max-[760px]:flex-col',
 	paidField: 'grid min-w-0 gap-2 text-sm font-medium text-[#cfe4ff]',
 	paidSlotsControls:
-		'mt-4 grid grid-cols-2 items-end gap-3 max-[520px]:grid-cols-1',
+		'mt-4 grid w-full max-w-[27rem] grid-cols-[9.5rem_13rem] items-end gap-3 max-[520px]:max-w-full max-[520px]:grid-cols-1',
 	paidSwitch:
 		'data-[size=default]:!h-[1.55rem] data-[size=default]:!w-[3rem] !border-event-panel-border-strong !bg-[rgba(3,13,27,0.76)] !p-[3px] !shadow-[inset_0_0_14px_rgba(63,127,235,0.10)] data-checked:!border-[#b88dff]/80 data-checked:!bg-[linear-gradient(90deg,rgba(126,71,255,0.95),rgba(76,35,166,0.92))] data-checked:!shadow-[inset_0_0_14px_rgba(215,182,255,0.24),0_0_12px_rgba(126,71,255,0.18)]',
 	paidSwitchField: 'flex h-12 items-end',
 	paidSwitchThumb:
 		'!size-[1.05rem] !bg-[radial-gradient(circle_at_35%_30%,#ffffff,#d9ccff_58%,#bba1ff)] !shadow-[0_0_10px_rgba(215,182,255,0.48)] group-data-checked/switch:!translate-x-[1.55rem]',
-	paramsGrid: 'mt-3 grid gap-3',
+	paramsGrid:
+		'mt-3 grid gap-3 min-[1041px]:grid-cols-[minmax(220px,0.38fr)_minmax(0,1fr)]',
 	premiumBadge:
 		'!inline-flex !w-fit items-center gap-1 !border-event-legendary/60 !bg-event-legendary/15 !text-[#ffb45c] shadow-[inset_0_0_14px_rgba(255,128,0,0.12),0_0_12px_rgba(255,128,0,0.10)]',
 	previewCard: cn(panelSurface, 'min-w-0 rounded-lg p-4'),
@@ -207,13 +209,23 @@ export const eventUi = {
 		),
 	publishTargets: 'flex items-center gap-2',
 	roleCard:
-		'grid gap-3 rounded-lg bg-[rgba(3,13,27,0.34)] p-3',
+		'grid min-h-[3.7rem] grid-cols-[minmax(0,1fr)_minmax(9.4rem,0.62fr)] items-center gap-3 rounded-lg border border-event-panel-border bg-[rgba(3,13,27,0.34)] p-2.5',
 	roleGrid: 'mt-3 grid gap-3 min-[761px]:grid-cols-3',
-	roleHeader: 'flex items-center gap-3',
+	roleHeader: 'flex min-w-0 items-center gap-3',
 	roleIcon:
-		'grid size-11 place-items-center overflow-hidden rounded-lg bg-[#041125] shadow-[inset_0_0_12px_rgba(143,92,255,0.12)] [&_img]:size-10 [&_img]:object-contain',
+		'grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#041125] shadow-[inset_0_0_12px_rgba(143,92,255,0.12)] [&_img]:size-9 [&_img]:object-contain',
+	roleStepper: (hasError: boolean) =>
+		cn(
+			'grid min-w-0 grid-cols-[2.25rem_minmax(3.2rem,1fr)_2.25rem] items-center overflow-hidden rounded-lg border border-event-panel-border bg-[rgba(3,13,27,0.62)] text-white transition-colors focus-within:border-event-cyan/55',
+			hasError && 'border-red-400/65',
+		),
+	roleStepButton:
+		'grid size-9 min-h-0 place-items-center rounded-none border-0 bg-transparent p-0 text-event-copy transition-colors hover:bg-[#10254a] hover:text-white disabled:pointer-events-none disabled:opacity-40',
 	roleInput: (hasError: boolean) =>
-		cn(textInputSurface, hasError && 'border-red-400/65'),
+		cn(
+			'h-9 min-w-0 rounded-none border-0 bg-transparent px-1 text-center font-semibold text-white shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
+			hasError && 'text-red-200',
+		),
 	sectionRow:
 		'flex items-center justify-between gap-3 max-[760px]:items-start max-[760px]:flex-col',
 	sectionTitle:
@@ -270,7 +282,6 @@ export const eventUi = {
 	),
 	textInput: textInputSurface,
 	embeddedInput: embeddedInputSurface,
-	topGrid: 'grid gap-3 min-[1041px]:grid-cols-2',
 	typeTabs:
 		'grid overflow-hidden rounded-lg border border-event-panel-border min-[761px]:grid-cols-[0.85fr_1.25fr_0.9fr_0.9fr] max-[760px]:grid-cols-1',
 	typeTab: (isActive: boolean) =>
