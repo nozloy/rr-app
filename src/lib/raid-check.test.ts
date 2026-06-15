@@ -16,6 +16,7 @@ const { blizzardApiMock, MockBattleNetAuthError, MockBlizzardApiRequestError } =
 
     return {
       blizzardApiMock: {
+        fetchCharacterMedia: vi.fn(),
         fetchCharacterRaidEncounters: vi.fn(),
         getApplicationAccessToken: vi.fn(),
         resolveRealmSlug: vi.fn(),
@@ -28,6 +29,7 @@ const { blizzardApiMock, MockBattleNetAuthError, MockBlizzardApiRequestError } =
 vi.mock("@/lib/blizzard-api", () => ({
   BattleNetAuthError: MockBattleNetAuthError,
   BlizzardApiRequestError: MockBlizzardApiRequestError,
+  fetchCharacterMedia: blizzardApiMock.fetchCharacterMedia,
   fetchCharacterRaidEncounters: blizzardApiMock.fetchCharacterRaidEncounters,
   getApplicationAccessToken: blizzardApiMock.getApplicationAccessToken,
   resolveRealmSlug: blizzardApiMock.resolveRealmSlug,
@@ -138,6 +140,12 @@ describe("raid check", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
     blizzardApiMock.getApplicationAccessToken.mockResolvedValue("app-token");
+    blizzardApiMock.fetchCharacterMedia.mockResolvedValue({
+      assets: [
+        { key: "inset", value: "https://render.worldofwarcraft.com/inset.jpg" },
+        { key: "avatar", value: "https://render.worldofwarcraft.com/avatar.jpg" },
+      ],
+    });
     blizzardApiMock.resolveRealmSlug.mockImplementation(
       async (_token: string, realm: string) => {
         if (realm === "Missing Realm") {
@@ -191,10 +199,15 @@ describe("raid check", () => {
         name: "Clean",
         status: "clean",
         killedBosses: [],
+        avatarUrl: "https://render.worldofwarcraft.com/avatar.jpg",
+        serverSlug: "draenor",
+        serverRegion: "eu",
       },
       {
         name: "Locked",
         status: "locked",
+        serverSlug: "howling-fjord",
+        serverRegion: "eu",
         killedBosses: [
           {
             name: "Император Аверзиан",
@@ -207,6 +220,45 @@ describe("raid check", () => {
       "app-token",
       "howling-fjord",
       "Locked",
+    );
+    expect(blizzardApiMock.fetchCharacterMedia).toHaveBeenCalledWith(
+      "app-token",
+      "draenor",
+      "Clean",
+    );
+  });
+
+  it("keeps lockout result when character media is unavailable", async () => {
+    blizzardApiMock.fetchCharacterMedia.mockRejectedValue(new Error("media failed"));
+
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Draenor",
+        classFile: "PALADIN",
+        groupType: "raid",
+        groupSize: "1",
+        instanceType: "raid",
+        instanceName: "The Voidspire",
+        selectedRaidDifficultyID: "15",
+        selectedRaidDifficultyName: "Heroic",
+        roster: "Clean:Draenor:MAGE:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows[0]).toMatchObject({
+      name: "Clean",
+      status: "clean",
+      avatarUrl: null,
+      serverSlug: "draenor",
+      serverRegion: "eu",
+    });
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
+      "app-token",
+      "draenor",
+      "Clean",
     );
   });
 
@@ -229,6 +281,8 @@ describe("raid check", () => {
     expect(result.rows[0]).toMatchObject({
       name: "Leader",
       status: "clean",
+      serverSlug: "draenor",
+      serverRegion: "eu",
     });
   });
 
@@ -252,10 +306,14 @@ describe("raid check", () => {
       {
         name: "NoRealm",
         status: "not_found",
+        serverSlug: null,
+        serverRegion: "eu",
       },
       {
         name: "Notfound",
         status: "not_found",
+        serverSlug: "draenor",
+        serverRegion: "eu",
       },
     ]);
   });

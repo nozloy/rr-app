@@ -6,6 +6,7 @@ import {
 import {
   BattleNetAuthError,
   BlizzardApiRequestError,
+  fetchCharacterMedia,
   fetchCharacterRaidEncounters,
   getApplicationAccessToken,
   resolveRealmSlug,
@@ -34,12 +35,34 @@ import {
 } from "@/lib/raids";
 
 const RAID_CHECK_CONCURRENCY = 5;
+const RAID_CHECK_REGION = "eu";
 
 export type RaidCheckCharacterStatus =
   | "clean"
   | "locked"
   | "not_found"
   | "error";
+
+export type RaidCheckLogDifficulty = "heroic" | "mythic";
+
+export type RaidCheckLogEncounter = {
+  name: string;
+  parse: number | null;
+  spec: string | null;
+  totalKills: number | null;
+  rank: number | null;
+};
+
+export type RaidCheckCharacterLogs = {
+  status: "ready" | "not_found" | "unsupported" | "error";
+  difficulty: RaidCheckLogDifficulty | null;
+  averageParse: number | null;
+  bestParse: number | null;
+  encounters: RaidCheckLogEncounter[];
+  profileUrl: string | null;
+  lastFetchedAt: string | null;
+  message: string | null;
+};
 
 export type RaidCheckCharacterResult = {
   name: string;
@@ -51,6 +74,10 @@ export type RaidCheckCharacterResult = {
   status: RaidCheckCharacterStatus;
   killedBosses: RaidCheckKilledBoss[];
   error: string | null;
+  avatarUrl: string | null;
+  serverSlug: string | null;
+  serverRegion: string;
+  logs: RaidCheckCharacterLogs | null;
 };
 
 export type RaidCheckResult = {
@@ -156,17 +183,37 @@ function getResultRaidMeta(raids: RaidDefinition[], locale: RaidCheckLocale) {
   };
 }
 
+function getCharacterAvatarUrl(
+  media: Awaited<ReturnType<typeof fetchCharacterMedia>> | null,
+) {
+  if (!media?.assets) {
+    return null;
+  }
+
+  for (const key of ["avatar", "inset", "main-raw"]) {
+    const asset = media.assets.find((item) => item.key === key);
+
+    if (asset?.value) {
+      return asset.value;
+    }
+  }
+
+  return null;
+}
+
 function buildUnavailableResult({
   error = null,
   locale,
   member,
   raids,
+  serverSlug = null,
   status,
 }: {
   error?: string | null;
   member: AddonRosterMember;
   locale: RaidCheckLocale;
   raids: RaidDefinition[];
+  serverSlug?: string | null;
   status?: RaidCheckCharacterStatus;
 }): RaidCheckCharacterResult {
   const raidMeta = getResultRaidMeta(raids, locale);
@@ -177,6 +224,10 @@ function buildUnavailableResult({
     status: status ?? "error",
     killedBosses: [],
     error,
+    avatarUrl: null,
+    serverSlug,
+    serverRegion: RAID_CHECK_REGION,
+    logs: null,
   };
 }
 
@@ -195,8 +246,10 @@ async function checkCharacterForRaids({
   resetStart: Date;
   locale: RaidCheckLocale;
 }): Promise<RaidCheckCharacterResult> {
+  let realmSlug: string | null = null;
+
   try {
-    const realmSlug = await resolveRealmSlug(accessToken, member.realm);
+    realmSlug = await resolveRealmSlug(accessToken, member.realm);
 
     if (!realmSlug) {
       return buildUnavailableResult({
@@ -208,11 +261,17 @@ async function checkCharacterForRaids({
       });
     }
 
-    const encounters = await fetchCharacterRaidEncounters(
-      accessToken,
-      realmSlug,
-      member.name,
-    );
+    const avatarUrlPromise = fetchCharacterMedia(accessToken, realmSlug, member.name)
+      .then(getCharacterAvatarUrl)
+      .catch(() => null);
+    const [encounters, avatarUrl] = await Promise.all([
+      fetchCharacterRaidEncounters(
+        accessToken,
+        realmSlug,
+        member.name,
+      ),
+      avatarUrlPromise,
+    ]);
 
     const killedBosses = raids.flatMap((raid) =>
       getKilledBossesForRaidDifficulty({
@@ -235,6 +294,10 @@ async function checkCharacterForRaids({
       status: killedBosses.length > 0 ? "locked" : "clean",
       killedBosses,
       error: null,
+      avatarUrl,
+      serverSlug: realmSlug,
+      serverRegion: RAID_CHECK_REGION,
+      logs: null,
     };
   } catch (error) {
     if (error instanceof BlizzardApiRequestError && error.status === 404) {
@@ -243,6 +306,7 @@ async function checkCharacterForRaids({
         member,
         locale,
         raids,
+        serverSlug: realmSlug,
         status: "not_found",
       });
     }
@@ -255,6 +319,7 @@ async function checkCharacterForRaids({
       member,
       locale,
       raids,
+      serverSlug: realmSlug,
       status: "error",
     });
   }

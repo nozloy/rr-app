@@ -1,8 +1,9 @@
 @reference '../../app/globals.css';
 
 .createEventPage {
-	@apply relative z-[1] min-h-screen pb-8;
+	@apply relative z-[1] pb-8;
 
+	min-height: 100%;
 	background:
 		linear-gradient(180deg, rgba(2, 7, 18, 0.12), rgba(2, 7, 18, 0.88)),
 		#020814;

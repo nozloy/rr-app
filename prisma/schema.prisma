@@ -81,3 +81,22 @@ model Character {
   @@unique([userId, characterId])
   @@index([userId, isActive])
 }
+
+model WowCharacter {
+  id             String    @id @default(cuid())
+  name           String
+  serverSlug     String
+  serverRegion   String
+  warcraftLogsId Int?
+  lastFetchedAt  DateTime?
+  rankingsJson   Json?
+  gearJson       Json?
+  averageParse   Float?
+  bestParse      Float?
+  raidStatsJson  Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([name, serverSlug, serverRegion])
+  @@index([serverRegion, serverSlug])
+}

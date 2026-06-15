@@ -26,7 +26,8 @@ export function getRaidCheckSteps(locale: AppLocale): RaidCheckStep[] {
 		},
 		{
 			icon: SearchCheck,
-			label: locale === 'ru' ? 'Проверка через API' : 'API check',
+			label:
+				locale === 'ru' ? 'Проверка через Blizzard API' : 'Blizzard API check',
 			text:
 				locale === 'ru'
 					? 'Сервер получает убийства боссов каждого участника на этом кд.'

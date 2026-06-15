@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
         pathname: "/roles/**",
       },
       {
+        pathname: "/classes/**",
+      },
+      {
         pathname: "/banners/**",
       },
     ],
@@ -28,6 +31,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.battle.net",
+      },
+      {
+        protocol: "https",
+        hostname: "render.worldofwarcraft.com",
       },
     ],
   },

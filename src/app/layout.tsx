@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
+import { SiteFooter } from "@/components/home/site-footer";
 import { LocaleProvider } from "@/components/shell/locale-provider";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,12 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={cn("font-sans", jetbrainsMono.variable)}>
       <body>
-        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+        <LocaleProvider locale={locale}>
+          <div className="site-shell">
+            <div className="site-shell-content">{children}</div>
+            <SiteFooter locale={locale} />
+          </div>
+        </LocaleProvider>
       </body>
     </html>
   );
