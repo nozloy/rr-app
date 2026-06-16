@@ -503,6 +503,7 @@ function RaidCheckTableRow({
       <td>
         <RaidCheckLogs locale={locale} logs={row.logs} name={row.name} />
       </td>
+      <td aria-hidden="true" className="raidcheck-table-spacer" />
       <td className="raidcheck-row-action-cell">
         <Button
           aria-label={t(locale, "raidcheck.openCharacterDetails", {
@@ -903,12 +904,21 @@ export function RaidCheckForm() {
                 scrollbarOrientation="horizontal"
               >
                 <table className="raidcheck-table">
+                  <colgroup>
+                    <col className="raidcheck-table-col-character" />
+                    <col className="raidcheck-table-col-class" />
+                    <col className="raidcheck-table-col-lockout" />
+                    <col className="raidcheck-table-col-logs" />
+                    <col className="raidcheck-table-col-spacer" />
+                    <col className="raidcheck-table-col-actions" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>{t(locale, "raidcheck.playerRealm")}</th>
                       <th>{t(locale, "raidcheck.class")}</th>
                       <th>{t(locale, "raidcheck.lockout")}</th>
                       <th>{t(locale, "raidcheck.logs")}</th>
+                      <th aria-hidden="true" className="raidcheck-table-spacer" />
                       <th aria-label={t(locale, "raidcheck.actions")} />
                     </tr>
                   </thead>
@@ -924,7 +934,7 @@ export function RaidCheckForm() {
                       ))
                     ) : (
                       <tr>
-                        <td className="raidcheck-table-empty" colSpan={5}>
+                        <td className="raidcheck-table-empty" colSpan={6}>
                           {t(locale, "raidcheck.noFilteredRows")}
                         </td>
                       </tr>

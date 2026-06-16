@@ -1,5 +1,6 @@
 local ADDON_NAME = ...
 local EXPORT_PREFIX = "RR1?"
+local RR2_EXPORT_PREFIX = "RR2?"
 local ADDON_MESSAGE_PREFIX = "RaidReminder"
 local ADDON_MESSAGE_SEPARATOR = "\t"
 local MEDIA_PATH = "Interface\\AddOns\\RaidReminder\\Media\\"
@@ -588,6 +589,56 @@ local function CompactInstanceType(instanceType)
   return INSTANCE_CODES[instanceType] or instanceType
 end
 
+local function GetRealmRegionCode()
+  local regionId = GetCurrentRegion and GetCurrentRegion()
+
+  if regionId == 1 then
+    return "u"
+  end
+
+  if regionId == 3 then
+    return "e"
+  end
+
+  return nil
+end
+
+local function NormalizeRealmCodeKey(realm)
+  if type(realm) ~= "string" then
+    return nil
+  end
+
+  realm = realm:gsub("%s+", "")
+  if realm == "" then
+    return nil
+  end
+
+  return realm
+end
+
+local function GetRealmCodeEntry(regionCode, realm)
+  local byRegion = RaidReminderRealmCodes and RaidReminderRealmCodes.byRegion and RaidReminderRealmCodes.byRegion[regionCode]
+  if not byRegion then
+    return nil
+  end
+
+  if type(realm) ~= "string" or realm == "" then
+    return nil
+  end
+
+  local direct = byRegion[realm]
+  if direct then
+    return direct
+  end
+
+  local key = NormalizeRealmCodeKey(realm)
+  if not key then
+    return nil
+  end
+
+  return byRegion[key] or byRegion[string.lower(key)]
+end
+
 local function GetUnitRole(unit, playerSpecRole)
   local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
 
@@ -970,7 +1021,68 @@ local function GetExportFields()
   }
 end
 
-local function BuildExportString(fields)
+local function BuildCompactRoster(roster, regionCode)
+  if type(roster) ~= "string" or roster == "" then
+    return nil
+  end
+
+  local compactRoster = {}
+  for part in string.gmatch(roster, "([^,]+)") do
+    local name, realm, classFile, role = part:match("^([^:]+):([^:]+):([^:]+):([^:]+)$")
+    if not name or not realm or not classFile then
+      return nil
+    end
+
+    local realmEntry = GetRealmCodeEntry(regionCode, realm)
+    if not realmEntry then
+      return nil
+    end
+
+    table.insert(compactRoster, name .. ":" .. realmEntry[1] .. ":" .. CompactClass(classFile) .. ":" .. CompactRole(role))
+  end
+
+  return table.concat(compactRoster, ",")
+end
+
+local function BuildRR2ExportString(fields)
+  local regionCode = GetRealmRegionCode()
+  if not regionCode then
+    return nil
+  end
+
+  local realmEntry = GetRealmCodeEntry(regionCode, fields.realmName)
+  if not realmEntry then
+    return nil
+  end
+
+  local compactRoster = BuildCompactRoster(fields.roster, regionCode)
+  if fields.roster and fields.roster ~= "" and not compactRoster then
+    return nil
+  end
+
+  local params = {}
+  AddParam(params, "rg", regionCode)
+  AddParam(params, "n", fields.playerName)
+  AddParam(params, "l", fields.raidLeaderName)
+  AddParam(params, "r", realmEntry[1])
+  AddParam(params, "c", CompactClass(fields.classFile))
+  AddParam(params, "i", fields.itemLevel)
+  AddParam(params, "g", CompactGroupType(fields.groupType))
+  AddParam(params, "z", fields.groupSize)
+  AddParam(params, "m", fields.compactMembers)
+  AddParam(params, "ro", compactRoster)
+  AddParam(params, "t", CompactInstanceType(fields.instanceType))
+  AddParam(params, "in", fields.instanceName)
+  AddParam(params, "di", fields.difficultyID)
+  AddParam(params, "sr", fields.selectedRaidDifficultyID)
+  AddParam(params, "kl", fields.keyLevel)
+  AddParam(params, "km", fields.keyChallengeMapID)
+  AddParam(params, "kn", fields.keyMapName)
+
+  return RR2_EXPORT_PREFIX .. table.concat(params, "&")
+end
+
+local function BuildLegacyExportString(fields)
   fields = fields or GetExportFields()
 
   local params = {}
@@ -996,6 +1108,12 @@ local function BuildExportString(fields)
   AddParam(params, "keyMapName", fields.keyMapName)
 
   return EXPORT_PREFIX .. table.concat(params, "&")
+end
+
+local function BuildExportString(fields)
+  fields = fields or GetExportFields()
+
+  return BuildRR2ExportString(fields) or BuildLegacyExportString(fields)
 end
 
 local function RaidNamesMatch(left, right)

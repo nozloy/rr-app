@@ -6,11 +6,18 @@ import {
   getRaidByName,
   type RaidDefinition,
 } from "@/lib/raids";
+import {
+  getRealmCodeEntryByRegionCode,
+  getRealmRegionByCode,
+  type RealmRegion,
+} from "@/lib/realm-codes";
 
 export const ADDON_EXPORT_PREFIX = "RR1?";
 export const ADDON_QR_EXPORT_PREFIX = "RRQ1?";
+export const ADDON_RR2_EXPORT_PREFIX = "RR2?";
 export const MAX_ADDON_EXPORT_LENGTH = 12000;
 
+export type AddonServerRegion = RealmRegion;
 export type AddonGroupType = "solo" | "party" | "raid";
 export type AddonRole = "TANK" | "HEALER" | "DAMAGER" | "NONE";
 
@@ -22,6 +29,8 @@ export type AddonGroupMember = {
 export type AddonRosterMember = AddonGroupMember & {
   name: string;
   realm: string;
+  realmSlug: string | null;
+  serverRegion: AddonServerRegion;
 };
 
 export type AddonDraftOverrides = {
@@ -39,6 +48,8 @@ export type AddonExportData = {
   playerName: string;
   raidLeaderName: string | null;
   realm: string;
+  realmSlug: string | null;
+  serverRegion: AddonServerRegion;
   classFile: string;
   className: string;
   spec: string | null;
@@ -148,6 +159,7 @@ const BATTLE_RES_CLASSES = new Set([
   "PALADIN",
   "WARLOCK",
 ]);
+const DEFAULT_SERVER_REGION: AddonServerRegion = "eu";
 
 export class AddonExportParseError extends Error {}
 
@@ -229,6 +241,46 @@ function parseCompactRole(value: string | undefined): AddonRole {
   return COMPACT_ROLE_CODES[normalized] ?? "NONE";
 }
 
+function parseRr2Region(value: string, locale: AppLocale): AddonServerRegion {
+  const region = getRealmRegionByCode(value.trim().toLowerCase());
+
+  if (!region) {
+    throw new AddonExportParseError(
+      locale === "ru"
+        ? `Неподдерживаемый регион RR2: ${value}.`
+        : `Unsupported RR2 region: ${value}.`,
+    );
+  }
+
+  return region;
+}
+
+function parseRr2Realm({
+  code,
+  locale,
+  regionCode,
+}: {
+  code: string;
+  locale: AppLocale;
+  regionCode: string;
+}) {
+  const entry = getRealmCodeEntryByRegionCode(regionCode, code);
+
+  if (!entry) {
+    throw new AddonExportParseError(
+      locale === "ru"
+        ? `Реалм RR2 не найден в справочнике: ${code}.`
+        : `RR2 realm was not found in the catalog: ${code}.`,
+    );
+  }
+
+  return {
+    realm: entry.realmName,
+    realmSlug: entry.slug,
+    serverRegion: entry.region,
+  };
+}
+
 function parseMembers(value: string | null) {
   if (!value) {
     return [];
@@ -236,7 +288,7 @@ function parseMembers(value: string | null) {
 
   return value
     .split(",")
-    .map((part) => {
+    .map((part): AddonRosterMember | null => {
       const [classFile, role] = part.split(":");
       const normalizedClass = normalizeClassFile(classFile ?? "");
       const normalizedRole = (role ?? "NONE").trim().toUpperCase();
@@ -262,7 +314,7 @@ function parseRoster(value: string | null) {
 
   return value
     .split(",")
-    .map((part) => {
+    .map((part): AddonRosterMember | null => {
       const [name, realm, classFile, role] = part.split(":");
       const normalizedName = name?.trim() ?? "";
       const normalizedRealm = realm?.trim() ?? "";
@@ -287,8 +339,59 @@ function parseRoster(value: string | null) {
       return {
         name: normalizedName,
         realm: normalizedRealm,
+        realmSlug: null,
+        serverRegion: DEFAULT_SERVER_REGION,
         classFile: normalizedClass,
         role: normalizedRole as AddonRole,
+      };
+    })
+    .filter((member): member is AddonRosterMember => Boolean(member));
+}
+
+function parseRr2Roster({
+  locale,
+  regionCode,
+  value,
+}: {
+  locale: AppLocale;
+  regionCode: string;
+  value: string | null;
+}) {
+  if (!value) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return value
+    .split(",")
+    .map((part) => {
+      const [name, realmCode, classCode, roleCode] = part.split(":");
+      const normalizedName = name?.trim() ?? "";
+      const normalizedRealmCode = realmCode?.trim().toLowerCase() ?? "";
+      const classFile = parseCompactClassFile(classCode ?? "");
+      const role = parseCompactRole(roleCode);
+
+      if (!normalizedName || !normalizedRealmCode || !classFile) {
+        return null;
+      }
+
+      const realm = parseRr2Realm({
+        code: normalizedRealmCode,
+        locale,
+        regionCode,
+      });
+      const key = `${realm.serverRegion}-${normalizedName.toLowerCase()}-${realm.realmSlug}`;
+      if (seen.has(key)) {
+        return null;
+      }
+      seen.add(key);
+
+      return {
+        name: normalizedName,
+        ...realm,
+        classFile,
+        role,
       };
     })
     .filter((member): member is AddonRosterMember => Boolean(member));
@@ -417,11 +520,14 @@ function parseFullAddonExport(
   const itemLevel = optionalInt(params, "ilvl", 0, 999) ?? 0;
   const groupSize = optionalInt(params, "groupSize", 1, 40) ?? 1;
   const dungeonSlug = optionalString(params, "dungeonSlug") ?? undefined;
+  const realm = requireString(params, "realm", locale);
 
   return {
     playerName: requireString(params, "name", locale),
     raidLeaderName: optionalString(params, "raidLeaderName"),
-    realm: requireString(params, "realm", locale),
+    realm,
+    realmSlug: null,
+    serverRegion: DEFAULT_SERVER_REGION,
     classFile,
     className: optionalString(params, "className") ?? classFile,
     spec: optionalString(params, "spec"),
@@ -469,11 +575,14 @@ function parseCompactAddonExport(
 ): AddonExportData {
   const classFile = parseCompactClassFile(requireString(params, "c", locale));
   const itemLevel = optionalInt(params, "i", 0, 999) ?? 0;
+  const realm = requireString(params, "r", locale);
 
   return {
     playerName: requireString(params, "n", locale),
     raidLeaderName: optionalString(params, "l"),
-    realm: requireString(params, "r", locale),
+    realm,
+    realmSlug: null,
+    serverRegion: DEFAULT_SERVER_REGION,
     classFile,
     className: optionalString(params, "cl") ?? classFile,
     spec: optionalString(params, "s"),
@@ -490,6 +599,53 @@ function parseCompactAddonExport(
     difficultyName: optionalString(params, "dn"),
     selectedRaidDifficultyID: optionalInt(params, "sr", 0, 999),
     selectedRaidDifficultyName: optionalString(params, "sn"),
+    keyLevel: optionalInt(params, "kl", 2, 30),
+    keyChallengeMapID: optionalInt(params, "km", 0, 99999),
+    keyMapName: optionalString(params, "kn"),
+    draft: {},
+  };
+}
+
+function parseRr2AddonExport(
+  params: URLSearchParams,
+  locale: AppLocale,
+): AddonExportData {
+  const regionCode = requireString(params, "rg", locale).toLowerCase();
+  const serverRegion = parseRr2Region(regionCode, locale);
+  const realm = parseRr2Realm({
+    code: requireString(params, "r", locale).toLowerCase(),
+    locale,
+    regionCode,
+  });
+  const classFile = parseCompactClassFile(requireString(params, "c", locale));
+  const itemLevel = optionalInt(params, "i", 0, 999) ?? 0;
+
+  return {
+    playerName: requireString(params, "n", locale),
+    raidLeaderName: optionalString(params, "l"),
+    realm: realm.realm,
+    realmSlug: realm.realmSlug,
+    serverRegion,
+    classFile,
+    className: classFile,
+    spec: null,
+    itemLevel,
+    groupType: parseCompactGroupType(params.get("g")),
+    groupSize: optionalInt(params, "z", 1, 40) ?? 1,
+    members: parseCompactMembers(params.get("m")),
+    roster: parseRr2Roster({
+      locale,
+      regionCode,
+      value: params.get("ro"),
+    }),
+    instanceType:
+      COMPACT_INSTANCE_TYPES[params.get("t")?.toLowerCase() ?? ""] ??
+      optionalString(params, "t"),
+    instanceName: optionalString(params, "in"),
+    difficultyID: optionalInt(params, "di", 0, 999),
+    difficultyName: null,
+    selectedRaidDifficultyID: optionalInt(params, "sr", 0, 999),
+    selectedRaidDifficultyName: null,
     keyLevel: optionalInt(params, "kl", 2, 30),
     keyChallengeMapID: optionalInt(params, "km", 0, 99999),
     keyMapName: optionalString(params, "kn"),
@@ -517,6 +673,13 @@ export function parseAddonExportString(
   if (trimmed.startsWith(ADDON_QR_EXPORT_PREFIX)) {
     return parseCompactAddonExport(
       new URLSearchParams(trimmed.slice(ADDON_QR_EXPORT_PREFIX.length)),
+      locale,
+    );
+  }
+
+  if (trimmed.startsWith(ADDON_RR2_EXPORT_PREFIX)) {
+    return parseRr2AddonExport(
+      new URLSearchParams(trimmed.slice(ADDON_RR2_EXPORT_PREFIX.length)),
       locale,
     );
   }

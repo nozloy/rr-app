@@ -5,4 +5,5 @@
 ## Version: 0.2.0
 ## IconTexture: Interface\AddOns\RaidReminder\Media\RaidReminderIcon.tga
 
+RealmCodes.lua
 RaidReminder.lua

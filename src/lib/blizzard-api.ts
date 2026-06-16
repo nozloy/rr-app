@@ -9,10 +9,37 @@ import { getRuntimeEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { toBattleNetSlug } from "@/lib/utils";
 
-const API_BASE = "https://eu.api.blizzard.com";
-const OAUTH_BASE = "https://eu.battle.net";
-const ARMORY_BASE = "https://worldofwarcraft.blizzard.com/ru-ru/character/eu";
-const LOCALES = ["ru_RU", "en_GB"] as const;
+export type BlizzardRegion = "eu" | "us";
+
+const REGION_CONFIG = {
+  eu: {
+    apiBase: "https://eu.api.blizzard.com",
+    armoryBase: "https://worldofwarcraft.blizzard.com/ru-ru/character/eu",
+    dynamicNamespace: "dynamic-eu",
+    locales: ["ru_RU", "en_GB"] as const,
+    oauthBase: "https://eu.battle.net",
+    profileNamespace: "profile-eu",
+  },
+  us: {
+    apiBase: "https://us.api.blizzard.com",
+    armoryBase: "https://worldofwarcraft.blizzard.com/en-us/character/us",
+    dynamicNamespace: "dynamic-us",
+    locales: ["en_US"] as const,
+    oauthBase: "https://us.battle.net",
+    profileNamespace: "profile-us",
+  },
+} satisfies Record<
+  BlizzardRegion,
+  {
+    apiBase: string;
+    armoryBase: string;
+    dynamicNamespace: string;
+    locales: readonly string[];
+    oauthBase: string;
+    profileNamespace: string;
+  }
+>;
+const DEFAULT_REGION: BlizzardRegion = "eu";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 
 type AccountProfileSummary = {
@@ -98,7 +125,7 @@ export class BlizzardApiRequestError extends Error {
   }
 }
 
-let applicationTokenCache: ApplicationTokenCache | null = null;
+const applicationTokenCache = new Map<BlizzardRegion, ApplicationTokenCache>();
 const realmSlugCache = new Map<string, string>();
 const realmIndexCache = new Map<string, RealmIndex["realms"]>();
 
@@ -135,7 +162,7 @@ async function refreshAccessToken(account: Account) {
     refresh_token: account.refresh_token,
   });
 
-  const response = await fetch(`${OAUTH_BASE}/oauth/token`, {
+  const response = await fetch(`${REGION_CONFIG.eu.oauthBase}/oauth/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${Buffer.from(
@@ -167,20 +194,22 @@ async function refreshAccessToken(account: Account) {
   });
 }
 
-export async function getApplicationAccessToken() {
+export async function getApplicationAccessToken(region: BlizzardRegion = DEFAULT_REGION) {
+  const cached = applicationTokenCache.get(region);
   if (
-    applicationTokenCache &&
-    applicationTokenCache.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS
+    cached &&
+    cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS
   ) {
-    return applicationTokenCache.accessToken;
+    return cached.accessToken;
   }
 
+  const config = REGION_CONFIG[region];
   const env = getRuntimeEnv();
   const body = new URLSearchParams({
     grant_type: "client_credentials",
   });
 
-  const response = await fetch(`${OAUTH_BASE}/oauth/token`, {
+  const response = await fetch(`${config.oauthBase}/oauth/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${Buffer.from(
@@ -197,10 +226,10 @@ export async function getApplicationAccessToken() {
   }
 
   const token = (await response.json()) as RefreshTokenResponse;
-  applicationTokenCache = {
+  applicationTokenCache.set(region, {
     accessToken: token.access_token,
     expiresAt: Date.now() + (token.expires_in ?? 0) * 1000,
-  };
+  });
 
   return token.access_token;
 }
@@ -236,14 +265,16 @@ export async function getValidAccessToken(userId: string) {
 async function blizzardRequest<T>(
   path: string,
   accessToken: string,
-  locales: readonly string[] = LOCALES,
+  region: BlizzardRegion = DEFAULT_REGION,
+  locales: readonly string[] = REGION_CONFIG[region].locales,
 ) {
+  const config = REGION_CONFIG[region];
   let lastError: Error | null = null;
 
   for (const locale of locales) {
     const separator = path.includes("?") ? "&" : "?";
     const response = await fetch(
-      `${API_BASE}${path}${separator}namespace=profile-eu&locale=${locale}`,
+      `${config.apiBase}${path}${separator}namespace=${config.profileNamespace}&locale=${locale}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -272,15 +303,17 @@ async function blizzardRequest<T>(
 async function blizzardDataRequest<T>(
   path: string,
   accessToken: string,
-  namespace = "dynamic-eu",
-  locales: readonly string[] = LOCALES,
+  region: BlizzardRegion = DEFAULT_REGION,
+  namespace = REGION_CONFIG[region].dynamicNamespace,
+  locales: readonly string[] = REGION_CONFIG[region].locales,
 ) {
+  const config = REGION_CONFIG[region];
   let lastError: Error | null = null;
 
   for (const locale of locales) {
     const separator = path.includes("?") ? "&" : "?";
     const response = await fetch(
-      `${API_BASE}${path}${separator}namespace=${namespace}&locale=${locale}`,
+      `${config.apiBase}${path}${separator}namespace=${namespace}&locale=${locale}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -310,6 +343,7 @@ export async function fetchAccountCharacters(accessToken: string) {
   const summary = await blizzardRequest<AccountProfileSummary>(
     "/profile/user/wow",
     accessToken,
+    DEFAULT_REGION,
     ["ru_RU"],
   );
 
@@ -320,10 +354,12 @@ export async function fetchCharacterProfile(
   accessToken: string,
   realmSlug: string,
   characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ) {
   return blizzardRequest<BlizzardCharacterProfile>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}`,
     accessToken,
+    region,
   );
 }
 
@@ -331,10 +367,12 @@ export async function fetchCharacterEquipment(
   accessToken: string,
   realmSlug: string,
   characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ) {
   return blizzardRequest<BlizzardEquipmentSummary>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}/equipment`,
     accessToken,
+    region,
   );
 }
 
@@ -342,10 +380,12 @@ export async function fetchCharacterMedia(
   accessToken: string,
   realmSlug: string,
   characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ) {
   return blizzardRequest<BlizzardCharacterMedia>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}/character-media`,
     accessToken,
+    region,
   );
 }
 
@@ -353,15 +393,22 @@ export async function fetchCharacterRaidEncounters(
   accessToken: string,
   realmSlug: string,
   characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ) {
   return blizzardRequest<BlizzardCharacterRaidEncounters>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}/encounters/raids`,
     accessToken,
+    region,
   );
 }
 
-async function fetchRealmIndex(accessToken: string, locale: string) {
-  const cached = realmIndexCache.get(locale);
+async function fetchRealmIndex(
+  accessToken: string,
+  locale: string,
+  region: BlizzardRegion = DEFAULT_REGION,
+) {
+  const cacheKey = `${region}:${locale}`;
+  const cached = realmIndexCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -369,11 +416,12 @@ async function fetchRealmIndex(accessToken: string, locale: string) {
   const index = await blizzardDataRequest<RealmIndex>(
     "/data/wow/realm/index",
     accessToken,
-    "dynamic-eu",
+    region,
+    REGION_CONFIG[region].dynamicNamespace,
     [locale],
   );
   const realms = index.realms ?? [];
-  realmIndexCache.set(locale, realms);
+  realmIndexCache.set(cacheKey, realms);
 
   return realms;
 }
@@ -381,23 +429,25 @@ async function fetchRealmIndex(accessToken: string, locale: string) {
 export async function resolveRealmSlug(
   accessToken: string,
   realmName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ) {
-  const cacheKey = normalizeRealmLookup(realmName);
+  const lookupKey = normalizeRealmLookup(realmName);
+  const cacheKey = `${region}:${lookupKey}`;
   const cached = realmSlugCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  for (const locale of LOCALES) {
-    const realms = await fetchRealmIndex(accessToken, locale);
+  for (const locale of REGION_CONFIG[region].locales) {
+    const realms = await fetchRealmIndex(accessToken, locale, region);
     const match = realms.find((realm) => {
       if (!realm.name || !realm.slug) {
         return false;
       }
 
       return (
-        normalizeRealmLookup(realm.name) === cacheKey ||
-        normalizeRealmLookup(realm.slug) === cacheKey
+        normalizeRealmLookup(realm.name) === lookupKey ||
+        normalizeRealmLookup(realm.slug) === lookupKey
       );
     });
 
@@ -419,8 +469,10 @@ export async function resolveRealmSlug(
 export async function fetchPublicCharacterSummary(
   realmSlug: string,
   characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
 ): Promise<PublicCharacterSummary> {
-  const url = `${ARMORY_BASE}/${realmSlug}/${encodeURIComponent(characterName)}`;
+  const config = REGION_CONFIG[region];
+  const url = `${config.armoryBase}/${realmSlug}/${encodeURIComponent(characterName)}`;
   const response = await fetch(url, {
     cache: "no-store",
   });
@@ -442,7 +494,7 @@ export async function fetchPublicCharacterSummary(
     html.match(/,\s*(\d+)\s+(?:ilvl|ур\.\s*предметов)/i);
   const specMatch = html.match(
     new RegExp(
-      `"averageItemLevel":\\d+,"class":\\{[^}]+\\},"name":"${escapedName}","race":\\{[^}]+\\},"realm":\\{"name":"[^"]+","slug":"${escapedRealmSlug}"\\},"region":"eu","spec":\\{"enum":"[^"]+","id":\\d+,"name":"([^"]+)"`,
+      `"averageItemLevel":\\d+,"class":\\{[^}]+\\},"name":"${escapedName}","race":\\{[^}]+\\},"realm":\\{"name":"[^"]+","slug":"${escapedRealmSlug}"\\},"region":"${region}","spec":\\{"enum":"[^"]+","id":\\d+,"name":"([^"]+)"`,
       "u",
     ),
   );

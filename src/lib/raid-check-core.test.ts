@@ -5,8 +5,7 @@ import {
 	getRaidCheckDifficultyById,
 } from '@/lib/raid-check-core'
 import type { RaidDefinition } from '@/lib/raids'
-import { describe, it } from 'node:test'
-import { expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 const raid: RaidDefinition = {
 	slug: 'the-voidspire',

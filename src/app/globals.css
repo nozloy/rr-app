@@ -1324,23 +1324,27 @@ textarea {
 	table-layout: fixed;
 }
 
-.raidcheck-table th:nth-child(2),
-.raidcheck-table td:nth-child(2) {
+.raidcheck-table-col-character {
+	width: clamp(18rem, 28vw, 23rem);
+}
+
+.raidcheck-table-col-class {
 	width: 4.4rem;
 }
 
-.raidcheck-table th:nth-child(3),
-.raidcheck-table td:nth-child(3) {
+.raidcheck-table-col-lockout {
 	width: 4.2rem;
 }
 
-.raidcheck-table th:nth-child(4),
-.raidcheck-table td:nth-child(4) {
+.raidcheck-table-col-logs {
 	width: 7.5rem;
 }
 
-.raidcheck-table th:nth-child(5),
-.raidcheck-table td:nth-child(5) {
+.raidcheck-table-col-spacer {
+	width: auto;
+}
+
+.raidcheck-table-col-actions {
 	width: 3.2rem;
 }
 
@@ -1357,6 +1361,11 @@ textarea {
 	font-size: 0.72rem;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
+}
+
+.raidcheck-table-spacer {
+	padding-right: 0;
+	padding-left: 0;
 }
 
 .raidcheck-table tr:last-child td {

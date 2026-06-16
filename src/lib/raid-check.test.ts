@@ -1,6 +1,10 @@
-import { ADDON_EXPORT_PREFIX } from "@/lib/addon-export";
+import {
+  ADDON_EXPORT_PREFIX,
+  ADDON_RR2_EXPORT_PREFIX,
+} from "@/lib/addon-export";
 import type { BlizzardCharacterRaidEncounters } from "@/lib/blizzard-api";
 import { ALL_SEASON_RAIDS_VALUE } from "@/lib/raid-check-core";
+import { REALM_CODE_ENTRIES, type RealmRegion } from "@/lib/realm-codes";
 
 const { blizzardApiMock, MockBattleNetAuthError, MockBlizzardApiRequestError } =
   vi.hoisted(() => {
@@ -39,6 +43,22 @@ import { checkRaidLockoutsForExport } from "@/lib/raid-check";
 
 function makeExport(params: Record<string, string>) {
   return `${ADDON_EXPORT_PREFIX}${new URLSearchParams(params).toString()}`;
+}
+
+function makeRr2Export(params: Record<string, string>) {
+  return `${ADDON_RR2_EXPORT_PREFIX}${new URLSearchParams(params).toString()}`;
+}
+
+function realmCode(region: RealmRegion, slug: string) {
+  const entry = REALM_CODE_ENTRIES.find(
+    (item) => item.region === region && item.slug === slug,
+  );
+
+  if (!entry) {
+    throw new Error(`Missing realm code for ${region}/${slug}.`);
+  }
+
+  return entry.code;
 }
 
 function makeEncounterSummary(killTimestamp?: number): BlizzardCharacterRaidEncounters {
@@ -123,6 +143,30 @@ function makeSeasonEncounterSummary(): BlizzardCharacterRaidEncounters {
                       },
                       completed_count: 1,
                       last_kill_timestamp: Date.parse("2026-05-21T10:00:00.000Z"),
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            instance: {
+              name: "Sporefall",
+            },
+            modes: [
+              {
+                difficulty: {
+                  type: "HEROIC",
+                  name: "Heroic",
+                },
+                progress: {
+                  encounters: [
+                    {
+                      encounter: {
+                        name: "Rotmire",
+                      },
+                      completed_count: 1,
+                      last_kill_timestamp: Date.parse("2026-05-22T11:00:00.000Z"),
                     },
                   ],
                 },
@@ -220,11 +264,13 @@ describe("raid check", () => {
       "app-token",
       "howling-fjord",
       "Locked",
+      "eu",
     );
     expect(blizzardApiMock.fetchCharacterMedia).toHaveBeenCalledWith(
       "app-token",
       "draenor",
       "Clean",
+      "eu",
     );
   });
 
@@ -259,6 +305,7 @@ describe("raid check", () => {
       "app-token",
       "draenor",
       "Clean",
+      "eu",
     );
   });
 
@@ -316,6 +363,59 @@ describe("raid check", () => {
         serverRegion: "eu",
       },
     ]);
+  });
+
+  it("checks legacy RR1 roster members with normalized Cyrillic realm names", async () => {
+    blizzardApiMock.resolveRealmSlug.mockImplementation(
+      async (_token: string, realm: string) =>
+        realm.replace(/\s/gu, "") === "Ревущийфьорд" ? "howling-fjord" : null,
+    );
+
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      raidSlug: "the-voidspire",
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Ревущий фьорд",
+        classFile: "DEATHKNIGHT",
+        groupType: "party",
+        groupSize: "2",
+        instanceType: "raid",
+        instanceName: "The Voidspire",
+        selectedRaidDifficultyID: "15",
+        roster:
+          "NoSpace:Ревущийфьорд:DEATHKNIGHT:TANK,WithSpace:Ревущий фьорд:SHAMAN:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows).toMatchObject([
+      {
+        name: "NoSpace",
+        realm: "Ревущийфьорд",
+        status: "clean",
+        serverSlug: "howling-fjord",
+        serverRegion: "eu",
+      },
+      {
+        name: "WithSpace",
+        realm: "Ревущий фьорд",
+        status: "clean",
+        serverSlug: "howling-fjord",
+        serverRegion: "eu",
+      },
+    ]);
+    expect(blizzardApiMock.resolveRealmSlug).toHaveBeenCalledWith(
+      "app-token",
+      "Ревущийфьорд",
+      "eu",
+    );
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
+      "app-token",
+      "howling-fjord",
+      "NoSpace",
+      "eu",
+    );
   });
 
   it("uses a manually selected current raid when the import is not a raid", async () => {
@@ -402,9 +502,92 @@ describe("raid check", () => {
           raidName: "Шпиль Бездны",
           sourceName: "Imperator Averzian",
         },
+        {
+          raidSlug: "sporefall",
+          raidName: "Споропад",
+          sourceName: "Rotmire",
+        },
       ],
     });
     expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses RR2 realm slugs directly without resolving legacy realm names", async () => {
+    const draenor = realmCode("eu", "draenor");
+    const howlingFjord = realmCode("eu", "howling-fjord");
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      exportText: makeRr2Export({
+        rg: "e",
+        n: "Leader",
+        r: draenor,
+        c: "P",
+        g: "r",
+        z: "2",
+        t: "r",
+        in: "The Voidspire",
+        sr: "15",
+        ro: `Clean:${draenor}:M:D,Locked:${howlingFjord}:WL:D`,
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows).toMatchObject([
+      {
+        name: "Clean",
+        realm: "Draenor",
+        serverSlug: "draenor",
+        serverRegion: "eu",
+      },
+      {
+        name: "Locked",
+        realm: "Howling Fjord",
+        serverSlug: "howling-fjord",
+        serverRegion: "eu",
+        status: "locked",
+      },
+    ]);
+    expect(blizzardApiMock.getApplicationAccessToken).toHaveBeenCalledWith("eu");
+    expect(blizzardApiMock.resolveRealmSlug).not.toHaveBeenCalled();
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
+      "app-token",
+      "howling-fjord",
+      "Locked",
+      "eu",
+    );
+  });
+
+  it("checks US RR2 exports against US Blizzard endpoints", async () => {
+    const draenor = realmCode("us", "draenor");
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      exportText: makeRr2Export({
+        rg: "u",
+        n: "Leader",
+        r: draenor,
+        c: "P",
+        g: "r",
+        z: "1",
+        t: "r",
+        in: "The Voidspire",
+        ro: `Clean:${draenor}:M:D`,
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows[0]).toMatchObject({
+      name: "Clean",
+      serverSlug: "draenor",
+      serverRegion: "us",
+    });
+    expect(blizzardApiMock.getApplicationAccessToken).toHaveBeenCalledWith("us");
+    expect(blizzardApiMock.resolveRealmSlug).not.toHaveBeenCalled();
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
+      "app-token",
+      "draenor",
+      "Clean",
+      "us",
+    );
   });
 
   it("rejects an unknown manual raid slug", async () => {

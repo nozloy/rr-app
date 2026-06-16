@@ -35,7 +35,6 @@ import {
 } from "@/lib/raids";
 
 const RAID_CHECK_CONCURRENCY = 5;
-const RAID_CHECK_REGION = "eu";
 
 export type RaidCheckCharacterStatus =
   | "clean"
@@ -124,6 +123,8 @@ function buildFallbackRoster(exportData: ReturnType<typeof parseAddonExportStrin
     {
       name: exportData.playerName,
       realm: exportData.realm,
+      realmSlug: exportData.realmSlug,
+      serverRegion: exportData.serverRegion,
       classFile: exportData.classFile,
       role: "NONE",
     },
@@ -136,7 +137,7 @@ function getRoster(exportData: ReturnType<typeof parseAddonExportString>) {
   const seen = new Set<string>();
 
   return source.filter((member) => {
-    const key = `${member.name.toLowerCase()}-${member.realm.toLowerCase()}`;
+    const key = `${member.serverRegion}-${member.name.toLowerCase()}-${member.realm.toLowerCase()}`;
     if (seen.has(key)) {
       return false;
     }
@@ -226,7 +227,7 @@ function buildUnavailableResult({
     error,
     avatarUrl: null,
     serverSlug,
-    serverRegion: RAID_CHECK_REGION,
+    serverRegion: member.serverRegion,
     logs: null,
   };
 }
@@ -246,10 +247,12 @@ async function checkCharacterForRaids({
   resetStart: Date;
   locale: RaidCheckLocale;
 }): Promise<RaidCheckCharacterResult> {
-  let realmSlug: string | null = null;
+  let realmSlug: string | null = member.realmSlug;
 
   try {
-    realmSlug = await resolveRealmSlug(accessToken, member.realm);
+    realmSlug =
+      realmSlug ??
+      (await resolveRealmSlug(accessToken, member.realm, member.serverRegion));
 
     if (!realmSlug) {
       return buildUnavailableResult({
@@ -261,7 +264,12 @@ async function checkCharacterForRaids({
       });
     }
 
-    const avatarUrlPromise = fetchCharacterMedia(accessToken, realmSlug, member.name)
+    const avatarUrlPromise = fetchCharacterMedia(
+      accessToken,
+      realmSlug,
+      member.name,
+      member.serverRegion,
+    )
       .then(getCharacterAvatarUrl)
       .catch(() => null);
     const [encounters, avatarUrl] = await Promise.all([
@@ -269,6 +277,7 @@ async function checkCharacterForRaids({
         accessToken,
         realmSlug,
         member.name,
+        member.serverRegion,
       ),
       avatarUrlPromise,
     ]);
@@ -296,7 +305,7 @@ async function checkCharacterForRaids({
       error: null,
       avatarUrl,
       serverSlug: realmSlug,
-      serverRegion: RAID_CHECK_REGION,
+      serverRegion: member.serverRegion,
       logs: null,
     };
   } catch (error) {
@@ -452,7 +461,7 @@ export async function checkRaidLockoutsForExport({
   const resetStart = getEuWeeklyResetStart();
 
   try {
-    const accessToken = await getApplicationAccessToken();
+    const accessToken = await getApplicationAccessToken(exportData.serverRegion);
     const rows = await mapWithConcurrency(
       roster,
       RAID_CHECK_CONCURRENCY,

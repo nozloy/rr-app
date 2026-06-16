@@ -1,12 +1,14 @@
 import {
   ADDON_EXPORT_PREFIX,
   ADDON_QR_EXPORT_PREFIX,
+  ADDON_RR2_EXPORT_PREFIX,
   AddonExportParseError,
   getImportedRaidDisplayMode,
   getImportedBannerDraftFromExport,
   getImportedBannerImageUrl,
   parseAddonExportString,
 } from "@/lib/addon-export";
+import { REALM_CODE_ENTRIES, type RealmRegion } from "@/lib/realm-codes";
 
 function makeExport(params: Record<string, string>) {
   return `${ADDON_EXPORT_PREFIX}${new URLSearchParams(params).toString()}`;
@@ -14,6 +16,22 @@ function makeExport(params: Record<string, string>) {
 
 function makeQrExport(params: Record<string, string>) {
   return `${ADDON_QR_EXPORT_PREFIX}${new URLSearchParams(params).toString()}`;
+}
+
+function makeRr2Export(params: Record<string, string>) {
+  return `${ADDON_RR2_EXPORT_PREFIX}${new URLSearchParams(params).toString()}`;
+}
+
+function realmCode(region: RealmRegion, slug: string) {
+  const entry = REALM_CODE_ENTRIES.find(
+    (item) => item.region === region && item.slug === slug,
+  );
+
+  if (!entry) {
+    throw new Error(`Missing realm code for ${region}/${slug}.`);
+  }
+
+  return entry.code;
 }
 
 describe("addon export", () => {
@@ -91,18 +109,24 @@ describe("addon export", () => {
       {
         name: "Mender",
         realm: "Howling Fjord",
+        realmSlug: null,
+        serverRegion: "eu",
         classFile: "PALADIN",
         role: "TANK",
       },
       {
         name: "Totemic",
         realm: "Ревущий фьорд",
+        realmSlug: null,
+        serverRegion: "eu",
         classFile: "SHAMAN",
         role: "HEALER",
       },
       {
         name: "Dotter",
         realm: "Draenor",
+        realmSlug: null,
+        serverRegion: "eu",
         classFile: "WARLOCK",
         role: "DAMAGER",
       },
@@ -327,6 +351,92 @@ describe("addon export", () => {
     expect(getImportedBannerDraftFromExport(parsed).characterName).toBe(
       "Raidboss",
     );
+  });
+
+  it("parses RR2 raid exports with encoded EU realms and full roster", () => {
+    const howlingFjord = realmCode("eu", "howling-fjord");
+    const draenor = realmCode("eu", "draenor");
+    const parsed = parseAddonExportString(
+      makeRr2Export({
+        rg: "e",
+        n: "Mender",
+        l: "Raidboss",
+        r: howlingFjord,
+        c: "P",
+        i: "710",
+        g: "r",
+        z: "2",
+        m: "P:T,WL:D",
+        ro: `Mender:${howlingFjord}:P:T,Dotter:${draenor}:WL:D`,
+        t: "r",
+        in: "The Voidspire",
+        di: "15",
+        sr: "16",
+      }),
+    );
+
+    expect(parsed).toMatchObject({
+      playerName: "Mender",
+      raidLeaderName: "Raidboss",
+      realm: "Howling Fjord",
+      realmSlug: "howling-fjord",
+      serverRegion: "eu",
+      classFile: "PALADIN",
+      className: "PALADIN",
+      difficultyID: 15,
+      selectedRaidDifficultyID: 16,
+      instanceType: "raid",
+    });
+    expect(parsed.members).toEqual([
+      { classFile: "PALADIN", role: "TANK" },
+      { classFile: "WARLOCK", role: "DAMAGER" },
+    ]);
+    expect(parsed.roster).toEqual([
+      {
+        name: "Mender",
+        realm: "Howling Fjord",
+        realmSlug: "howling-fjord",
+        serverRegion: "eu",
+        classFile: "PALADIN",
+        role: "TANK",
+      },
+      {
+        name: "Dotter",
+        realm: "Draenor",
+        realmSlug: "draenor",
+        serverRegion: "eu",
+        classFile: "WARLOCK",
+        role: "DAMAGER",
+      },
+    ]);
+  });
+
+  it("parses RR2 US realm codes independently from matching EU slugs", () => {
+    const draenor = realmCode("us", "draenor");
+    const parsed = parseAddonExportString(
+      makeRr2Export({
+        rg: "u",
+        n: "Mender",
+        r: draenor,
+        c: "PR",
+        g: "r",
+        z: "1",
+        ro: `Mender:${draenor}:PR:H`,
+      }),
+    );
+
+    expect(parsed).toMatchObject({
+      realm: "Draenor",
+      realmSlug: "draenor",
+      serverRegion: "us",
+      classFile: "PRIEST",
+    });
+    expect(parsed.roster[0]).toMatchObject({
+      realmSlug: "draenor",
+      serverRegion: "us",
+      classFile: "PRIEST",
+      role: "HEALER",
+    });
   });
 
   it("handles missing key and instance data", () => {

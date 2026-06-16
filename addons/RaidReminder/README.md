@@ -15,7 +15,8 @@ World of Warcraft\_retail_\Interface\AddOns\RaidReminder
 
 ## Commands
 
-In game, run `/rr` or `/raidreminder`, press `Ctrl+C` in the export field, then paste the `RR1?...` string into RaidReminder.pro.
+In game, run `/rr` or `/raidreminder`, press `Ctrl+C` in the export field, then paste the `RR2?...` string into RaidReminder.pro.
+The add-on falls back to the legacy `RR1?...` format when the current region or realm cannot be encoded.
 
 The same window checks raid readiness:
 
@@ -38,6 +39,7 @@ Correct CurseForge archive structure:
 RaidReminder.zip
 └─ RaidReminder/
    ├─ RaidReminder.toc
+   ├─ RealmCodes.lua
    ├─ RaidReminder.lua
    ├─ Media/
    │  └─ RaidReminderIcon.tga
