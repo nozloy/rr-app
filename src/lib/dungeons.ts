@@ -18,7 +18,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "magisters-terrace",
     name: "Терраса Магистров",
     shortName: "MT",
-    artPath: "/dungeons/Magisters_Terrace_styled_16x9.webp",
+    artPath: "/dungeons/Magisters_Terrace_styled_16x9.jpg",
     names: {
       en: "Magister's Terrace",
       ru: "Терраса Магистров",
@@ -28,7 +28,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "maisara-caverns",
     name: "Пещеры Майсары",
     shortName: "MC",
-    artPath: "/dungeons/Maisara_Caverns_styled_16x9.webp",
+    artPath: "/dungeons/Maisara_Caverns_styled_16x9.jpg",
     names: {
       en: "Maisara Caverns",
       ru: "Пещеры Майсары",
@@ -38,7 +38,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "nexus-point-xenas",
     name: "Узел Нексуса Зенас",
     shortName: "NPX",
-    artPath: "/dungeons/Nexus_Point_Xenas_styled_16x9.webp",
+    artPath: "/dungeons/Nexus_Point_Xenas_styled_16x9.jpg",
     names: {
       en: "Nexus-Point Xenas",
       ru: "Узел Нексуса Зенас",
@@ -48,7 +48,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "windrunner-spire",
     name: "Шпиль Ветрокрылых",
     shortName: "WS",
-    artPath: "/dungeons/windrunner_spire_styled_16x9.webp",
+    artPath: "/dungeons/windrunner_spire_styled_16x9.jpg",
     names: {
       en: "Windrunner Spire",
       ru: "Шпиль Ветрокрылых",
@@ -58,7 +58,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "blinding-vale",
     name: "Слепящая долина",
     shortName: "BV",
-    artPath: "/dungeons/blinding_vale_styled_16x9.webp",
+    artPath: "/dungeons/blinding_vale_styled_16x9.jpg",
     names: {
       en: "The Blinding Vale",
       ru: "Слепящая долина",
@@ -68,7 +68,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "den-of-nalorakk",
     name: "Берлога Налоракка",
     shortName: "DN",
-    artPath: "/dungeons/den_of_nalorakk_styled_16x9.webp",
+    artPath: "/dungeons/den_of_nalorakk_styled_16x9.jpg",
     names: {
       en: "Den of Nalorakk",
       ru: "Берлога Налоракка",
@@ -78,7 +78,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "murder-row",
     name: "Закоулок душегубов",
     shortName: "MR",
-    artPath: "/dungeons/murder_row_styled_16x9.webp",
+    artPath: "/dungeons/murder_row_styled_16x9.jpg",
     names: {
       en: "Murder Row",
       ru: "Закоулок душегубов",
@@ -88,7 +88,7 @@ const midnightDungeons: DungeonDefinition[] = [
     slug: "voidscar-arena",
     name: "Арена Шрама Бездны",
     shortName: "VA",
-    artPath: "/dungeons/voidscar_arena_styled_16x9.webp",
+    artPath: "/dungeons/voidscar_arena_styled_16x9.jpg",
     names: {
       en: "Voidscar Arena",
       ru: "Арена Шрама Бездны",
@@ -101,7 +101,7 @@ const legacySeasonDungeons: DungeonDefinition[] = [
     slug: "algethar-academy",
     name: "Академия Алгет'ар",
     shortName: "AA",
-    artPath: "/dungeons/Algethar_Academy_styled_16x9.webp",
+    artPath: "/dungeons/Algethar_Academy_styled_16x9.jpg",
     names: {
       en: "Algeth'ar Academy",
       ru: "Академия Алгет'ар",
@@ -111,7 +111,7 @@ const legacySeasonDungeons: DungeonDefinition[] = [
     slug: "seat-of-the-triumvirate",
     name: "Престол Триумвирата",
     shortName: "SEAT",
-    artPath: "/dungeons/The_Seat_of_the_Triumvirate_styled_16x9.webp",
+    artPath: "/dungeons/The_Seat_of_the_Triumvirate_styled_16x9.jpg",
     names: {
       en: "Seat of the Triumvirate",
       ru: "Престол Триумвирата",
@@ -121,7 +121,7 @@ const legacySeasonDungeons: DungeonDefinition[] = [
     slug: "skyreach",
     name: "Небесный Путь",
     shortName: "SR",
-    artPath: "/dungeons/Skyreach_styled_16x9.webp",
+    artPath: "/dungeons/Skyreach_styled_16x9.jpg",
     names: {
       en: "Skyreach",
       ru: "Небесный Путь",
@@ -131,7 +131,7 @@ const legacySeasonDungeons: DungeonDefinition[] = [
     slug: "pit-of-saron",
     name: "Яма Сарона",
     shortName: "POS",
-    artPath: "/dungeons/Pit_of_Saron_styled_16x9.webp",
+    artPath: "/dungeons/Pit_of_Saron_styled_16x9.jpg",
     names: {
       en: "Pit of Saron",
       ru: "Яма Сарона",

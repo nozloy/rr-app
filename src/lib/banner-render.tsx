@@ -168,7 +168,6 @@ export function renderBannerImage({
           justifyContent: "space-between",
           alignItems: "flex-start",
           position: "relative",
-          zIndex: 1,
         }}
       >
         <div
@@ -272,7 +271,6 @@ export function renderBannerImage({
           flexDirection: "column",
           gap: hasRaidDetails ? "14px" : "18px",
           position: "relative",
-          zIndex: 1,
           padding: hasRaidDetails ? "22px 26px" : "28px 30px",
           borderRadius: "28px",
           border: "1px solid rgba(255,255,255,0.2)",

@@ -288,7 +288,7 @@ function parseMembers(value: string | null) {
 
   return value
     .split(",")
-    .map((part): AddonRosterMember | null => {
+    .map((part): AddonGroupMember | null => {
       const [classFile, role] = part.split(":");
       const normalizedClass = normalizeClassFile(classFile ?? "");
       const normalizedRole = (role ?? "NONE").trim().toUpperCase();
@@ -365,7 +365,7 @@ function parseRr2Roster({
 
   return value
     .split(",")
-    .map((part) => {
+    .map((part): AddonRosterMember | null => {
       const [name, realmCode, classCode, roleCode] = part.split(":");
       const normalizedName = name?.trim() ?? "";
       const normalizedRealmCode = realmCode?.trim().toLowerCase() ?? "";
