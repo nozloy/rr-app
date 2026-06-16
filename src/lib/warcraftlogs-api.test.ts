@@ -55,6 +55,35 @@ function zonesResponse() {
   });
 }
 
+function zonesWithSporefallResponse() {
+  return jsonResponse({
+    data: {
+      worldData: {
+        zones: [
+          {
+            id: 46,
+            name: "VS / DR / MQD",
+            frozen: false,
+            difficulties: [
+              { id: 4, name: "Heroic" },
+              { id: 5, name: "Mythic" },
+            ],
+          },
+          {
+            id: 50,
+            name: "Sporefall",
+            frozen: false,
+            difficulties: [
+              { id: 4, name: "Heroic" },
+              { id: 5, name: "Mythic" },
+            ],
+          },
+        ],
+      },
+    },
+  });
+}
+
 function characterResponse(character: unknown) {
   return jsonResponse({
     data: {
@@ -63,6 +92,28 @@ function characterResponse(character: unknown) {
       },
     },
   });
+}
+
+function rankingCharacter(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 777,
+    name: "Clean",
+    heroicRankings: {
+      bestPerformanceAverage: 85,
+      rankings: [
+        {
+          encounter: { name: "Imperator Averzian" },
+          rankPercent: 94.6,
+        },
+      ],
+    },
+    mythicRankings: { rankings: [] },
+    gameData: {
+      averageItemLevel: 710,
+      gear: [{ id: 1, name: "Arcane Blade", slot: "Main Hand", itemLevel: 720 }],
+    },
+    ...overrides,
+  };
 }
 
 function baseRecord(overrides: Record<string, unknown> = {}) {
@@ -82,6 +133,21 @@ function baseRecord(overrides: Record<string, unknown> = {}) {
     updatedAt: new Date("2026-06-15T10:00:00.000Z"),
     ...overrides,
   };
+}
+
+async function recordFromRankingUpdate({
+  data,
+}: {
+  data: Record<string, unknown>;
+}) {
+  return baseRecord({
+    warcraftLogsId: data.warcraftLogsId,
+    lastFetchedAt: data.lastFetchedAt,
+    averageParse: data.averageParse,
+    bestParse: data.bestParse,
+    raidStatsJson: data.raidStatsJson,
+    gearJson: data.gearJson,
+  });
 }
 
 async function loadApi() {
@@ -193,42 +259,14 @@ describe("warcraftlogs api cache", () => {
     fetchMock
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce(zonesResponse())
-      .mockResolvedValueOnce(
-        characterResponse({
-          id: 777,
-          name: "Clean",
-          heroicRankings: {
-            bestPerformanceAverage: 85,
-            rankings: [
-              {
-                encounter: { name: "Imperator Averzian" },
-                rankPercent: 94.6,
-              },
-            ],
-          },
-          mythicRankings: { rankings: [] },
-          gameData: {
-            averageItemLevel: 710,
-            gear: [{ id: 1, name: "Arcane Blade", slot: "Main Hand", itemLevel: 720 }],
-          },
-        }),
-      );
+      .mockResolvedValueOnce(characterResponse(rankingCharacter()));
     prismaMock.wowCharacter.findUnique.mockResolvedValue(
       baseRecord({
         lastFetchedAt: new Date("2026-06-14T10:00:00.000Z"),
       }),
     );
     prismaMock.wowCharacter.upsert.mockResolvedValue(baseRecord());
-    prismaMock.wowCharacter.update.mockImplementation(async ({ data }) =>
-      baseRecord({
-        warcraftLogsId: data.warcraftLogsId,
-        lastFetchedAt: data.lastFetchedAt,
-        averageParse: data.averageParse,
-        bestParse: data.bestParse,
-        raidStatsJson: data.raidStatsJson,
-        gearJson: data.gearJson,
-      }),
-    );
+    prismaMock.wowCharacter.update.mockImplementation(recordFromRankingUpdate);
 
     const { getWarcraftLogsCharacterDetails } = await loadApi();
     const result = await getWarcraftLogsCharacterDetails({
@@ -255,6 +293,82 @@ describe("warcraftlogs api cache", () => {
         itemLevel: 710,
         items: [{ name: "Arcane Blade", itemLevel: 720 }],
       },
+    });
+  });
+
+  it("uses the manually selected raid zone instead of the newest active zone", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(zonesWithSporefallResponse())
+      .mockResolvedValueOnce(characterResponse(rankingCharacter()));
+    prismaMock.wowCharacter.findUnique.mockResolvedValue(null);
+    prismaMock.wowCharacter.upsert.mockResolvedValue(baseRecord());
+    prismaMock.wowCharacter.update.mockImplementation(recordFromRankingUpdate);
+
+    const { getWarcraftLogsCharacterDetails } = await loadApi();
+    const result = await getWarcraftLogsCharacterDetails(
+      {
+        name: "Clean",
+        serverSlug: "draenor",
+        serverRegion: "eu",
+      },
+      { raidSlug: "the-voidspire" },
+    );
+    const characterRequest = fetchMock.mock.calls[2][1] as RequestInit;
+    const characterRequestBody = JSON.parse(String(characterRequest.body));
+
+    expect(characterRequestBody.variables.zoneID).toBe(46);
+    expect(result.rankings.heroic?.zoneId).toBe(46);
+    expect(result.rankings.heroic?.zoneName).toBe("VS / DR / MQD");
+  });
+
+  it("refreshes fresh cached logs when they belong to another raid zone", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const cachedRecord = baseRecord({
+      warcraftLogsId: 123,
+      lastFetchedAt: new Date("2026-06-15T11:30:00.000Z"),
+      averageParse: 21.5,
+      bestParse: 23,
+      raidStatsJson: {
+        zoneId: 50,
+        zoneName: "Sporefall",
+        heroic: null,
+        mythic: null,
+      },
+      gearJson: {
+        itemLevel: 710,
+        items: [],
+      },
+    });
+
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(zonesWithSporefallResponse())
+      .mockResolvedValueOnce(characterResponse(rankingCharacter({ id: 778 })));
+    prismaMock.wowCharacter.findUnique.mockResolvedValue(cachedRecord);
+    prismaMock.wowCharacter.upsert.mockResolvedValue(cachedRecord);
+    prismaMock.wowCharacter.update.mockImplementation(recordFromRankingUpdate);
+
+    const { getWarcraftLogsCharacterDetails } = await loadApi();
+    const result = await getWarcraftLogsCharacterDetails(
+      {
+        name: "Clean",
+        serverSlug: "draenor",
+        serverRegion: "eu",
+      },
+      { raidSlug: "the-voidspire" },
+    );
+    const characterRequest = fetchMock.mock.calls[2][1] as RequestInit;
+    const characterRequestBody = JSON.parse(String(characterRequest.body));
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(characterRequestBody.variables.zoneID).toBe(46);
+    expect(result.warcraftLogsId).toBe(778);
+    expect(result.summary).toMatchObject({
+      averageParse: 85,
+      bestParse: 94.6,
     });
   });
 });

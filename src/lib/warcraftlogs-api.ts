@@ -1,6 +1,7 @@
 import { Prisma, type WowCharacter } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { RaidCheckCharacterResult } from "@/lib/raid-check";
+import { getRaidBySlug } from "@/lib/raids";
 import {
   buildWarcraftLogsRaidStats,
   getWarcraftLogsSummary,
@@ -65,8 +66,20 @@ type WowCharacterKey = {
   serverRegion: string;
 };
 
+type WarcraftLogsLookupOptions = {
+  raidSlug?: string | null;
+};
+
+type WarcraftLogsZoneHint = {
+  raidName: string;
+  raidSlug: string;
+  zoneId: number | null;
+  zoneName: string | null;
+};
+
 let tokenCache: WarcraftLogsTokenCache | null = null;
-let currentRaidZoneCache: WarcraftLogsZone | null = null;
+let raidZonesCache: WarcraftLogsZone[] | null = null;
+const raidZoneCache = new Map<string, WarcraftLogsZone>();
 
 function getWarcraftLogsEnv() {
   const clientId = trimEnvSecret(process.env.WARCRAFTLOGS_CLIENT_ID);
@@ -89,6 +102,116 @@ function normalizeWowCharacterKey({
     serverSlug: serverSlug.trim().toLowerCase(),
     serverRegion: serverRegion.trim().toLowerCase(),
   };
+}
+
+function normalizeWarcraftLogsLookupOptions(
+  options: WarcraftLogsLookupOptions = {},
+): WarcraftLogsLookupOptions {
+  const raidSlug = options.raidSlug?.trim();
+
+  return {
+    raidSlug: raidSlug || null,
+  };
+}
+
+function normalizeWarcraftLogsZoneName(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function getWarcraftLogsZoneHint(
+  options: WarcraftLogsLookupOptions = {},
+): WarcraftLogsZoneHint | null {
+  const raidSlug = normalizeWarcraftLogsLookupOptions(options).raidSlug;
+
+  if (!raidSlug) {
+    return null;
+  }
+
+  const raid = getRaidBySlug(raidSlug);
+
+  if (!raid || (!raid.warcraftLogsZoneId && !raid.warcraftLogsZoneName)) {
+    return null;
+  }
+
+  return {
+    raidName: raid.names?.en ?? raid.name,
+    raidSlug,
+    zoneId: raid.warcraftLogsZoneId ?? null,
+    zoneName: raid.warcraftLogsZoneName ?? null,
+  };
+}
+
+function getRequestedWarcraftLogsZoneId(
+  options: WarcraftLogsLookupOptions = {},
+) {
+  return getWarcraftLogsZoneHint(options)?.zoneId ?? null;
+}
+
+function getWarcraftLogsZoneCacheKey(
+  options: WarcraftLogsLookupOptions = {},
+) {
+  return getWarcraftLogsZoneHint(options)?.raidSlug ?? "current";
+}
+
+function isCurrentWarcraftLogsRaidZone(zone: WarcraftLogsZone) {
+  const difficultyIds = new Set(
+    zone.difficulties?.map((difficulty) => difficulty.id) ?? [],
+  );
+
+  return !zone.frozen && difficultyIds.has(4) && difficultyIds.has(5);
+}
+
+function selectCurrentWarcraftLogsRaidZone(zones: WarcraftLogsZone[]) {
+  return zones
+    .filter(isCurrentWarcraftLogsRaidZone)
+    .sort((left, right) => right.id - left.id)[0];
+}
+
+function selectWarcraftLogsRaidZoneByHint(
+  zones: WarcraftLogsZone[],
+  hint: WarcraftLogsZoneHint,
+) {
+  if (hint.zoneId !== null) {
+    const zone = zones.find((item) => item.id === hint.zoneId);
+
+    if (zone) {
+      return zone;
+    }
+  }
+
+  if (hint.zoneName) {
+    const normalizedHintName = normalizeWarcraftLogsZoneName(hint.zoneName);
+    const zone = zones.find(
+      (item) => normalizeWarcraftLogsZoneName(item.name) === normalizedHintName,
+    );
+
+    if (zone) {
+      return zone;
+    }
+  }
+
+  return null;
+}
+
+function isWowCharacterRecordForRequestedZone(
+  record: WowCharacter,
+  requestedZoneId: number | null,
+) {
+  if (requestedZoneId === null) {
+    return true;
+  }
+
+  const raidStats = getRaidStatsFromRecord(record);
+
+  if (raidStats?.zoneId === requestedZoneId) {
+    return true;
+  }
+
+  return !record.warcraftLogsId && !raidStats && !record.gearJson;
 }
 
 export function getWowCharacterCacheKey(key: WowCharacterKey) {
@@ -180,9 +303,9 @@ async function warcraftLogsGraphql<T>(
   return payload.data;
 }
 
-export async function fetchCurrentWarcraftLogsRaidZone() {
-  if (currentRaidZoneCache) {
-    return currentRaidZoneCache;
+async function fetchWarcraftLogsRaidZones() {
+  if (raidZonesCache) {
+    return raidZonesCache;
   }
 
   const data = await warcraftLogsGraphql<WarcraftLogsZonesPayload>(`
@@ -200,27 +323,45 @@ export async function fetchCurrentWarcraftLogsRaidZone() {
       }
     }
   `);
-  const zone = data.worldData.zones
-    .filter((item) => {
-      const difficultyIds = new Set(
-        item.difficulties?.map((difficulty) => difficulty.id) ?? [],
-      );
 
-      return !item.frozen && difficultyIds.has(4) && difficultyIds.has(5);
-    })
-    .sort((left, right) => right.id - left.id)[0];
+  raidZonesCache = data.worldData.zones;
+  return raidZonesCache;
+}
 
-  if (!zone) {
-    throw new Error("Warcraft Logs current raid zone was not found.");
+export async function fetchCurrentWarcraftLogsRaidZone(
+  options: WarcraftLogsLookupOptions = {},
+) {
+  const cacheKey = getWarcraftLogsZoneCacheKey(options);
+  const cachedZone = raidZoneCache.get(cacheKey);
+
+  if (cachedZone) {
+    return cachedZone;
   }
 
-  currentRaidZoneCache = zone;
+  const zones = await fetchWarcraftLogsRaidZones();
+  const hint = getWarcraftLogsZoneHint(options);
+  const zone = hint
+    ? selectWarcraftLogsRaidZoneByHint(zones, hint)
+    : selectCurrentWarcraftLogsRaidZone(zones);
+
+  if (!zone) {
+    throw new Error(
+      hint
+        ? `Warcraft Logs zone for ${hint.raidName} was not found.`
+        : "Warcraft Logs current raid zone was not found.",
+    );
+  }
+
+  raidZoneCache.set(cacheKey, zone);
   return zone;
 }
 
-async function fetchWarcraftLogsCharacterPayload(key: WowCharacterKey) {
+async function fetchWarcraftLogsCharacterPayload(
+  key: WowCharacterKey,
+  options: WarcraftLogsLookupOptions = {},
+) {
   const normalizedKey = normalizeWowCharacterKey(key);
-  const zone = await fetchCurrentWarcraftLogsRaidZone();
+  const zone = await fetchCurrentWarcraftLogsRaidZone(options);
 
   const data = await warcraftLogsGraphql<WarcraftLogsCharacterPayload>(
     `
@@ -337,11 +478,17 @@ async function upsertEmptyWowCharacter(key: WowCharacterKey) {
   });
 }
 
-export async function refreshWowCharacterRankings(key: WowCharacterKey) {
+export async function refreshWowCharacterRankings(
+  key: WowCharacterKey,
+  options: WarcraftLogsLookupOptions = {},
+) {
   const normalizedKey = normalizeWowCharacterKey(key);
   await upsertEmptyWowCharacter(normalizedKey);
 
-  const { character, zone } = await fetchWarcraftLogsCharacterPayload(normalizedKey);
+  const { character, zone } = await fetchWarcraftLogsCharacterPayload(
+    normalizedKey,
+    options,
+  );
   const fetchedAt = new Date();
 
   if (!character) {
@@ -393,9 +540,11 @@ export async function refreshWowCharacterRankings(key: WowCharacterKey) {
 
 export async function getWarcraftLogsCharacterDetails(
   key: WowCharacterKey,
+  options: WarcraftLogsLookupOptions = {},
 ): Promise<WarcraftLogsCharacterDetailsResult> {
   const normalizedKey = normalizeWowCharacterKey(key);
   const profileUrl = getWarcraftLogsProfileUrl(normalizedKey);
+  const requestedZoneId = getRequestedWarcraftLogsZoneId(options);
 
   if (!normalizedKey.name || !normalizedKey.serverSlug || !normalizedKey.serverRegion) {
     return emptyDetails({
@@ -411,12 +560,16 @@ export async function getWarcraftLogsCharacterDetails(
     },
   });
 
-  if (existing && isWarcraftLogsCacheFresh(existing.lastFetchedAt)) {
+  if (
+    existing &&
+    isWarcraftLogsCacheFresh(existing.lastFetchedAt) &&
+    isWowCharacterRecordForRequestedZone(existing, requestedZoneId)
+  ) {
     return recordToDetails(existing);
   }
 
   try {
-    const refreshed = await refreshWowCharacterRankings(normalizedKey);
+    const refreshed = await refreshWowCharacterRankings(normalizedKey, options);
     return recordToDetails(refreshed);
   } catch (error) {
     if (existing?.lastFetchedAt) {
@@ -457,6 +610,7 @@ async function mapWithConcurrency<T>(
 
 export async function syncWowCharactersFromRaidCheckRows(
   rows: RaidCheckCharacterResult[],
+  options: WarcraftLogsLookupOptions = {},
 ): Promise<Map<string, WarcraftLogsCharacterDetailsResult>> {
   const seen = new Set<string>();
   const detailsByKey = new Map<string, WarcraftLogsCharacterDetailsResult>();
@@ -484,7 +638,10 @@ export async function syncWowCharactersFromRaidCheckRows(
     const cacheKey = getWowCharacterCacheKey(key);
 
     try {
-      detailsByKey.set(cacheKey, await getWarcraftLogsCharacterDetails(key));
+      detailsByKey.set(
+        cacheKey,
+        await getWarcraftLogsCharacterDetails(key, options),
+      );
     } catch (error) {
       await upsertEmptyWowCharacter(key).catch(() => undefined);
       detailsByKey.set(

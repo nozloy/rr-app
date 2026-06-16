@@ -13,6 +13,8 @@ export type RaidDefinition = {
   artPath: string;
   aliases: string[];
   names?: RaidLocalizedNames;
+  warcraftLogsZoneId?: number;
+  warcraftLogsZoneName?: string;
 };
 
 const pngRaidSlugs = new Set([
@@ -535,6 +537,8 @@ export const currentRaidInstances: RaidDefinition[] = [
       ru: "Марш на Кель'Данас",
     },
     aliases: ["Марш на Кельданас", "March on Quel'Danas", "March on Queldanas"],
+    warcraftLogsZoneId: 46,
+    warcraftLogsZoneName: "VS / DR / MQD",
   },
   {
     slug: "the-dreamrift",
@@ -547,6 +551,8 @@ export const currentRaidInstances: RaidDefinition[] = [
       ru: "Провал снов",
     },
     aliases: ["Провалснов", "The Dreamrift", "Dreamrift"],
+    warcraftLogsZoneId: 46,
+    warcraftLogsZoneName: "VS / DR / MQD",
   },
   {
     slug: "the-voidspire",
@@ -559,6 +565,8 @@ export const currentRaidInstances: RaidDefinition[] = [
       ru: "Шпиль Бездны",
     },
     aliases: ["Шпильбездны", "The Voidspire", "Voidspire"],
+    warcraftLogsZoneId: 46,
+    warcraftLogsZoneName: "VS / DR / MQD",
   },
   {
     slug: "sporefall",
@@ -571,6 +579,8 @@ export const currentRaidInstances: RaidDefinition[] = [
       ru: "Споропад",
     },
     aliases: ["Споропад", "Sporefall", "Rotmire", "Гнилотоп"],
+    warcraftLogsZoneId: 50,
+    warcraftLogsZoneName: "Sporefall",
   },
 ];
 

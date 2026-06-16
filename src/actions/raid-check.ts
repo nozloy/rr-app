@@ -8,6 +8,7 @@ import {
   type RaidCheckLogDifficulty,
   type RaidCheckResult,
 } from "@/lib/raid-check";
+import { ALL_SEASON_RAIDS_VALUE } from "@/lib/raid-check-core";
 import {
   getWarcraftLogsCharacterDetails,
   getWowCharacterCacheKey,
@@ -29,6 +30,12 @@ function getSelectedLogsDifficulty(
   }
 
   return null;
+}
+
+function getWarcraftLogsRaidSlug(result: RaidCheckResult) {
+  const raidSlug = result.rows[0]?.raidSlug;
+
+  return raidSlug && raidSlug !== ALL_SEASON_RAIDS_VALUE ? raidSlug : null;
 }
 
 function emptyCharacterLogs({
@@ -169,9 +176,10 @@ export async function raidCheckAction(
 
   if (result.status === "success") {
     const difficulty = getSelectedLogsDifficulty(result.difficulty);
-    const detailsByKey = await syncWowCharactersFromRaidCheckRows(result.rows).catch(
-      () => new Map<string, WarcraftLogsCharacterDetailsResult>(),
-    );
+    const raidSlug = getWarcraftLogsRaidSlug(result);
+    const detailsByKey = await syncWowCharactersFromRaidCheckRows(result.rows, {
+      raidSlug,
+    }).catch(() => new Map<string, WarcraftLogsCharacterDetailsResult>());
 
     return {
       ...result,
@@ -188,12 +196,14 @@ export async function raidCheckAction(
 
 export type RaidCheckCharacterDetailsInput = {
   name: string;
+  raidSlug?: string | null;
   serverSlug: string | null;
   serverRegion: string;
 };
 
 export async function getRaidCheckCharacterDetailsAction({
   name,
+  raidSlug,
   serverSlug,
   serverRegion,
 }: RaidCheckCharacterDetailsInput): Promise<WarcraftLogsCharacterDetailsResult> {
@@ -216,9 +226,14 @@ export async function getRaidCheckCharacterDetailsAction({
     };
   }
 
-  return getWarcraftLogsCharacterDetails({
-    name,
-    serverSlug,
-    serverRegion,
-  });
+  return getWarcraftLogsCharacterDetails(
+    {
+      name,
+      serverSlug,
+      serverRegion,
+    },
+    {
+      raidSlug: raidSlug === ALL_SEASON_RAIDS_VALUE ? null : raidSlug,
+    },
+  );
 }

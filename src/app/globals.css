@@ -1363,6 +1363,18 @@ textarea {
 	text-transform: uppercase;
 }
 
+.raidcheck-table th:nth-child(4),
+.raidcheck-table td:nth-child(4),
+.raidcheck-table th:nth-child(5),
+.raidcheck-table td:nth-child(5) {
+	text-align: center;
+}
+
+.raidcheck-table th:nth-child(6),
+.raidcheck-table td:nth-child(6) {
+	text-align: right;
+}
+
 .raidcheck-table-spacer {
 	padding-right: 0;
 	padding-left: 0;
@@ -1447,7 +1459,7 @@ textarea {
 .raidcheck-status-cell {
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: center;
 }
 
 .raidcheck-status-icon {
@@ -1494,7 +1506,7 @@ textarea {
 .raidcheck-logs-cell {
 	display: flex;
 	align-items: center;
-	justify-content: flex-start;
+	justify-content: center;
 }
 
 .raidcheck-logs-trigger {
