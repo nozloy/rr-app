@@ -35,6 +35,7 @@ import {
 } from "@/lib/raids";
 
 const RAID_CHECK_CONCURRENCY = 5;
+const RAIDERIO_CHARACTER_PROFILE_URL = "https://raider.io/api/v1/characters/profile";
 
 export type RaidCheckCharacterStatus =
   | "clean"
@@ -202,6 +203,36 @@ function getCharacterAvatarUrl(
   return null;
 }
 
+async function characterExistsOnRaiderIo({
+  member,
+  realmSlug,
+}: {
+  member: AddonRosterMember;
+  realmSlug: string;
+}) {
+  const url = new URL(RAIDERIO_CHARACTER_PROFILE_URL);
+  url.searchParams.set("region", member.serverRegion);
+  url.searchParams.set("realm", realmSlug);
+  url.searchParams.set("name", member.name);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (response.status === 404) {
+      return false;
+    }
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 function buildUnavailableResult({
   error = null,
   locale,
@@ -310,6 +341,23 @@ async function checkCharacterForRaids({
     };
   } catch (error) {
     if (error instanceof BlizzardApiRequestError && error.status === 404) {
+      if (
+        realmSlug &&
+        (await characterExistsOnRaiderIo({
+          member,
+          realmSlug,
+        }))
+      ) {
+        return buildUnavailableResult({
+          error: tr(locale, "errors.blizzardProfileUnavailable"),
+          member,
+          locale,
+          raids,
+          serverSlug: realmSlug,
+          status: "error",
+        });
+      }
+
       return buildUnavailableResult({
         error: tr(locale, "errors.notFound"),
         member,
@@ -354,7 +402,7 @@ export async function checkRaidLockoutsForExport({
   }
 
   const defaultDifficultyID = getDefaultRaidCheckDifficultyID(exportData);
-  const difficultyOptions = getRaidCheckDifficultyOptions(exportData);
+  const difficultyOptions = getRaidCheckDifficultyOptions(exportData, locale);
   const checksAllSeasonRaids = raidSlug === ALL_SEASON_RAIDS_VALUE;
   const selectedRaid =
     raidSlug && !checksAllSeasonRaids ? getRaidBySlug(raidSlug) : null;
@@ -457,6 +505,7 @@ export async function checkRaidLockoutsForExport({
   const difficulty = getRaidCheckDifficultyById(
     selectedDifficultyID,
     exportData.selectedRaidDifficultyName ?? exportData.difficultyName,
+    locale,
   );
   const resetStart = getEuWeeklyResetStart();
 

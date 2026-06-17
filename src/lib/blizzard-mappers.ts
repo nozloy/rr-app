@@ -31,8 +31,24 @@ export type BlizzardCharacterProfile = {
   active_specialization?: BlizzardReference | null;
 };
 
+export type BlizzardEquipmentItem = {
+  item?: {
+    id?: number;
+    name?: string;
+  };
+  slot?: BlizzardReference;
+  quality?: BlizzardReference;
+  level?: {
+    value?: number;
+    display_string?: string;
+  };
+  item_level?: number;
+  name?: string;
+};
+
 export type BlizzardEquipmentSummary = {
   equipped_item_level?: number;
+  equipped_items?: BlizzardEquipmentItem[];
 };
 
 export type BlizzardCharacterMedia = {

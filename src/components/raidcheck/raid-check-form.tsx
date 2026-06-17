@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { signIn } from "next-auth/react";
 import Image from "next/image";
 import {
   CheckCircle2,
@@ -28,6 +29,8 @@ import {
 import {
   getRaidCheckCharacterDetailsAction,
   raidCheckAction,
+  toggleRaidCheckBookmarkAction,
+  type RaidCheckCharacterSheetDetails,
 } from "@/actions/raid-check";
 import { RaidCheckCharacterSheet } from "@/components/raidcheck/raid-check-character-sheet";
 import {
@@ -67,7 +70,6 @@ import type {
   RaidCheckCharacterResult,
   RaidCheckResult,
 } from "@/lib/raid-check";
-import type { WarcraftLogsCharacterDetailsResult } from "@/lib/warcraftlogs-core";
 
 type ImportPreview =
   | {
@@ -116,7 +118,7 @@ function getPreview(exportText: string, locale: "ru" | "en"): ImportPreview {
       status: "ready",
       exportData,
       defaultDifficultyID: getDefaultRaidCheckDifficultyID(exportData),
-      options: getRaidCheckDifficultyOptions(exportData),
+      options: getRaidCheckDifficultyOptions(exportData, locale),
     };
   } catch (error) {
     return {
@@ -581,9 +583,11 @@ export function RaidCheckForm() {
   const [selectedDetailsRow, setSelectedDetailsRow] =
     useState<RaidCheckCharacterResult | null>(null);
   const [details, setDetails] =
-    useState<WarcraftLogsCharacterDetailsResult | null>(null);
+    useState<RaidCheckCharacterSheetDetails | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isDetailsPending, startDetailsTransition] = useTransition();
+  const [isDetailsRefreshing, startDetailsRefreshTransition] = useTransition();
+  const [isBookmarkPending, startBookmarkTransition] = useTransition();
   const preview = useMemo(() => getPreview(exportText, locale), [exportText, locale]);
   const resultStats = getResultStats(result);
   const resultRows = useMemo(
@@ -671,11 +675,74 @@ export function RaidCheckForm() {
       setDetails(
         await getRaidCheckCharacterDetailsAction({
           name: row.name,
+          realm: row.realm,
           raidSlug: row.raidSlug,
           serverSlug: row.serverSlug,
           serverRegion: row.serverRegion,
         }),
       );
+    });
+  }
+
+  function handleRefreshDetails() {
+    const row = selectedDetailsRow;
+
+    if (!row) {
+      return;
+    }
+
+    startDetailsRefreshTransition(async () => {
+      setDetails(
+        await getRaidCheckCharacterDetailsAction({
+          forceRefresh: true,
+          name: row.name,
+          realm: row.realm,
+          raidSlug: row.raidSlug,
+          serverSlug: row.serverSlug,
+          serverRegion: row.serverRegion,
+        }),
+      );
+    });
+  }
+
+  function handleToggleBookmark() {
+    const row = selectedDetailsRow;
+
+    if (!row) {
+      return;
+    }
+
+    startBookmarkTransition(async () => {
+      const result = await toggleRaidCheckBookmarkAction({
+        name: row.name,
+        realm: row.realm,
+        raidSlug: row.raidSlug,
+        serverSlug: row.serverSlug,
+        serverRegion: row.serverRegion,
+      });
+
+      if (result.status === "requires_auth") {
+        await signIn("battlenet", { callbackUrl: "/raidcheck" });
+        return;
+      }
+
+      setDetails((current) => {
+        if (!current) {
+          return current;
+        }
+
+        if (result.status === "error") {
+          return {
+            ...current,
+            warnings: [...current.warnings, result.message],
+          };
+        }
+
+        return {
+          ...current,
+          bookmark: result.bookmark,
+        };
+      });
     });
   }
 
@@ -956,14 +1023,18 @@ export function RaidCheckForm() {
       </Card>
       <RaidCheckCharacterSheet
         details={details}
+        isBookmarkPending={isBookmarkPending}
         isLoading={isDetailsPending}
+        isRefreshing={isDetailsRefreshing}
         locale={locale}
+        onBookmarkToggle={handleToggleBookmark}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
             setSelectedDetailsRow(null);
             setDetails(null);
           }
         }}
+        onRefresh={handleRefreshDetails}
         open={Boolean(selectedDetailsRow)}
         row={selectedDetailsRow}
       />

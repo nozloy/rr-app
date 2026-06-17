@@ -60,13 +60,14 @@ type WarcraftLogsZonesPayload = {
   };
 };
 
-type WowCharacterKey = {
+export type WowCharacterKey = {
   name: string;
   serverSlug: string;
   serverRegion: string;
 };
 
 type WarcraftLogsLookupOptions = {
+  forceRefresh?: boolean;
   raidSlug?: string | null;
 };
 
@@ -92,7 +93,7 @@ function getWarcraftLogsEnv() {
   return { clientId, clientSecret };
 }
 
-function normalizeWowCharacterKey({
+export function normalizeWowCharacterKey({
   name,
   serverSlug,
   serverRegion,
@@ -110,6 +111,7 @@ function normalizeWarcraftLogsLookupOptions(
   const raidSlug = options.raidSlug?.trim();
 
   return {
+    forceRefresh: options.forceRefresh ?? false,
     raidSlug: raidSlug || null,
   };
 }
@@ -543,8 +545,9 @@ export async function getWarcraftLogsCharacterDetails(
   options: WarcraftLogsLookupOptions = {},
 ): Promise<WarcraftLogsCharacterDetailsResult> {
   const normalizedKey = normalizeWowCharacterKey(key);
+  const normalizedOptions = normalizeWarcraftLogsLookupOptions(options);
   const profileUrl = getWarcraftLogsProfileUrl(normalizedKey);
-  const requestedZoneId = getRequestedWarcraftLogsZoneId(options);
+  const requestedZoneId = getRequestedWarcraftLogsZoneId(normalizedOptions);
 
   if (!normalizedKey.name || !normalizedKey.serverSlug || !normalizedKey.serverRegion) {
     return emptyDetails({
@@ -561,6 +564,7 @@ export async function getWarcraftLogsCharacterDetails(
   });
 
   if (
+    !normalizedOptions.forceRefresh &&
     existing &&
     isWarcraftLogsCacheFresh(existing.lastFetchedAt) &&
     isWowCharacterRecordForRequestedZone(existing, requestedZoneId)

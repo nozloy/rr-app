@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   REALM_CODE_ENTRIES,
   REALM_CODE_TOTAL,
+  getRealmCodeEntryByRealmName,
   type RealmRegion,
 } from "@/lib/realm-codes";
 
@@ -63,5 +64,17 @@ describe("realm codes", () => {
     const value = `{ ${luaString(entry!.code)}, ${luaString(entry!.slug)}, ${luaString(entry!.realmName)} }`;
     expect(lua).toContain(`[${luaString("Ревущий фьорд")}] = ${value}`);
     expect(lua).toContain(`[${luaString("Ревущийфьорд")}] = ${value}`);
+  });
+
+  it("resolves legacy realm display values to catalog entries", () => {
+    expect(getRealmCodeEntryByRealmName("eu", "TarrenMill")?.slug).toBe(
+      "tarren-mill",
+    );
+    expect(getRealmCodeEntryByRealmName("eu", "Tarren Mill")?.slug).toBe(
+      "tarren-mill",
+    );
+    expect(getRealmCodeEntryByRealmName("eu", "Ревущийфьорд")?.slug).toBe(
+      "howling-fjord",
+    );
   });
 });

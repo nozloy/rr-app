@@ -7,6 +7,7 @@ import type {
 } from "@/lib/blizzard-mappers";
 import { getRuntimeEnv } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { getRealmCodeEntryByRealmName } from "@/lib/realm-codes";
 import { toBattleNetSlug } from "@/lib/utils";
 
 export type BlizzardRegion = "eu" | "us";
@@ -402,6 +403,18 @@ export async function fetchCharacterRaidEncounters(
   );
 }
 
+export function getBlizzardArmoryUrl(
+  realmSlug: string,
+  characterName: string,
+  region: BlizzardRegion = DEFAULT_REGION,
+) {
+  const config = REGION_CONFIG[region];
+
+  return `${config.armoryBase}/${encodeURIComponent(
+    realmSlug.trim().toLowerCase(),
+  )}/${encodeURIComponent(characterName.trim())}`;
+}
+
 async function fetchRealmIndex(
   accessToken: string,
   locale: string,
@@ -436,6 +449,12 @@ export async function resolveRealmSlug(
   const cached = realmSlugCache.get(cacheKey);
   if (cached) {
     return cached;
+  }
+
+  const localRealm = getRealmCodeEntryByRealmName(region, realmName);
+  if (localRealm) {
+    realmSlugCache.set(cacheKey, localRealm.slug);
+    return localRealm.slug;
   }
 
   for (const locale of REGION_CONFIG[region].locales) {

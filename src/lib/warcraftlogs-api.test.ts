@@ -253,6 +253,51 @@ describe("warcraftlogs api cache", () => {
     });
   });
 
+  it("force refreshes fresh cached Warcraft Logs data", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const cachedRecord = baseRecord({
+      warcraftLogsId: 123,
+      lastFetchedAt: new Date("2026-06-15T11:30:00.000Z"),
+      averageParse: 21.5,
+      bestParse: 23,
+      raidStatsJson: {
+        zoneId: 46,
+        zoneName: "VS / DR / MQD",
+        heroic: null,
+        mythic: null,
+      },
+      gearJson: {
+        itemLevel: 710,
+        items: [],
+      },
+    });
+
+    fetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(zonesResponse())
+      .mockResolvedValueOnce(characterResponse(rankingCharacter({ id: 779 })));
+    prismaMock.wowCharacter.findUnique.mockResolvedValue(cachedRecord);
+    prismaMock.wowCharacter.upsert.mockResolvedValue(cachedRecord);
+    prismaMock.wowCharacter.update.mockImplementation(recordFromRankingUpdate);
+
+    const { getWarcraftLogsCharacterDetails } = await loadApi();
+    const result = await getWarcraftLogsCharacterDetails(
+      {
+        name: "Clean",
+        serverSlug: "draenor",
+        serverRegion: "eu",
+      },
+      { forceRefresh: true },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.warcraftLogsId).toBe(779);
+    expect(result.summary).toMatchObject({
+      averageParse: 85,
+      bestParse: 94.6,
+    });
+  });
+
   it("refreshes stale cache and normalizes rankings", async () => {
     const fetchMock = vi.mocked(fetch);
 

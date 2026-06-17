@@ -122,6 +122,7 @@
 html {
 	min-height: 100%;
 	background: var(--background);
+	scrollbar-gutter: stable;
 	scroll-behavior: smooth;
 }
 
@@ -1861,6 +1862,380 @@ textarea {
 	padding: 0.85rem;
 }
 
+.raidcheck-sheet {
+	display: flex;
+	width: min(720px, 100vw);
+	max-width: min(720px, 100vw) !important;
+	flex-direction: column;
+	border-color: rgba(105, 151, 218, 0.34);
+	background:
+		radial-gradient(circle at 8% 0%, rgba(124, 58, 237, 0.24), transparent 32%),
+		linear-gradient(180deg, rgba(7, 18, 38, 0.99), rgba(4, 10, 22, 0.99)),
+		#050d1a;
+	box-shadow: -26px 0 90px rgba(0, 0, 0, 0.42);
+}
+
+.raidcheck-sheet-header {
+	border-color: rgba(105, 151, 218, 0.2);
+	background:
+		linear-gradient(180deg, rgba(11, 25, 52, 0.88), rgba(5, 13, 29, 0.72)),
+		rgba(4, 12, 26, 0.96);
+	padding: 1.35rem 4rem 1rem 1.55rem;
+}
+
+.raidcheck-sheet-character {
+	grid-template-columns: auto minmax(0, 1fr) minmax(4rem, auto);
+	gap: 0.9rem;
+}
+
+.raidcheck-sheet-avatar {
+	width: 4.35rem;
+	height: 4.35rem;
+	border-radius: 999px;
+	box-shadow:
+		0 0 0 2px rgba(79, 209, 197, 0.72),
+		0 0 28px rgba(124, 58, 237, 0.38);
+}
+
+.raidcheck-sheet-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.raidcheck-sheet-character-copy {
+	display: grid;
+	min-width: 0;
+	gap: 0.22rem;
+}
+
+.raidcheck-sheet-character-copy h2 {
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 1.65rem;
+	line-height: 1.06;
+}
+
+.raidcheck-sheet-character-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.18rem;
+}
+
+.raidcheck-sheet-class {
+	display: grid;
+	justify-items: end;
+	gap: 0.45rem;
+	min-width: 0;
+	color: rgba(219, 229, 248, 0.68);
+	text-align: right;
+}
+
+.raidcheck-sheet-class small {
+	max-width: 9.5rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.72rem;
+}
+
+.raidcheck-sheet-actions {
+	align-items: center;
+	gap: 0.55rem;
+	margin-top: 1rem;
+}
+
+.raidcheck-sheet-actions .raidcheck-sheet-icon-button {
+	width: 2.55rem;
+	padding: 0;
+}
+
+.raidcheck-sheet-menu {
+	border-color: rgba(105, 151, 218, 0.28);
+	background: rgba(5, 14, 30, 0.98);
+	color: #edf5ff;
+}
+
+.raidcheck-sheet-scroll {
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0;
+}
+
+.raidcheck-sheet-content {
+	gap: 0.75rem;
+	padding: 0.95rem 1rem 1rem;
+}
+
+.raidcheck-sheet-warning-list {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.raidcheck-sheet-metrics {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.65rem;
+}
+
+.raidcheck-sheet-metric {
+	display: grid;
+	min-height: 5.45rem;
+	gap: 0.25rem;
+	border: 1px solid rgba(105, 151, 218, 0.22);
+	border-radius: 8px;
+	background: linear-gradient(180deg, rgba(12, 27, 56, 0.76), rgba(5, 15, 32, 0.72));
+	padding: 0.78rem 0.82rem;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.raidcheck-sheet-metric span,
+.raidcheck-sheet-metric small {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.raidcheck-sheet-metric span {
+	color: rgba(219, 229, 248, 0.66);
+	font-size: 0.74rem;
+}
+
+.raidcheck-sheet-metric strong {
+	color: #dce9ff;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 1.78rem;
+	line-height: 1;
+}
+
+.raidcheck-sheet-metric small {
+	color: rgba(219, 229, 248, 0.58);
+	font-size: 0.72rem;
+}
+
+.raidcheck-sheet-metric[data-tone='purple'] strong {
+	color: #a970ff;
+}
+
+.raidcheck-sheet-metric[data-tone='blue'] strong {
+	color: #38a8ff;
+}
+
+.raidcheck-sheet-metric[data-tone='good'] strong {
+	color: #63e38a;
+}
+
+.raidcheck-sheet-metric[data-tone='warn'] strong {
+	color: #facc15;
+}
+
+.raidcheck-sheet-metric[data-tone='bad'] strong {
+	color: #fb7185;
+}
+
+.raidcheck-sheet-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.raidcheck-sheet-tabs {
+	display: inline-grid;
+	grid-template-columns: repeat(3, minmax(4.4rem, auto));
+	overflow: hidden;
+	border: 1px solid rgba(105, 151, 218, 0.22);
+	border-radius: 8px;
+	background: rgba(2, 8, 20, 0.54);
+}
+
+.raidcheck-sheet-tab {
+	min-height: 2rem;
+	border: 0;
+	border-right: 1px solid rgba(105, 151, 218, 0.16);
+	background: transparent;
+	color: rgba(219, 229, 248, 0.74);
+	padding: 0.32rem 0.82rem;
+	font-size: 0.82rem;
+	font-weight: 760;
+}
+
+.raidcheck-sheet-tab:last-child {
+	border-right: 0;
+}
+
+.raidcheck-sheet-tab:hover,
+.raidcheck-sheet-tab[data-active='true'] {
+	background: linear-gradient(180deg, rgba(139, 92, 246, 0.8), rgba(91, 33, 182, 0.74));
+	color: #ffffff;
+}
+
+.raidcheck-sheet-sort {
+	width: 11.7rem;
+	border-color: rgba(105, 151, 218, 0.24);
+	background: rgba(3, 12, 27, 0.72);
+	color: #edf5ff;
+}
+
+.raidcheck-sheet-log-list {
+	display: grid;
+	gap: 0.65rem;
+}
+
+.raidcheck-sheet-log-group {
+	overflow: hidden;
+	border: 1px solid rgba(105, 151, 218, 0.2);
+	border-radius: 8px;
+	background: rgba(5, 15, 32, 0.62);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.raidcheck-sheet-log-heading {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border: 0;
+	border-bottom: 1px solid rgba(105, 151, 218, 0.14);
+	background: rgba(12, 27, 56, 0.56);
+	color: #edf5ff;
+	padding: 0.72rem 0.85rem;
+	text-align: left;
+}
+
+.raidcheck-sheet-log-heading > span {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.raidcheck-sheet-log-heading > span:last-child {
+	justify-content: flex-end;
+	color: rgba(219, 229, 248, 0.68);
+	font-size: 0.78rem;
+}
+
+.raidcheck-sheet-log-heading svg[data-open='true'] {
+	transform: rotate(180deg);
+}
+
+.raidcheck-sheet-ranking-row {
+	grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem) 3rem;
+	padding: 0.55rem 0.75rem;
+}
+
+.raidcheck-sheet-boss {
+	min-width: 0;
+}
+
+.raidcheck-sheet-parse-bar {
+	height: 0.42rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background: rgba(94, 108, 132, 0.48);
+}
+
+.raidcheck-sheet-parse-bar span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #83e89b, #55d184);
+}
+
+.raidcheck-sheet-section-title {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	color: #fde68a;
+	font-size: 0.9rem;
+}
+
+.raidcheck-sheet-insights {
+	display: grid;
+	gap: 0.8rem;
+	border: 1px solid rgba(245, 158, 11, 0.38);
+	border-radius: 8px;
+	background:
+		linear-gradient(135deg, rgba(88, 28, 135, 0.2), rgba(5, 15, 32, 0.76)),
+		rgba(5, 15, 32, 0.74);
+	padding: 0.9rem;
+}
+
+.raidcheck-sheet-insight-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.9rem;
+}
+
+.raidcheck-sheet-insight-grid > div {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.raidcheck-sheet-insight {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 0.55rem;
+	color: #68e086;
+}
+
+.raidcheck-sheet-insight[data-tone='bad'] {
+	color: #fb7185;
+}
+
+.raidcheck-sheet-insight[data-tone='blue'] {
+	color: #38a8ff;
+}
+
+.raidcheck-sheet-insight[data-tone='purple'] {
+	color: #a970ff;
+}
+
+.raidcheck-sheet-insight small,
+.raidcheck-sheet-insight b {
+	display: block;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.raidcheck-sheet-insight small {
+	color: rgba(219, 229, 248, 0.66);
+	font-size: 0.74rem;
+}
+
+.raidcheck-sheet-insight b {
+	color: currentColor;
+	font-size: 0.82rem;
+}
+
+.raidcheck-sheet-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border-top: 1px solid rgba(105, 151, 218, 0.18);
+	background: rgba(3, 10, 23, 0.72);
+	padding: 0.8rem 1rem;
+	color: rgba(219, 229, 248, 0.64);
+	font-size: 0.82rem;
+}
+
+.raidcheck-sheet-footer a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: #c4a7ff;
+	font-weight: 760;
+}
+
 .raidcheck-empty-result {
 	position: relative;
 	display: grid;
@@ -2016,6 +2391,52 @@ textarea {
 	.raidcheck-sheet-stats,
 	.raidcheck-sheet-character {
 		grid-template-columns: 1fr;
+	}
+
+	.raidcheck-sheet {
+		width: 100vw;
+	}
+
+	.raidcheck-sheet-header {
+		padding: 1rem 3.2rem 0.85rem 1rem;
+	}
+
+	.raidcheck-sheet-character-copy h2 {
+		white-space: normal;
+	}
+
+	.raidcheck-sheet-class {
+		justify-items: start;
+		text-align: left;
+	}
+
+	.raidcheck-sheet-metrics,
+	.raidcheck-sheet-insight-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.raidcheck-sheet-toolbar {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.raidcheck-sheet-tabs,
+	.raidcheck-sheet-sort {
+		width: 100%;
+	}
+
+	.raidcheck-sheet-ranking-row {
+		grid-template-columns: minmax(0, 1fr) 4rem;
+	}
+
+	.raidcheck-sheet-parse-bar {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
+
+	.raidcheck-sheet-footer {
+		align-items: flex-start;
+		flex-direction: column;
 	}
 
 	.raidcheck-empty-result {

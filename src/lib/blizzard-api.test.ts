@@ -51,17 +51,17 @@ describe("blizzard api regions", () => {
     );
   });
 
-  it("uses US dynamic realm index when resolving US legacy realms", async () => {
+  it("uses US dynamic realm index when resolving realms missing from the local catalog", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
-        realms: [{ name: "Draenor", slug: "draenor" }],
+        realms: [{ name: "Future Realm", slug: "future-realm" }],
       }),
     );
 
     const { resolveRealmSlug } = await loadApi();
-    await expect(resolveRealmSlug("token", "Draenor", "us")).resolves.toBe(
-      "draenor",
+    await expect(resolveRealmSlug("token", "Future Realm", "us")).resolves.toBe(
+      "future-realm",
     );
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -72,25 +72,25 @@ describe("blizzard api regions", () => {
     );
   });
 
-  it("resolves legacy normalized Cyrillic realm names through the EU realm index", async () => {
+  it("resolves legacy normalized Cyrillic realm names through the local catalog", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        realms: [{ name: "Ревущий фьорд", slug: "howling-fjord" }],
-      }),
-    );
 
     const { resolveRealmSlug } = await loadApi();
     await expect(resolveRealmSlug("token", "Ревущийфьорд", "eu")).resolves.toBe(
       "howling-fjord",
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://eu.api.blizzard.com/data/wow/realm/index?namespace=dynamic-eu&locale=ru_RU",
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer token" }),
-      }),
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("resolves compact connected realm names through the local catalog", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    const { resolveRealmSlug } = await loadApi();
+    await expect(resolveRealmSlug("token", "TarrenMill", "eu")).resolves.toBe(
+      "tarren-mill",
     );
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

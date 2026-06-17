@@ -183,6 +183,7 @@ describe("raid check", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 404 })));
     blizzardApiMock.getApplicationAccessToken.mockResolvedValue("app-token");
     blizzardApiMock.fetchCharacterMedia.mockResolvedValue({
       assets: [
@@ -217,6 +218,7 @@ describe("raid check", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("checks clean and locked characters from full roster", async () => {
@@ -405,16 +407,96 @@ describe("raid check", () => {
         serverRegion: "eu",
       },
     ]);
-    expect(blizzardApiMock.resolveRealmSlug).toHaveBeenCalledWith(
-      "app-token",
-      "Ревущийфьорд",
-      "eu",
-    );
+    expect(blizzardApiMock.resolveRealmSlug).not.toHaveBeenCalled();
     expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
       "app-token",
       "howling-fjord",
       "NoSpace",
       "eu",
+    );
+  });
+
+  it("checks legacy RR1 roster members with compact connected realm names", async () => {
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      raidSlug: "the-voidspire",
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Draenor",
+        classFile: "DEMONHUNTER",
+        groupType: "party",
+        groupSize: "1",
+        instanceType: "raid",
+        instanceName: "The Voidspire",
+        selectedRaidDifficultyID: "15",
+        roster: "Avayn:TarrenMill:DEMONHUNTER:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows[0]).toMatchObject({
+      name: "Avayn",
+      realm: "TarrenMill",
+      status: "clean",
+      serverSlug: "tarren-mill",
+      serverRegion: "eu",
+    });
+    expect(blizzardApiMock.resolveRealmSlug).not.toHaveBeenCalled();
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledWith(
+      "app-token",
+      "tarren-mill",
+      "Avayn",
+      "eu",
+    );
+  });
+
+  it("keeps existing characters visible when Blizzard lockout API returns 404", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ name: "Avayn", realm: "Tarren Mill" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    blizzardApiMock.fetchCharacterRaidEncounters.mockImplementationOnce(
+      async () => {
+        throw new MockBlizzardApiRequestError("missing", 404);
+      },
+    );
+
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      raidSlug: "the-voidspire",
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Draenor",
+        classFile: "DEMONHUNTER",
+        groupType: "party",
+        groupSize: "1",
+        instanceType: "raid",
+        instanceName: "The Voidspire",
+        selectedRaidDifficultyID: "15",
+        roster: "Avayn:TarrenMill:DEMONHUNTER:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.rows[0]).toMatchObject({
+      name: "Avayn",
+      realm: "TarrenMill",
+      status: "error",
+      error:
+        "Персонаж существует, но Blizzard API не отдаёт данные о рейдовых сохранениях.",
+      serverSlug: "tarren-mill",
+      serverRegion: "eu",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        href: expect.stringContaining("realm=tarren-mill"),
+      }),
+      expect.objectContaining({
+        cache: "no-store",
+      }),
     );
   });
 
@@ -555,6 +637,39 @@ describe("raid check", () => {
       "Locked",
       "eu",
     );
+  });
+
+  it("labels imported RR2 flex difficulty with the request locale", async () => {
+    const draenor = realmCode("eu", "draenor");
+    const result = await checkRaidLockoutsForExport({
+      locale: "en",
+      exportText: makeRr2Export({
+        rg: "e",
+        n: "Leader",
+        r: draenor,
+        c: "P",
+        g: "r",
+        z: "1",
+        t: "r",
+        in: "Sporefall",
+        di: "233",
+        sr: "233",
+        ro: `Clean:${draenor}:M:D`,
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.defaultDifficultyID).toBe(233);
+    expect(result.difficulty).toEqual({
+      id: 233,
+      label: "Flex",
+      type: "MYTHIC",
+    });
+    expect(result.difficultyOptions.find((difficulty) => difficulty.id === 233)).toEqual({
+      id: 233,
+      label: "Flex",
+      type: "MYTHIC",
+    });
   });
 
   it("checks US RR2 exports against US Blizzard endpoints", async () => {

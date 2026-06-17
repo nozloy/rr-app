@@ -38,6 +38,22 @@ export const RAID_CHECK_DIFFICULTIES: RaidCheckDifficulty[] = [
   { id: 16, label: "Mythic", type: "MYTHIC" },
 ];
 
+const IMPORTED_RAID_CHECK_DIFFICULTIES = {
+  233: {
+    labels: {
+      en: "Flex",
+      ru: "Гибкий",
+    },
+    type: "MYTHIC",
+  },
+} satisfies Record<
+  number,
+  {
+    labels: Record<RaidCheckLocale, string>;
+    type: NonNullable<RaidCheckDifficulty["type"]>;
+  }
+>;
+
 export function normalizeRaidCheckText(value: string) {
   return value
     .normalize("NFKD")
@@ -49,13 +65,23 @@ export function normalizeRaidCheckText(value: string) {
 export function getRaidCheckDifficultyById(
   difficultyID: number,
   fallbackName?: string | null,
+  locale: RaidCheckLocale = DEFAULT_RAID_CHECK_LOCALE,
 ): RaidCheckDifficulty {
   const known = RAID_CHECK_DIFFICULTIES.find(
     (difficulty) => difficulty.id === difficultyID,
   );
+  const imported = IMPORTED_RAID_CHECK_DIFFICULTIES[difficultyID];
 
   return (
-    known ?? {
+    known ??
+    (imported
+      ? {
+          id: difficultyID,
+          label: imported.labels[locale],
+          type: imported.type,
+        }
+      : null) ??
+    {
       id: difficultyID,
       label: fallbackName ?? `Difficulty ${difficultyID}`,
       type: null,
@@ -67,7 +93,10 @@ export function getDefaultRaidCheckDifficultyID(exportData: AddonExportData) {
   return exportData.selectedRaidDifficultyID ?? exportData.difficultyID ?? 15;
 }
 
-export function getRaidCheckDifficultyOptions(exportData: AddonExportData) {
+export function getRaidCheckDifficultyOptions(
+  exportData: AddonExportData,
+  locale: RaidCheckLocale = DEFAULT_RAID_CHECK_LOCALE,
+) {
   const options = [...RAID_CHECK_DIFFICULTIES];
   const importedDifficultyID = getDefaultRaidCheckDifficultyID(exportData);
 
@@ -76,6 +105,7 @@ export function getRaidCheckDifficultyOptions(exportData: AddonExportData) {
       getRaidCheckDifficultyById(
         importedDifficultyID,
         exportData.selectedRaidDifficultyName ?? exportData.difficultyName,
+        locale,
       ),
     );
   }

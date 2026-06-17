@@ -97,19 +97,20 @@ describe("addon export", () => {
         realm: "Howling Fjord",
         classFile: "PALADIN",
         groupType: "raid",
-        groupSize: "3",
-        members: "PALADIN:TANK,SHAMAN:HEALER,WARLOCK:DAMAGER",
+        groupSize: "4",
+        members:
+          "PALADIN:TANK,SHAMAN:HEALER,WARLOCK:DAMAGER,DEMONHUNTER:DAMAGER",
         roster:
-          "Mender:Howling Fjord:PALADIN:TANK,Totemic:Ревущий фьорд:SHAMAN:HEALER,Dotter:Draenor:WARLOCK:DAMAGER",
+          "Mender:Howling Fjord:PALADIN:TANK,Totemic:Ревущий фьорд:SHAMAN:HEALER,Dotter:Draenor:WARLOCK:DAMAGER,Avayn:TarrenMill:DEMONHUNTER:DAMAGER",
       }),
     );
 
-    expect(parsed.members).toHaveLength(3);
+    expect(parsed.members).toHaveLength(4);
     expect(parsed.roster).toEqual([
       {
         name: "Mender",
         realm: "Howling Fjord",
-        realmSlug: null,
+        realmSlug: "howling-fjord",
         serverRegion: "eu",
         classFile: "PALADIN",
         role: "TANK",
@@ -117,7 +118,7 @@ describe("addon export", () => {
       {
         name: "Totemic",
         realm: "Ревущий фьорд",
-        realmSlug: null,
+        realmSlug: "howling-fjord",
         serverRegion: "eu",
         classFile: "SHAMAN",
         role: "HEALER",
@@ -125,9 +126,17 @@ describe("addon export", () => {
       {
         name: "Dotter",
         realm: "Draenor",
-        realmSlug: null,
+        realmSlug: "draenor",
         serverRegion: "eu",
         classFile: "WARLOCK",
+        role: "DAMAGER",
+      },
+      {
+        name: "Avayn",
+        realm: "TarrenMill",
+        realmSlug: "tarren-mill",
+        serverRegion: "eu",
+        classFile: "DEMONHUNTER",
         role: "DAMAGER",
       },
     ]);

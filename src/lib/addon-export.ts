@@ -8,6 +8,7 @@ import {
 } from "@/lib/raids";
 import {
   getRealmCodeEntryByRegionCode,
+  getRealmCodeEntryByRealmName,
   getRealmRegionByCode,
   type RealmRegion,
 } from "@/lib/realm-codes";
@@ -305,7 +306,10 @@ function parseMembers(value: string | null) {
     .filter((member): member is AddonGroupMember => Boolean(member));
 }
 
-function parseRoster(value: string | null) {
+function parseRoster(
+  value: string | null,
+  serverRegion: AddonServerRegion = DEFAULT_SERVER_REGION,
+) {
   if (!value) {
     return [];
   }
@@ -336,11 +340,16 @@ function parseRoster(value: string | null) {
       }
       seen.add(key);
 
+      const realmEntry = getRealmCodeEntryByRealmName(
+        serverRegion,
+        normalizedRealm,
+      );
+
       return {
         name: normalizedName,
         realm: normalizedRealm,
-        realmSlug: null,
-        serverRegion: DEFAULT_SERVER_REGION,
+        realmSlug: realmEntry?.slug ?? null,
+        serverRegion,
         classFile: normalizedClass,
         role: normalizedRole as AddonRole,
       };
@@ -521,13 +530,14 @@ function parseFullAddonExport(
   const groupSize = optionalInt(params, "groupSize", 1, 40) ?? 1;
   const dungeonSlug = optionalString(params, "dungeonSlug") ?? undefined;
   const realm = requireString(params, "realm", locale);
+  const realmEntry = getRealmCodeEntryByRealmName(DEFAULT_SERVER_REGION, realm);
 
   return {
     playerName: requireString(params, "name", locale),
     raidLeaderName: optionalString(params, "raidLeaderName"),
     realm,
-    realmSlug: null,
-    serverRegion: DEFAULT_SERVER_REGION,
+    realmSlug: realmEntry?.slug ?? null,
+    serverRegion: realmEntry?.region ?? DEFAULT_SERVER_REGION,
     classFile,
     className: optionalString(params, "className") ?? classFile,
     spec: optionalString(params, "spec"),
@@ -535,7 +545,10 @@ function parseFullAddonExport(
     groupType: parseGroupType(params.get("groupType")),
     groupSize,
     members: parseMembers(params.get("members")),
-    roster: parseRoster(params.get("roster")),
+    roster: parseRoster(
+      params.get("roster"),
+      realmEntry?.region ?? DEFAULT_SERVER_REGION,
+    ),
     instanceType: optionalString(params, "instanceType"),
     instanceName: optionalString(params, "instanceName"),
     difficultyID: optionalInt(params, "difficultyID", 0, 999),

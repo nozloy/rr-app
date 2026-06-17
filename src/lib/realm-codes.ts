@@ -525,6 +525,86 @@ const realmByRegionAndCode = new Map<string, RealmCodeEntry>(
   REALM_CODE_ENTRIES.map((entry) => [`${entry.region}:${entry.code}`, entry]),
 );
 
+const REALM_LOOKUP_ALIASES = [
+  { region: "eu", slug: "ashenvale", aliases: ["Ясеневый лес"] },
+  { region: "eu", slug: "azuregos", aliases: ["Азурегос"] },
+  { region: "eu", slug: "blackscar", aliases: ["Черный Шрам"] },
+  { region: "eu", slug: "booty-bay", aliases: ["Пиратская Бухта"] },
+  { region: "eu", slug: "borean-tundra", aliases: ["Борейская тундра"] },
+  { region: "eu", slug: "deathguard", aliases: ["Страж Смерти"] },
+  { region: "eu", slug: "deathweaver", aliases: ["Ткач Смерти"] },
+  { region: "eu", slug: "deepholm", aliases: ["Подземье"] },
+  { region: "eu", slug: "eversong", aliases: ["Вечная Песня"] },
+  { region: "eu", slug: "fordragon", aliases: ["Дракономор"] },
+  { region: "eu", slug: "galakrond", aliases: ["Галакронд"] },
+  { region: "eu", slug: "goldrinn", aliases: ["Голдринн"] },
+  { region: "eu", slug: "gordunni", aliases: ["Гордунни"] },
+  { region: "eu", slug: "greymane", aliases: ["Седогрив"] },
+  { region: "eu", slug: "grom", aliases: ["Гром"] },
+  { region: "eu", slug: "howling-fjord", aliases: ["Ревущий фьорд"] },
+  { region: "eu", slug: "lich-king", aliases: ["Король-лич"] },
+  { region: "eu", slug: "razuvious", aliases: ["Разувий"] },
+  { region: "eu", slug: "soulflayer", aliases: ["Свежеватель Душ"] },
+  { region: "eu", slug: "thermaplugg", aliases: ["Термоштепсель"] },
+] as const;
+
+function normalizeRealmLookup(value: string | null | undefined) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-zа-я0-9]+/giu, "");
+}
+
+function getRealmLookupValues(entry: RealmCodeEntry) {
+  return [
+    entry.realmName,
+    entry.normalizedRealm,
+    entry.slug,
+    entry.realmName.replaceAll(" ", ""),
+    entry.normalizedRealm.replaceAll(" ", ""),
+  ];
+}
+
+const realmByRegionAndLookup = new Map<string, RealmCodeEntry>();
+
+for (const entry of REALM_CODE_ENTRIES) {
+  for (const value of getRealmLookupValues(entry)) {
+    const lookup = normalizeRealmLookup(value);
+    if (lookup) {
+      realmByRegionAndLookup.set(`${entry.region}:${lookup}`, entry);
+    }
+  }
+}
+
+for (const aliasGroup of REALM_LOOKUP_ALIASES) {
+  const entry = REALM_CODE_ENTRIES.find(
+    (item) => item.region === aliasGroup.region && item.slug === aliasGroup.slug,
+  );
+
+  if (!entry) {
+    continue;
+  }
+
+  for (const alias of aliasGroup.aliases) {
+    const lookup = normalizeRealmLookup(alias);
+    if (lookup) {
+      realmByRegionAndLookup.set(`${entry.region}:${lookup}`, entry);
+    }
+
+    const compactLookup = normalizeRealmLookup(alias.replaceAll(" ", ""));
+    if (compactLookup) {
+      realmByRegionAndLookup.set(`${entry.region}:${compactLookup}`, entry);
+    }
+  }
+}
+
 export function isRealmRegion(value: string): value is RealmRegion {
   return value === "eu" || value === "us";
 }
@@ -543,4 +623,20 @@ export function getRealmCodeEntryByRegionCode(
 ) {
   const region = getRealmRegionByCode(regionCode);
   return region ? getRealmCodeEntry(region, code) : null;
+}
+
+export function getRealmCodeEntryByRealmName(
+  region: RealmRegion,
+  realmName: string | null | undefined,
+) {
+  const lookup = normalizeRealmLookup(realmName);
+  return lookup ? realmByRegionAndLookup.get(`${region}:${lookup}`) ?? null : null;
+}
+
+export function getRealmCodeEntryByRegionCodeAndRealmName(
+  regionCode: string | null | undefined,
+  realmName: string | null | undefined,
+) {
+  const region = getRealmRegionByCode(regionCode);
+  return region ? getRealmCodeEntryByRealmName(region, realmName) : null;
 }
