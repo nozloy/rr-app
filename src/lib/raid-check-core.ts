@@ -38,7 +38,14 @@ export const RAID_CHECK_DIFFICULTIES: RaidCheckDifficulty[] = [
   { id: 16, label: "Mythic", type: "MYTHIC" },
 ];
 
-const IMPORTED_RAID_CHECK_DIFFICULTIES = {
+type ImportedRaidCheckDifficulty = {
+  labels: Record<RaidCheckLocale, string>;
+  type: NonNullable<RaidCheckDifficulty["type"]>;
+};
+
+const IMPORTED_RAID_CHECK_DIFFICULTIES: Partial<
+  Record<number, ImportedRaidCheckDifficulty>
+> = {
   233: {
     labels: {
       en: "Flex",
@@ -46,13 +53,7 @@ const IMPORTED_RAID_CHECK_DIFFICULTIES = {
     },
     type: "MYTHIC",
   },
-} satisfies Record<
-  number,
-  {
-    labels: Record<RaidCheckLocale, string>;
-    type: NonNullable<RaidCheckDifficulty["type"]>;
-  }
->;
+};
 
 export function normalizeRaidCheckText(value: string) {
   return value
