@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState, type ReactNode, type SVGProps } from 'react'
+import React, { useEffect, useState, type ReactNode, type SVGProps } from 'react'
 import {
 	CalendarDays,
 	Check,
@@ -34,7 +34,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import {
-	addons,
 	getActivityTabs,
 	getCalendarMonthNames,
 	getCalendarWeekdays,
@@ -48,8 +47,11 @@ import { useAppLocale } from '@/components/shell/locale-provider'
 import { t } from '@/lib/i18n'
 import type {
 	CreateEventDraft,
+	DifficultyOption,
+	EventAddonOption,
 	EventActivityType,
 	EventCharacterOption,
+	EventDifficulty,
 	EventInstanceOption,
 	EventPublishTarget,
 	EventRole,
@@ -235,6 +237,7 @@ export function LeaderSection({
 					{selectedCharacter ? (
 						characters.length > 1 ? (
 							<DropdownMenu
+								modal={false}
 								open={isCharacterMenuOpen}
 								onOpenChange={setIsCharacterMenuOpen}
 							>
@@ -461,6 +464,7 @@ export function DateTimeSection({
 			<div className={eventUi.dateTimeRow}>
 				<div className={eventUi.dateTimeField}>
 					<DropdownMenu
+						modal={false}
 						open={isDateCalendarOpen}
 						onOpenChange={setIsDateCalendarOpen}
 					>
@@ -542,6 +546,7 @@ export function DateTimeSection({
 				</div>
 				<label className={eventUi.dateTimeField}>
 					<DropdownMenu
+						modal={false}
 						open={isTimePickerOpen}
 						onOpenChange={setIsTimePickerOpen}
 					>
@@ -652,19 +657,33 @@ export function DateTimeSection({
 type EventParamsSectionProps = {
 	activityType: EventActivityType
 	addon: string
+	addons: EventAddonOption[]
+	difficulty: EventDifficulty
+	difficultyOptions: DifficultyOption[]
 	onActivityTypeChange: (activityType: EventActivityType) => void
 	onAddonChange: (addon: string) => void
+	onDifficultyChange: (difficulty: EventDifficulty) => void
 }
 
 export function EventParamsSection({
 	activityType,
 	addon,
+	addons,
+	difficulty,
+	difficultyOptions,
 	onActivityTypeChange,
 	onAddonChange,
+	onDifficultyChange,
 }: EventParamsSectionProps) {
 	const locale = useAppLocale()
 	const activityTabs = getActivityTabs(locale)
+	const selectedAddonLabel =
+		addons.find(option => option.value === addon)?.label ?? addon
+	const selectedDifficultyLabel =
+		difficultyOptions.find(option => option.difficulty === difficulty)
+			?.label ?? t(locale, 'events.difficultyNormal')
 	const [isAddonMenuOpen, setIsAddonMenuOpen] = useState(false)
+	const [isDifficultyMenuOpen, setIsDifficultyMenuOpen] = useState(false)
 
 	return (
 		<section className={eventUi.panel}>
@@ -672,16 +691,18 @@ export function EventParamsSection({
 			<div className={eventUi.paramsGrid}>
 				<label>
 					<DropdownMenu
+						modal={false}
 						open={isAddonMenuOpen}
 						onOpenChange={setIsAddonMenuOpen}
 					>
 						<DropdownMenuTrigger asChild>
 							<Button
+								aria-label={selectedAddonLabel}
 								className={eventUi.addonTrigger}
 								type='button'
 								variant='ghost'
 							>
-								<span>{addon}</span>
+								<span>{selectedAddonLabel}</span>
 								<ChevronDown className='size-4' aria-hidden='true' />
 							</Button>
 						</DropdownMenuTrigger>
@@ -692,20 +713,69 @@ export function EventParamsSection({
 						>
 							<div className={eventUi.addonOptions}>
 								{addons.map(option => {
-									const isSelected = option === addon
+									const isSelected = option.value === addon
 
 									return (
 										<button
 											aria-pressed={isSelected}
 											className={eventUi.addonOption(isSelected)}
-											key={option}
+											key={option.value}
 											onClick={() => {
-												onAddonChange(option)
+												onAddonChange(option.value)
 												setIsAddonMenuOpen(false)
 											}}
 											type='button'
 										>
-											<span>{option}</span>
+											<span>{option.label}</span>
+											{isSelected ? (
+												<Check className='size-4' aria-hidden='true' />
+											) : null}
+										</button>
+									)
+								})}
+							</div>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</label>
+
+				<label>
+					<DropdownMenu
+						modal={false}
+						open={isDifficultyMenuOpen}
+						onOpenChange={setIsDifficultyMenuOpen}
+					>
+						<DropdownMenuTrigger asChild>
+							<Button
+								aria-label={selectedDifficultyLabel}
+								className={eventUi.addonTrigger}
+								type='button'
+								variant='ghost'
+							>
+								<span>{selectedDifficultyLabel}</span>
+								<ChevronDown className='size-4' aria-hidden='true' />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align='start'
+							className={eventUi.difficultyDropdown}
+							sideOffset={6}
+						>
+							<div className={eventUi.addonOptions}>
+								{difficultyOptions.map(option => {
+									const isSelected = option.difficulty === difficulty
+
+									return (
+										<button
+											aria-pressed={isSelected}
+											className={eventUi.addonOption(isSelected)}
+											key={option.difficulty}
+											onClick={() => {
+												onDifficultyChange(option.difficulty)
+												setIsDifficultyMenuOpen(false)
+											}}
+											type='button'
+										>
+											<span>{option.label}</span>
 											{isSelected ? (
 												<Check className='size-4' aria-hidden='true' />
 											) : null}
@@ -1127,6 +1197,7 @@ export function UnrollSection({
 						</button>
 					</div>
 					<DropdownMenu
+						modal={false}
 						onOpenChange={open => {
 							setIsTemplateMenuOpen(isUnrollDisabled ? false : open)
 						}}
@@ -1202,6 +1273,7 @@ export function UnrollSection({
 }
 
 type EventPreviewCardProps = {
+	difficultyOptions: DifficultyOption[]
 	draft: CreateEventDraft
 	leaderName: string
 	leaderRealm: string
@@ -1211,6 +1283,7 @@ type EventPreviewCardProps = {
 }
 
 export function EventPreviewCard({
+	difficultyOptions,
 	draft,
 	leaderName,
 	leaderRealm,
@@ -1220,6 +1293,9 @@ export function EventPreviewCard({
 }: EventPreviewCardProps) {
 	const locale = useAppLocale()
 	const activityTabs = getActivityTabs(locale)
+	const selectedDifficultyLabel =
+		difficultyOptions.find(option => option.difficulty === draft.difficulty)
+			?.label ?? t(locale, 'events.difficultyNormal')
 
 	return (
 		<section className={eventUi.previewCard}>
@@ -1266,6 +1342,13 @@ export function EventPreviewCard({
 					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewDateTime')}</span>
 					<strong className={eventUi.previewSummaryValue}>
 						{formatDate(draft.date)} {locale === 'ru' ? 'в' : 'at'} {draft.time}
+					</strong>
+				</div>
+				<div className={eventUi.previewSummaryItem}>
+					<Crown className='size-4' aria-hidden='true' />
+					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewDifficulty')}</span>
+					<strong className={eventUi.previewSummaryValue}>
+						{selectedDifficultyLabel}
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>

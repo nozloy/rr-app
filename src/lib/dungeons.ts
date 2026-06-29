@@ -94,6 +94,16 @@ const midnightDungeons: DungeonDefinition[] = [
       ru: "Арена Шрама Бездны",
     },
   },
+  {
+    slug: "altar-of-fangs",
+    name: "Алтарь Клыков",
+    shortName: "AF",
+    artPath: "/dungeons/altar_of_fangs_styled_16x9.jpg",
+    names: {
+      en: "Altar of Fangs",
+      ru: "Алтарь Клыков",
+    },
+  },
 ];
 
 const legacySeasonDungeons: DungeonDefinition[] = [

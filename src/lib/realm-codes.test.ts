@@ -45,9 +45,28 @@ describe("realm codes", () => {
     );
 
     for (const entry of REALM_CODE_ENTRIES) {
-      const value = `{ ${luaString(entry.code)}, ${luaString(entry.slug)}, ${luaString(entry.realmName)} }`;
+      const value = `{ ${luaString(entry.code)}, ${luaString(entry.slug)}, ${luaString(entry.realmName)}, ${luaString(entry.realmLocale)} }`;
       expect(lua).toContain(value);
     }
+  });
+
+  it("assigns realm locales for addon whisper language routing", () => {
+    const localeByRegionAndSlug = new Map(
+      REALM_CODE_ENTRIES.map((entry) => [
+        `${entry.region}:${entry.slug}`,
+        entry.realmLocale,
+      ]),
+    );
+
+    expect(localeByRegionAndSlug.get("eu:gordunni")).toBe("ruRU");
+    expect(localeByRegionAndSlug.get("eu:tarren-mill")).toBe("enUS");
+    expect(localeByRegionAndSlug.get("eu:die-aldor")).toBe("deDE");
+    expect(localeByRegionAndSlug.get("eu:hyjal")).toBe("frFR");
+    expect(localeByRegionAndSlug.get("eu:dun-modr")).toBe("esES");
+    expect(localeByRegionAndSlug.get("us:ragnaros")).toBe("esMX");
+    expect(localeByRegionAndSlug.get("eu:pozzo-delleternità")).toBe("itIT");
+    expect(localeByRegionAndSlug.get("eu:aggra-português")).toBe("ptBR");
+    expect(localeByRegionAndSlug.get("us:azralon")).toBe("ptBR");
   });
 
   it("includes localized Russian realm aliases for addon-side lookup", () => {
@@ -61,7 +80,7 @@ describe("realm codes", () => {
 
     expect(entry).toBeDefined();
 
-    const value = `{ ${luaString(entry!.code)}, ${luaString(entry!.slug)}, ${luaString(entry!.realmName)} }`;
+    const value = `{ ${luaString(entry!.code)}, ${luaString(entry!.slug)}, ${luaString(entry!.realmName)}, ${luaString(entry!.realmLocale)} }`;
     expect(lua).toContain(`[${luaString("Ревущий фьорд")}] = ${value}`);
     expect(lua).toContain(`[${luaString("Ревущийфьорд")}] = ${value}`);
   });

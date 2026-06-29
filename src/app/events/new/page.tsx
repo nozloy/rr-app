@@ -5,6 +5,7 @@ import {
 } from "@/components/events/create-event-form";
 import styles from "@/components/events/create-event-form.module.css";
 import { AppHeader } from "@/components/shell/app-header";
+import { getEventCatalog } from "@/lib/activity-catalog";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { prisma } from "@/lib/prisma";
@@ -32,23 +33,27 @@ function getTomorrowInputDate() {
 export default async function NewEventPage() {
   const locale = await getRequestLocale();
   const session = await requireSession();
-  const characters: EventCharacterOption[] = await prisma.character.findMany({
-    where: {
-      isActive: true,
-      userId: session.user.id,
-    },
-    orderBy: [{ itemLevel: "desc" }, { name: "asc" }],
-    select: {
-      activeSpec: true,
-      avatarUrl: true,
-      className: true,
-      id: true,
-      itemLevel: true,
-      name: true,
-      realm: true,
-      thumbnailUrl: true,
-    },
-  });
+  const [characters, eventCatalog]: [EventCharacterOption[], Awaited<ReturnType<typeof getEventCatalog>>] =
+    await Promise.all([
+      prisma.character.findMany({
+        where: {
+          isActive: true,
+          userId: session.user.id,
+        },
+        orderBy: [{ itemLevel: "desc" }, { name: "asc" }],
+        select: {
+          activeSpec: true,
+          avatarUrl: true,
+          className: true,
+          id: true,
+          itemLevel: true,
+          name: true,
+          realm: true,
+          thumbnailUrl: true,
+        },
+      }),
+      getEventCatalog(locale),
+    ]);
 
   const topCharacter = characters[0] ?? null;
   const displayName =
@@ -69,6 +74,7 @@ export default async function NewEventPage() {
         characters={characters}
         defaultDate={getTomorrowInputDate()}
         displayName={displayName}
+        eventCatalog={eventCatalog}
       />
     </main>
   );

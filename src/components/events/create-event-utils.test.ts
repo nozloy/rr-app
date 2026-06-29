@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import {
 	formatDate,
 	formatRange,
@@ -9,6 +11,12 @@ import {
 	parseRoleRangeInput,
 } from './create-event-utils'
 import { currentExpansionDungeons, currentSeasonDungeons } from '@/lib/dungeons'
+import {
+	addons,
+	eventDifficulties,
+	getDifficultyOptions,
+	getOpenWorldActivitiesForAddon,
+} from './create-event-data'
 
 describe('create event utils', () => {
 	it('parses single role counts as fixed ranges', () => {
@@ -48,6 +56,42 @@ describe('create event utils', () => {
 		expect(formatRange({ max: 12, min: 9 })).toBe('9-12')
 	})
 
+	it('keeps event difficulty options in normal heroic mythic order', () => {
+		expect(eventDifficulties).toEqual(['normal', 'heroic', 'mythic'])
+		expect(getDifficultyOptions('ru').map(option => option.label)).toEqual([
+			'Нормал',
+			'Героик',
+			'Мифик',
+		])
+	})
+
+	it('returns farm and achievements for every open world addon tab', () => {
+		for (const addon of addons) {
+			const ruOptions = getOpenWorldActivitiesForAddon(addon, 'ru')
+			const enOptions = getOpenWorldActivitiesForAddon(addon, 'en')
+
+			expect(ruOptions.map(option => option.slug)).toEqual([
+				'farm',
+				'achievements',
+			])
+			expect(ruOptions.map(option => option.name)).toEqual([
+				'Фарм',
+				'Достижения',
+			])
+			expect(enOptions.map(option => option.name)).toEqual([
+				'Farm',
+				'Achievements',
+			])
+
+			for (const option of ruOptions) {
+				const assetPath = path.join(process.cwd(), 'public', option.artPath)
+
+				expect(existsSync(assetPath)).toBe(true)
+				expect(option.artPath).toMatch(/^\/activities\/.+_styled_16x9\.jpg$/)
+			}
+		}
+	})
+
 	it('builds a six-week calendar grid starting on monday', () => {
 		const days = getCalendarDays(new Date(2026, 4, 1))
 
@@ -71,10 +115,19 @@ describe('create event utils', () => {
 	it('returns all Midnight expansion dungeons for the dungeon addon tab', () => {
 		const options = getDungeonOptions('Midnight')
 
-		expect(options).toHaveLength(8)
+		expect(options).toHaveLength(currentExpansionDungeons.length)
 		expect(options.every(option => option.activityType === 'dungeon')).toBe(true)
 		expect(new Set(options.map(option => option.slug))).toEqual(
 			new Set(currentExpansionDungeons.map(dungeon => dungeon.slug)),
+		)
+	})
+
+	it('keeps Altar of Fangs out of the current season dungeon tab', () => {
+		expect(currentExpansionDungeons.map(dungeon => dungeon.slug)).toContain(
+			'altar-of-fangs',
+		)
+		expect(currentSeasonDungeons.map(dungeon => dungeon.slug)).not.toContain(
+			'altar-of-fangs',
 		)
 	})
 

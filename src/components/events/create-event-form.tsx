@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { Save, Sparkles } from 'lucide-react'
 import { useAppLocale } from '@/components/shell/locale-provider'
 import { Button } from '@/components/ui/button'
@@ -76,8 +77,12 @@ export function CreateEventForm(props: CreateEventFormProps) {
 					<EventParamsSection
 						activityType={draft.activityType}
 						addon={draft.addon}
+						addons={props.eventCatalog.addons}
+						difficulty={draft.difficulty}
+						difficultyOptions={props.eventCatalog.difficulties}
 						onActivityTypeChange={dispatchers.setActivityType}
 						onAddonChange={dispatchers.setAddon}
+						onDifficultyChange={dispatchers.setDifficulty}
 					/>
 
 					<InstancesSection
@@ -113,6 +118,7 @@ export function CreateEventForm(props: CreateEventFormProps) {
 
 				<aside className={eventUi.previewStack}>
 					<EventPreviewCard
+						difficultyOptions={props.eventCatalog.difficulties}
 						draft={draft}
 						leaderName={leaderName}
 						leaderRealm={leaderRealm}

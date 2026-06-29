@@ -1,8 +1,11 @@
 import { CalendarDays, Globe2, Shield, Swords } from "lucide-react";
 import type { AppLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import { openWorldActivityDefinitions } from "@/lib/activity-catalog-source";
 import type {
   ActivityTab,
+  DifficultyOption,
+  EventDifficulty,
   EventInstanceOption,
   EventRole,
   PublishTargetField,
@@ -13,6 +16,11 @@ import type {
 
 export const addons = ["Midnight", "The War Within", "Dragonflight"] as const;
 export type EventAddon = (typeof addons)[number];
+export const eventDifficulties = [
+  "normal",
+  "heroic",
+  "mythic",
+] as const satisfies readonly EventDifficulty[];
 
 export function resolveEventAddon(addon: string): EventAddon {
   return addons.includes(addon as EventAddon) ? (addon as EventAddon) : "Midnight";
@@ -78,6 +86,17 @@ export function getActivityTabs(locale: AppLocale): ActivityTab[] {
 
 export const activityTabs = getActivityTabs("ru");
 
+export function getDifficultyOptions(locale: AppLocale): DifficultyOption[] {
+  return eventDifficulties.map((difficulty) => ({
+    difficulty,
+    label: t(locale, `events.difficulty${capitalizeDifficulty(difficulty)}`),
+  }));
+}
+
+function capitalizeDifficulty(difficulty: EventDifficulty) {
+  return `${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
+}
+
 type LocalizedOpenWorld = Omit<EventInstanceOption, "name" | "shortName" | "tag"> & {
   names: Record<AppLocale, string>;
   shortNames: Record<AppLocale, string>;
@@ -97,158 +116,33 @@ function toOpenWorldOption(
   };
 }
 
-const midnightOpenWorldActivities: LocalizedOpenWorld[] = [
-  {
+const openWorldActivities: LocalizedOpenWorld[] = openWorldActivityDefinitions.map(
+  (activity) => ({
     activityType: "open-world",
-    artPath: "/home/hero-midnight-citadel.jpg",
+    artPath: activity.artPath,
     names: {
-      en: "Quel'Thalas contract runs",
-      ru: "Контракты добычи Кель'Таласа",
+      en: activity.nameEn,
+      ru: activity.nameRu,
     },
     shortNames: {
-      en: "Contracts",
-      ru: "Контракты",
+      en: activity.shortNameEn,
+      ru: activity.shortNameRu,
     },
-    slug: "quelthalas-prey-contracts",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/march_on_queldanas_styled_16x9.png",
-    names: {
-      en: "Silvermoon patrols",
-      ru: "Патрули Серебряной Луны",
-    },
-    shortNames: {
-      en: "Patrols",
-      ru: "Патрули",
-    },
-    slug: "silvermoon-patrols",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/the_voidspire_styled_16x9.png",
-    names: {
-      en: "Void rifts",
-      ru: "Разломы Бездны",
-    },
-    shortNames: {
-      en: "Rifts",
-      ru: "Разломы",
-    },
-    slug: "void-rifts",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/the_dreamrift_styled_16x9.png",
-    names: {
-      en: "Rare target hunt",
-      ru: "Охота за редкими целями",
-    },
-    shortNames: {
-      en: "Rares",
-      ru: "Редкие цели",
-    },
-    slug: "rare-hunt",
-  },
-];
-
-const warWithinOpenWorldActivities: LocalizedOpenWorld[] = [
-  {
-    activityType: "open-world",
-    artPath: "/raids/nerubar_palace_styled_16x9.png",
-    names: {
-      en: "Azj-Kahet expeditions",
-      ru: "Походы в Азж-Кахет",
-    },
-    shortNames: {
-      en: "Azj-Kahet",
-      ru: "Азж-Кахет",
-    },
-    slug: "azj-kahet-expeditions",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/liberation_of_undermine_styled_16x9.png",
-    names: {
-      en: "Undermine operations",
-      ru: "Операции в Нижней Шахте",
-    },
-    shortNames: {
-      en: "Undermine",
-      ru: "Undermine",
-    },
-    slug: "undermine-operations",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/manaforge_omega_styled_16x9.png",
-    names: {
-      en: "Manaforge rifts",
-      ru: "Разломы Манагорна",
-    },
-    shortNames: {
-      en: "Manaforge",
-      ru: "Манагорн",
-    },
-    slug: "manaforge-rifts",
-  },
-];
-
-const dragonflightOpenWorldActivities: LocalizedOpenWorld[] = [
-  {
-    activityType: "open-world",
-    artPath: "/raids/vault_of_the_incarnates_styled_16x9.png",
-    names: {
-      en: "Primalist hunts",
-      ru: "Охота на первородных",
-    },
-    shortNames: {
-      en: "Primalists",
-      ru: "Праймалы",
-    },
-    slug: "primalist-hunts",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/aberrus_the_shadowed_crucible_styled_16x9.png",
-    names: {
-      en: "Aberrus rifts",
-      ru: "Разломы Аберрия",
-    },
-    shortNames: {
-      en: "Aberrus",
-      ru: "Аберрий",
-    },
-    slug: "aberrus-rifts",
-  },
-  {
-    activityType: "open-world",
-    artPath: "/raids/amirdrassil_the_dreams_hope_styled_16x9.png",
-    names: {
-      en: "Dream assaults",
-      ru: "Налёты во Сне",
-    },
-    shortNames: {
-      en: "Dream",
-      ru: "Сон",
-    },
-    slug: "dream-assaults",
-  },
-];
+    slug: activity.slug,
+  }),
+);
 
 function getOpenWorldActivitiesByAddon(
   locale: AppLocale,
 ): Record<EventAddon, EventInstanceOption[]> {
+  const activities = openWorldActivities.map((item) =>
+    toOpenWorldOption(locale, item),
+  );
+
   return {
-    Dragonflight: dragonflightOpenWorldActivities.map((item) =>
-      toOpenWorldOption(locale, item),
-    ),
-    Midnight: midnightOpenWorldActivities.map((item) =>
-      toOpenWorldOption(locale, item),
-    ),
-    "The War Within": warWithinOpenWorldActivities.map((item) =>
-      toOpenWorldOption(locale, item),
-    ),
+    Dragonflight: activities,
+    Midnight: activities,
+    "The War Within": activities,
   };
 }
 

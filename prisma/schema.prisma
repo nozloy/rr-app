@@ -21,6 +21,17 @@ model User {
   raidCheckBookmarks RaidCheckBookmark[]
 }
 
+enum ActivityKind {
+  RAID
+  DUNGEON
+  OPEN_WORLD
+}
+
+enum ActivityGroupKind {
+  EXPANSION
+  SEASON
+}
+
 model Account {
   id                String   @id @default(cuid())
   userId            String
@@ -123,4 +134,69 @@ model RaidCheckBookmark {
 
   @@unique([userId, name, serverSlug, serverRegion])
   @@index([userId, serverRegion, serverSlug])
+}
+
+model Activity {
+  id                   String              @id @default(cuid())
+  slug                 String              @unique
+  kind                 ActivityKind
+  nameRu               String
+  nameEn               String
+  shortNameRu          String
+  shortNameEn          String
+  artPath              String
+  aliases              String[]            @default([])
+  warcraftLogsZoneId   Int?
+  warcraftLogsZoneName String?
+  isActive             Boolean             @default(true)
+  sortOrder            Int                 @default(0)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  groupItems           ActivityGroupItem[]
+
+  @@index([kind, isActive, sortOrder])
+}
+
+model ActivityGroup {
+  id        String              @id @default(cuid())
+  slug      String              @unique
+  kind      ActivityGroupKind
+  nameRu    String
+  nameEn    String
+  startsAt  DateTime?
+  endsAt    DateTime?
+  isActive  Boolean             @default(true)
+  sortOrder Int                 @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  items     ActivityGroupItem[]
+
+  @@index([kind, isActive, sortOrder])
+}
+
+model ActivityGroupItem {
+  id         String        @id @default(cuid())
+  groupId    String
+  activityId String
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  group      ActivityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activity   Activity      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, activityId])
+  @@index([activityId])
+  @@index([groupId, sortOrder])
+}
+
+model EventDifficultyOption {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  labelRu   String
+  labelEn   String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
 }

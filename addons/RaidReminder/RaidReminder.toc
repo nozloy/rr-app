@@ -5,5 +5,30 @@
 ## Version: 0.2.0
 ## IconTexture: Interface\AddOns\RaidReminder\Media\RaidReminderIcon.tga
 
+Core.lua
+Constants.lua
+State.lua
 RealmCodes.lua
+Locales\Locales.lua
+Locales\enUS.lua
+Locales\ruRU.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\itIT.lua
+Locales\ptBR.lua
+Util.lua
+Locale.lua
+Realm.lua
+Comm.lua
+Group.lua
+Export.lua
+Readiness.lua
+Gear.lua
+UI\Common.lua
+UI\ExportFrame.lua
+UI\RaidLockoutsFrame.lua
+Events.lua
+SlashCommands.lua
 RaidReminder.lua

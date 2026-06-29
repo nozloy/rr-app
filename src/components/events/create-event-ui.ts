@@ -20,7 +20,9 @@ export const eventUi = {
 	actionSecondary:
 		'h-[3.15rem] w-full rounded-[7px] border-event-panel-border-strong bg-[rgba(3,13,27,0.52)] text-base font-medium text-[#eaf2ff]',
 	addonDropdown:
-		'w-[var(--radix-dropdown-menu-trigger-width)] min-w-[18rem] rounded-lg border border-[#8f5cff] bg-[#061327] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.45),0_0_0_1px_rgba(143,92,255,0.22)]',
+		'w-[var(--radix-dropdown-menu-trigger-width)] min-w-0 rounded-lg border border-[#8f5cff] bg-[#061327] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.45),0_0_0_1px_rgba(143,92,255,0.22)]',
+	difficultyDropdown:
+		'w-[var(--radix-dropdown-menu-trigger-width)] min-w-0 rounded-lg border border-[#8f5cff] bg-[#061327] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.45),0_0_0_1px_rgba(143,92,255,0.22)]',
 	addonOption: (isSelected: boolean) =>
 		cn(
 			'flex min-h-[3.1rem] w-full items-center justify-between gap-3 rounded-md border border-event-panel-border px-3 text-left text-[1.08rem] font-semibold text-[#eaf2ff] transition-colors hover:border-event-cyan/55 hover:bg-[#0c1f40]',
@@ -162,7 +164,7 @@ export const eventUi = {
 	paidSwitchThumb:
 		'!size-[1.05rem] !bg-[radial-gradient(circle_at_35%_30%,#ffffff,#d9ccff_58%,#bba1ff)] !shadow-[0_0_10px_rgba(215,182,255,0.48)] group-data-checked/switch:!translate-x-[1.55rem]',
 	paramsGrid:
-		'mt-3 grid gap-3 min-[1041px]:grid-cols-[minmax(220px,0.38fr)_minmax(0,1fr)]',
+		'mt-3 grid gap-3 min-[1180px]:grid-cols-[12.5rem_12.5rem_minmax(0,1fr)] min-[761px]:grid-cols-[12.5rem_12.5rem]',
 	premiumBadge:
 		'!inline-flex !w-fit items-center gap-1 !border-event-legendary/60 !bg-event-legendary/15 !text-[#ffb45c] shadow-[inset_0_0_14px_rgba(255,128,0,0.12),0_0_12px_rgba(255,128,0,0.10)]',
 	previewCard: cn(panelSurface, 'min-w-0 rounded-lg p-4'),
@@ -283,7 +285,7 @@ export const eventUi = {
 	textInput: textInputSurface,
 	embeddedInput: embeddedInputSurface,
 	typeTabs:
-		'grid overflow-hidden rounded-lg border border-event-panel-border min-[761px]:grid-cols-[0.85fr_1.25fr_0.9fr_0.9fr] max-[760px]:grid-cols-1',
+		'grid overflow-hidden rounded-lg border border-event-panel-border min-[761px]:col-span-2 min-[1180px]:col-span-1 min-[761px]:grid-cols-[0.85fr_1.25fr_0.9fr_0.9fr] max-[760px]:grid-cols-1',
 	typeTab: (isActive: boolean) =>
 		cn(
 			'flex h-12 items-center justify-center gap-2 border-r border-event-panel-border bg-[rgba(3,13,27,0.62)] px-3 font-medium text-event-copy transition-colors last:border-r-0 hover:bg-[#0c1f40] hover:text-white max-[760px]:justify-start max-[760px]:border-b max-[760px]:border-r-0 max-[760px]:last:border-b-0',

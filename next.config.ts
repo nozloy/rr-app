@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
         pathname: "/raids/**",
       },
       {
+        pathname: "/activities/**",
+      },
+      {
         pathname: "/roles/**",
       },
       {

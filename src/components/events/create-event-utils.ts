@@ -38,6 +38,7 @@ const dungeonSlugsByAddon: Record<EventAddon, string[]> = {
 		'den-of-nalorakk',
 		'murder-row',
 		'voidscar-arena',
+		'altar-of-fangs',
 	],
 	'The War Within': ['seat-of-the-triumvirate', 'skyreach', 'pit-of-saron'],
 }

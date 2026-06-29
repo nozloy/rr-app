@@ -43,6 +43,177 @@ REALM_ALIASES = {
     },
 }
 
+REALM_LOCALE_GROUPS = {
+    "deDE": {
+        ("eu", slug)
+        for slug in {
+            "aegwynn",
+            "alexstrasza",
+            "alleria",
+            "amanthul",
+            "ambossar",
+            "anetheron",
+            "antonidas",
+            "area-52",
+            "arygos",
+            "baelgun",
+            "blackhand",
+            "blackmoore",
+            "blackrock",
+            "blutkessel",
+            "der-abyssische-rat",
+            "der-mithrilorden",
+            "der-rat-von-dalaran",
+            "destromath",
+            "dethecus",
+            "die-aldor",
+            "die-arguswacht",
+            "die-ewige-wacht",
+            "die-nachtwache",
+            "die-silberne-hand",
+            "die-todeskrallen",
+            "durotan",
+            "echsenkessel",
+            "eredar",
+            "festung-der-stürme",
+            "forscherliga",
+            "frostwolf",
+            "garrosh",
+            "gilneas",
+            "gorgonnash",
+            "kargath",
+            "khazgoroth",
+            "kragjin",
+            "kult-der-verdammten",
+            "lothar",
+            "madmortem",
+            "malganis",
+            "malfurion",
+            "malorne",
+            "mannoroth",
+            "nathrezim",
+            "nefarian",
+            "nethersturm",
+            "nozdormu",
+            "onyxia",
+            "perenolde",
+            "proudmoore",
+            "rexxar",
+            "senjin",
+            "shattrath",
+            "taerar",
+            "teldrassil",
+            "terrordar",
+            "theradras",
+            "thrall",
+            "tirion",
+            "todeswache",
+            "ungoro",
+            "veklor",
+            "wrathbringer",
+            "ysera",
+            "zirkel-des-cenarius",
+            "zuluhed",
+        }
+    },
+    "frFR": {
+        ("eu", slug)
+        for slug in {
+            "arak-arahm",
+            "archimonde",
+            "chants-éternels",
+            "chogall",
+            "confrérie-du-thorium",
+            "conseil-des-ombres",
+            "culte-de-la-rive-noire",
+            "dalaran",
+            "drekthar",
+            "eitrigg",
+            "elune",
+            "garona",
+            "hyjal",
+            "illidan",
+            "kaelthas",
+            "kirin-tor",
+            "krasus",
+            "la-croisade-écarlate",
+            "les-clairvoyants",
+            "les-sentinelles",
+            "marécage-de-zangar",
+            "medivh",
+            "naxxramas",
+            "nerzhul",
+            "rashgarroth",
+            "sargeras",
+            "sinstralis",
+            "suramar",
+            "temple-noir",
+            "throkferoth",
+            "uldaman",
+            "varimathras",
+            "voljin",
+            "ysondre",
+        }
+    },
+    "esES": {
+        ("eu", slug)
+        for slug in {
+            "cthun",
+            "colinas-pardas",
+            "dun-modr",
+            "exodar",
+            "los-errantes",
+            "minahonda",
+            "sanguino",
+            "shendralar",
+            "tyrande",
+            "uldum",
+            "zuljin",
+        }
+    },
+    "esMX": {("us", slug) for slug in {"drakkari", "quelthalas", "ragnaros"}},
+    "itIT": {("eu", slug) for slug in {"nemesis", "pozzo-delleternità"}},
+    "ptBR": {
+        ("eu", "aggra-português"),
+        ("us", "azralon"),
+        ("us", "gallywix"),
+        ("us", "goldrinn"),
+        ("us", "nemesis"),
+        ("us", "tol-barad"),
+    },
+    "ruRU": {
+        ("eu", slug)
+        for slug in {
+            "azuregos",
+            "blackscar",
+            "booty-bay",
+            "borean-tundra",
+            "deathguard",
+            "deathweaver",
+            "deepholm",
+            "eversong",
+            "fordragon",
+            "galakrond",
+            "gordunni",
+            "greymane",
+            "howling-fjord",
+            "lich-king",
+            "razuvious",
+            "soulflayer",
+        }
+    },
+}
+
+REALM_LOCALE_BY_SLUG = {
+    key: locale
+    for locale, keys in REALM_LOCALE_GROUPS.items()
+    for key in keys
+}
+
+
+def get_realm_locale(region: str, slug: str) -> str:
+    return REALM_LOCALE_BY_SLUG.get((region, slug), "enUS")
+
 
 def base36(value: int) -> str:
     if value == 0:
@@ -65,13 +236,15 @@ def parse_source() -> list[dict[str, str]]:
 
         source_region, realm_name, normalized_realm, slug = match.groups()
         region, region_code = REGION_CODES[source_region]
+        slug = slug.strip()
         rows.append(
             {
                 "region": region,
                 "regionCode": region_code,
                 "realmName": realm_name.strip(),
                 "normalizedRealm": normalized_realm.strip(),
-                "slug": slug.strip(),
+                "realmLocale": get_realm_locale(region, slug),
+                "slug": slug,
             }
         )
 
@@ -133,10 +306,12 @@ def generate_ts(rows: list[dict[str, str]]) -> None:
         "",
         'export type RealmRegion = "eu" | "us";',
         'export type RealmRegionCode = "e" | "u";',
+        'export type RealmLocale = "deDE" | "enUS" | "esES" | "esMX" | "frFR" | "itIT" | "ptBR" | "ruRU";',
         "",
         "export type RealmCodeEntry = {",
         "  code: string;",
         "  normalizedRealm: string;",
+        "  realmLocale: RealmLocale;",
         "  realmName: string;",
         "  region: RealmRegion;",
         "  regionCode: RealmRegionCode;",
@@ -160,10 +335,11 @@ def generate_ts(rows: list[dict[str, str]]) -> None:
 
     for row in rows:
         lines.append(
-            "  { code: %s, normalizedRealm: %s, realmName: %s, region: %s, regionCode: %s, slug: %s },"
+            "  { code: %s, normalizedRealm: %s, realmLocale: %s, realmName: %s, region: %s, regionCode: %s, slug: %s },"
             % (
                 js(row["code"]),
                 js(row["normalizedRealm"]),
+                js(row["realmLocale"]),
                 js(row["realmName"]),
                 js(row["region"]),
                 js(row["regionCode"]),
@@ -328,7 +504,7 @@ def generate_lua(rows: list[dict[str, str]]) -> None:
         lines.append(f"    {region_code} = {{")
         for row in [item for item in rows if item["region"] == region]:
             value = "{ " + ", ".join(
-                [lua(row["code"]), lua(row["slug"]), lua(row["realmName"])]
+                [lua(row["code"]), lua(row["slug"]), lua(row["realmName"]), lua(row["realmLocale"])]
             ) + " }"
             for alias in lua_aliases(row):
                 lines.append(f"      [{lua(alias)}] = {value},")
@@ -348,6 +524,11 @@ def generate_lua(rows: list[dict[str, str]]) -> None:
 def validate(rows: list[dict[str, str]]) -> None:
     if len(rows) != 494:
         raise SystemExit(f"Expected 494 realm rows, found {len(rows)}.")
+
+    row_keys = {(row["region"], row["slug"]) for row in rows}
+    for key in sorted(REALM_LOCALE_BY_SLUG):
+        if key not in row_keys:
+            raise SystemExit(f"Unknown realm locale mapping: {key[0]}:{key[1]}.")
 
     for region in ("eu", "us"):
         region_rows = [row for row in rows if row["region"] == region]

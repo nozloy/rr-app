@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
 export type EventActivityType = 'raid' | 'dungeon' | 'season' | 'open-world'
+export type EventDifficulty = 'normal' | 'heroic' | 'mythic'
 
 export type EventCharacterOption = {
 	activeSpec?: string | null
@@ -44,6 +45,7 @@ export type CreateEventDraft = {
 	activityType: EventActivityType
 	characterId: string
 	date: string
+	difficulty: EventDifficulty
 	hasPaidSlots: boolean
 	hasUnroll: boolean
 	leaderMode: LeaderMode
@@ -64,12 +66,33 @@ export type CreateEventFormProps = {
 	characters: EventCharacterOption[]
 	defaultDate: string
 	displayName: string
+	eventCatalog: EventCatalog
 }
 
 export type ActivityTab = {
 	icon: LucideIcon
 	label: string
 	type: EventActivityType
+}
+
+export type DifficultyOption = {
+	difficulty: EventDifficulty
+	label: string
+}
+
+export type EventAddonOption = {
+	label: string
+	value: string
+}
+
+export type EventCatalog = {
+	addons: EventAddonOption[]
+	defaultAddon: string
+	difficulties: DifficultyOption[]
+	optionsByAddon: Record<
+		string,
+		Record<EventActivityType, EventInstanceOption[]>
+	>
 }
 
 export type RoleField = {

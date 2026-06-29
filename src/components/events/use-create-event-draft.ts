@@ -5,15 +5,14 @@ import { useAppLocale } from '@/components/shell/locale-provider'
 import { t } from '@/lib/i18n'
 import {
 	defaultRoleRanges,
-	getOpenWorldActivitiesForAddon,
 	getRoleFields,
-	resolveEventAddon,
 	unrollTemplates,
 } from './create-event-data'
 import type {
 	CreateEventDraft,
 	CreateEventFormProps,
 	EventActivityType,
+	EventDifficulty,
 	EventPublishTarget,
 	EventRole,
 	LeaderMode,
@@ -22,9 +21,6 @@ import type {
 } from './create-event-types'
 import {
 	formatRange,
-	getDungeonOptions,
-	getRaidOptions,
-	getSeasonDungeonOptions,
 	parseItemIds,
 	parseRoleRangeInput,
 	toDateInputValue,
@@ -55,6 +51,7 @@ type CreateEventDraftAction =
 	| { type: 'toggle-instance'; slug: string }
 	| { type: 'remove-instance'; slug: string }
 	| { type: 'set-addon'; addon: string; selectedInstanceSlugs: string[] }
+	| { type: 'set-difficulty'; difficulty: EventDifficulty }
 	| { type: 'set-date'; date: string }
 	| { type: 'set-date-time'; date: Date }
 	| { type: 'set-time-part'; part: 'hour' | 'minute'; value: string }
@@ -83,33 +80,28 @@ function clearStatus(state: CreateEventDraftState): CreateEventDraftState {
 	}
 }
 
-function getInstanceOptionsByType(addon: string, locale: 'ru' | 'en') {
-	const resolvedAddon = resolveEventAddon(addon)
-
-	return {
-		dungeon: getDungeonOptions(resolvedAddon, locale),
-		season: getSeasonDungeonOptions(locale),
-		'open-world': getOpenWorldActivitiesForAddon(resolvedAddon, locale),
-		raid: getRaidOptions(resolvedAddon, locale),
-	}
-}
-
 function createInitialState({
 	characters,
 	defaultDate,
 	displayName,
-	raidSlugs,
-}: CreateEventFormProps & { raidSlugs: string[] }): CreateEventDraftState {
+	eventCatalog,
+}: CreateEventFormProps): CreateEventDraftState {
 	const defaultTemplate = unrollTemplates[0] ?? null
 	const defaultUnrollItemIds = defaultTemplate?.itemIds ?? ['249343']
 	const defaultUnrollTemplateId = defaultTemplate?.id ?? 'custom'
+	const defaultAddon =
+		eventCatalog.defaultAddon || eventCatalog.addons[0]?.value || ''
+	const defaultRaidOptions = eventCatalog.optionsByAddon[defaultAddon]?.raid ?? []
+	const defaultDifficulty =
+		eventCatalog.difficulties[0]?.difficulty ?? 'normal'
 
 	return {
 		draft: {
 			activityType: 'raid',
-			addon: 'Midnight',
+			addon: defaultAddon,
 			characterId: characters[0]?.id ?? '',
 			date: defaultDate,
+			difficulty: defaultDifficulty,
 			hasPaidSlots: false,
 			hasUnroll: true,
 			leaderMode: characters.length > 0 ? 'character' : 'manual',
@@ -128,7 +120,7 @@ function createInitialState({
 				healer: { ...defaultRoleRanges.healer },
 				tank: { ...defaultRoleRanges.tank },
 			},
-			selectedInstanceSlugs: raidSlugs,
+			selectedInstanceSlugs: defaultRaidOptions.map(option => option.slug),
 			time: '20:30',
 			unrollInput: defaultUnrollItemIds.join(', '),
 			unrollItemIds: defaultUnrollItemIds,
@@ -249,6 +241,14 @@ function createEventDraftReducer(
 					...current.draft,
 					addon: action.addon,
 					selectedInstanceSlugs: action.selectedInstanceSlugs,
+				},
+			}
+		case 'set-difficulty':
+			return {
+				...current,
+				draft: {
+					...current.draft,
+					difficulty: action.difficulty,
 				},
 			}
 		case 'set-date':
@@ -383,23 +383,24 @@ export function useCreateEventDraft({
 	characters,
 	defaultDate,
 	displayName,
+	eventCatalog,
 }: CreateEventFormProps) {
 	const locale = useAppLocale()
 	const roleFields = useMemo(() => getRoleFields(locale), [locale])
-	const initialRaidSlugs = useMemo(
-		() => getRaidOptions('Midnight', locale).map(option => option.slug),
-		[locale],
-	)
 	const [state, dispatch] = useReducer(
 		createEventDraftReducer,
-		{ characters, defaultDate, displayName, raidSlugs: initialRaidSlugs },
+		{ characters, defaultDate, displayName, eventCatalog },
 		createInitialState,
 	)
 	const { draft, roleInputValues, statusMessage } = state
-	const instanceOptionsByType = useMemo(
-		() => getInstanceOptionsByType(draft.addon, locale),
-		[draft.addon, locale],
-	)
+	const instanceOptionsByType =
+		eventCatalog.optionsByAddon[draft.addon] ??
+		eventCatalog.optionsByAddon[eventCatalog.defaultAddon] ?? {
+			dungeon: [],
+			'open-world': [],
+			raid: [],
+			season: [],
+		}
 	const selectedCharacter =
 		characters.find(character => character.id === draft.characterId) ??
 		characters[0] ??
@@ -410,9 +411,20 @@ export function useCreateEventDraft({
 	)
 	const fallbackOpenWorldInstance =
 		instanceOptionsByType['open-world'][0] ??
-		getOpenWorldActivitiesForAddon('Midnight', locale)[0]
+		Object.values(eventCatalog.optionsByAddon).find(
+			options => options['open-world'][0],
+		)?.['open-world'][0]
 	const previewInstance =
-		selectedInstances[0] ?? instanceOptions[0] ?? fallbackOpenWorldInstance
+		selectedInstances[0] ??
+		instanceOptions[0] ??
+		fallbackOpenWorldInstance ?? {
+			activityType: 'open-world',
+			artPath: '/home/raid-reminder-mark.png',
+			name: 'Raid Reminder',
+			shortName: 'RR',
+			slug: 'raid-reminder',
+			tag: 'APP',
+		}
 	const selectedTemplate =
 		unrollTemplates.find(template => template.id === draft.unrollTemplateId) ??
 		null
@@ -468,7 +480,8 @@ export function useCreateEventDraft({
 				})
 			},
 			setAddon: (addon: string) => {
-				const nextOptionsByType = getInstanceOptionsByType(addon, locale)
+				const nextOptionsByType =
+					eventCatalog.optionsByAddon[addon] ?? instanceOptionsByType
 				const nextOptions = nextOptionsByType[draft.activityType]
 
 				dispatch({
@@ -477,6 +490,8 @@ export function useCreateEventDraft({
 					type: 'set-addon',
 				})
 			},
+			setDifficulty: (difficulty: EventDifficulty) =>
+				dispatch({ difficulty, type: 'set-difficulty' }),
 			setCharacter: (characterId: string) =>
 				dispatch({ characterId, type: 'set-character' }),
 			setDate: (date: string) => dispatch({ date, type: 'set-date' }),
