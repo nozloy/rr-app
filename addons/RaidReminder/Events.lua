@@ -11,14 +11,14 @@ raidCheckEventFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
 raidCheckEventFrame:RegisterEvent("INSPECT_READY")
 raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "PLAYER_LOGIN" then
-    RegisterAddonMessages()
+    RR.Comm.RegisterAddonMessages()
   elseif event == "CHAT_MSG_ADDON" then
-    HandleRaidCheckAddonMessage(...)
+    RR.Comm.HandleAddonMessage(...)
   elseif event == "INSPECT_READY" then
-    HandleInspectReady(...)
+    RR.Gear.HandleInspectReady(...)
   elseif event == "GROUP_ROSTER_UPDATE" then
     if frame and frame:IsShown() then
-      RefreshRaidCheck(GetExportFields(), GEAR_SCAN_MODE.roster)
+      RR.Readiness.Refresh(RR.Group.GetExportFields(), GEAR_SCAN_MODE.roster)
     end
   elseif event == "UPDATE_INSTANCE_INFO" then
     if frame and frame:IsShown() then
@@ -35,7 +35,7 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
       local fields = GetExportFields()
       local target = GetRaidCheckTarget(fields)
       if target and (not raidCheckState or not RaidCheckTargetsMatch(raidCheckState.target, target)) then
-        RefreshRaidCheck(fields, GEAR_SCAN_MODE.full)
+        RR.Readiness.Refresh(fields, GEAR_SCAN_MODE.full)
       elseif raidCheckState and raidCheckState.target then
         ApplyLocalRaidCheckResult(raidCheckState.requestId)
       end
@@ -43,4 +43,4 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
   end
 end)
 
-RegisterAddonMessages()
+RR.Comm.RegisterAddonMessages()

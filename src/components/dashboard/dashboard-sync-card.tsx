@@ -50,7 +50,7 @@ export function DashboardSyncCard({ locale }: { locale: AppLocale }) {
       {state.status === "reauth" ? (
         <Button
           className="dashboard-sync-button"
-          onClick={() => signIn("battlenet", { callbackUrl: "/dashboard" })}
+          onClick={() => signIn("battlenet", { callbackUrl: "/profile" })}
           type="button"
           variant="outline"
         >

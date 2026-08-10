@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 
 export type EventActivityType = 'raid' | 'dungeon' | 'season' | 'open-world'
-export type EventDifficulty = 'normal' | 'heroic' | 'mythic'
+export type EventDifficulty = string
 
 export type EventCharacterOption = {
 	activeSpec?: string | null
@@ -89,6 +89,7 @@ export type EventCatalog = {
 	addons: EventAddonOption[]
 	defaultAddon: string
 	difficulties: DifficultyOption[]
+	difficultiesByActivitySlug: Record<string, DifficultyOption[]>
 	optionsByAddon: Record<
 		string,
 		Record<EventActivityType, EventInstanceOption[]>

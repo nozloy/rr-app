@@ -4,12 +4,14 @@ import { t } from "@/lib/i18n";
 import type {
   EventActivityType,
   EventCatalog,
-  EventDifficulty,
   EventInstanceOption,
+  DifficultyOption,
 } from "@/components/events/create-event-types";
 
 type CatalogActivityKind = "RAID" | "DUNGEON" | "OPEN_WORLD";
 type CatalogGroupKind = "EXPANSION" | "SEASON";
+const EVENT_CATALOG_FALLBACK_ART = "/home/raid-reminder-mark.png";
+const standardDifficultySlugs = new Set(["normal", "heroic", "mythic"]);
 
 export type CatalogActivityRecord = {
   slug: string;
@@ -21,6 +23,10 @@ export type CatalogActivityRecord = {
   artPath: string;
   isActive: boolean;
   sortOrder: number;
+  difficultyOptions?: Array<{
+    sortOrder: number;
+    difficulty: CatalogDifficultyRecord;
+  }>;
 };
 
 export type CatalogGroupRecord = {
@@ -28,6 +34,7 @@ export type CatalogGroupRecord = {
   kind: CatalogGroupKind;
   nameRu: string;
   nameEn: string;
+  artPath?: string | null;
   isActive: boolean;
   sortOrder: number;
   items: Array<{
@@ -108,7 +115,7 @@ function toInstanceOption({
 
   return {
     activityType: resolvedActivityType,
-    artPath: activity.artPath,
+    artPath: activity.artPath || EVENT_CATALOG_FALLBACK_ART,
     name: localizeName(locale, activity),
     shortName: localizeShortName(locale, activity),
     slug: activity.slug,
@@ -136,10 +143,48 @@ function cloneEmptyOptions() {
   };
 }
 
+function toDifficultyOption(
+  difficulty: CatalogDifficultyRecord,
+  locale: AppLocale,
+): DifficultyOption {
+  return {
+    difficulty: difficulty.slug,
+    label: locale === "ru" ? difficulty.labelRu : difficulty.labelEn,
+  };
+}
+
+function getActiveSortedDifficulties(difficulties: CatalogDifficultyRecord[]) {
+  return difficulties
+    .filter((difficulty) => difficulty.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.slug.localeCompare(b.slug));
+}
+
+function getActivityDifficulties(
+  activity: CatalogActivityRecord,
+  fallbackDifficulties: DifficultyOption[],
+  locale: AppLocale,
+) {
+  const options = activity.difficultyOptions
+    ?.filter((item) => item.difficulty.isActive)
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder ||
+        a.difficulty.sortOrder - b.difficulty.sortOrder ||
+        a.difficulty.slug.localeCompare(b.difficulty.slug),
+    )
+    .map((item) => toDifficultyOption(item.difficulty, locale));
+
+  return options && options.length > 0 ? options : fallbackDifficulties;
+}
+
 export function buildEventCatalogFromRecords(
   input: BuildEventCatalogInput,
   locale: AppLocale,
 ): EventCatalog {
+  const activeDifficulties = getActiveSortedDifficulties(input.difficulties);
+  const standardDifficulties = activeDifficulties
+    .filter((difficulty) => standardDifficultySlugs.has(difficulty.slug))
+    .map((difficulty) => toDifficultyOption(difficulty, locale));
   const activeExpansionGroups = input.expansionGroups
     .filter((group) => group.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn));
@@ -177,6 +222,20 @@ export function buildEventCatalogFromRecords(
   }
 
   const fallbackAddon = activeExpansionGroups[0]?.slug ?? "";
+  const difficultiesByActivitySlug: EventCatalog["difficultiesByActivitySlug"] =
+    {};
+
+  for (const group of activeExpansionGroups) {
+    for (const item of getActiveSortedItems(group)) {
+      if (item.activity.kind === "RAID") {
+        difficultiesByActivitySlug[item.activity.slug] = getActivityDifficulties(
+          item.activity,
+          standardDifficulties,
+          locale,
+        );
+      }
+    }
+  }
 
   return {
     addons: activeExpansionGroups.map((group) => ({
@@ -185,18 +244,8 @@ export function buildEventCatalogFromRecords(
     })),
     defaultAddon: activeExpansionGroups.find((group) => group.slug === "midnight")
       ?.slug ?? fallbackAddon,
-    difficulties: input.difficulties
-      .filter((difficulty): difficulty is CatalogDifficultyRecord & {
-        slug: EventDifficulty;
-      } =>
-        difficulty.isActive &&
-        ["normal", "heroic", "mythic"].includes(difficulty.slug),
-      )
-      .sort((a, b) => a.sortOrder - b.sortOrder || a.slug.localeCompare(b.slug))
-      .map((difficulty) => ({
-        difficulty: difficulty.slug,
-        label: locale === "ru" ? difficulty.labelRu : difficulty.labelEn,
-      })),
+    difficulties: standardDifficulties,
+    difficultiesByActivitySlug,
     optionsByAddon,
   };
 }
@@ -209,7 +258,16 @@ export async function getEventCatalog(locale: AppLocale): Promise<EventCatalog> 
       include: {
         items: {
           orderBy: [{ sortOrder: "asc" }],
-          include: { activity: true },
+          include: {
+            activity: {
+              include: {
+                difficultyOptions: {
+                  include: { difficulty: true },
+                  orderBy: [{ sortOrder: "asc" }],
+                },
+              },
+            },
+          },
         },
       },
     }),
@@ -219,7 +277,16 @@ export async function getEventCatalog(locale: AppLocale): Promise<EventCatalog> 
       include: {
         items: {
           orderBy: [{ sortOrder: "asc" }],
-          include: { activity: true },
+          include: {
+            activity: {
+              include: {
+                difficultyOptions: {
+                  include: { difficulty: true },
+                  orderBy: [{ sortOrder: "asc" }],
+                },
+              },
+            },
+          },
         },
       },
     }),

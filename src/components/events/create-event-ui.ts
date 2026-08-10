@@ -136,7 +136,7 @@ export const eventUi = {
 		'flex h-12 items-center rounded-lg border border-event-panel-border bg-[rgba(3,13,27,0.62)] px-3 text-white focus-within:border-event-cyan/55 [&_svg]:text-[#ffd05d]',
 	instanceCard: (isSelected: boolean) =>
 		cn(
-			"group relative min-h-[6rem] overflow-hidden rounded-lg border border-event-panel-border bg-cover bg-center p-4 text-left transition-[border-color,box-shadow,transform] duration-150 before:absolute before:inset-0 before:bg-[linear-gradient(90deg,rgba(3,9,20,0.34),rgba(3,9,20,0.02)),linear-gradient(180deg,rgba(3,9,20,0.02),rgba(3,9,20,0.2))] before:content-[''] hover:border-event-cyan/55",
+			"group relative min-h-[6rem] overflow-hidden rounded-lg border border-event-panel-border bg-cover bg-center p-4 text-left transition-[border-color,box-shadow,transform] duration-150 before:absolute before:inset-0 before:bg-[linear-gradient(90deg,rgba(3,9,20,0.28),rgba(3,9,20,0.02)),linear-gradient(180deg,rgba(3,9,20,0.02),rgba(3,9,20,0.18))] before:content-[''] hover:border-event-cyan/55",
 			isSelected &&
 				'border-[#9f6bff] shadow-[0_0_0_1px_rgba(143,92,255,0.44),inset_0_0_22px_rgba(126,71,255,0.16)]',
 		),
@@ -146,7 +146,7 @@ export const eventUi = {
 	instanceGrid:
 		'mt-3 grid gap-3 min-[1041px]:grid-cols-3 max-[1040px]:grid-cols-2 max-[760px]:grid-cols-1',
 	instanceName:
-		'overflow-hidden text-ellipsis whitespace-nowrap font-serif text-xl font-semibold leading-tight text-white',
+		'block w-fit max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded  px-2 py-1 font-serif text-xl font-semibold leading-tight text-white drop-shadow drop-shadow-black/70',
 	instanceTag:
 		'w-fit rounded border border-event-cyan/55 bg-event-cyan/12 px-1.5 py-0.5 text-[0.66rem] font-semibold uppercase leading-none tracking-[0.02em] text-event-cyan',
 	layout:

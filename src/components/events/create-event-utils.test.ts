@@ -87,7 +87,7 @@ describe('create event utils', () => {
 				const assetPath = path.join(process.cwd(), 'public', option.artPath)
 
 				expect(existsSync(assetPath)).toBe(true)
-				expect(option.artPath).toMatch(/^\/activities\/.+_styled_16x9\.jpg$/)
+				expect(option.artPath).toMatch(/^\/activities\/.+_styled_16x9\.png$/)
 			}
 		}
 	})

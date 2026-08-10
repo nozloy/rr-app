@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 export type AppHeaderUser = {
   avatarUrl?: string | null;
   displayName: string;
+  isAdmin?: boolean;
 };
 
 type AppHeaderClientProps = {
@@ -78,9 +79,13 @@ export function AppHeaderClient({
 }: AppHeaderClientProps) {
   const locale = useAppLocale();
   const pathname = usePathname() ?? "/";
+  const isAdmin = user?.isAdmin ?? false;
   const headerNavItems = getHeaderNavItems(locale);
-  const authenticatedHeaderNavItems = getAuthenticatedHeaderNavItems(locale);
-  const accountMenuItems = getAccountMenuItems(locale);
+  const authenticatedHeaderNavItems = getAuthenticatedHeaderNavItems(
+    locale,
+    isAdmin,
+  );
+  const accountMenuItems = getAccountMenuItems(locale, isAdmin);
   const mainNavItems = user
     ? [...headerNavItems, ...authenticatedHeaderNavItems]
     : headerNavItems;

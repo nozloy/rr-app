@@ -1,7 +1,9 @@
 'use client'
 
 import React from 'react'
+import { useRouter } from 'next/navigation'
 import { Save, Sparkles } from 'lucide-react'
+import { createScheduledEventAction } from '@/actions/events'
 import { useAppLocale } from '@/components/shell/locale-provider'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,9 +26,12 @@ export type { EventCharacterOption } from './create-event-types'
 
 export function CreateEventForm(props: CreateEventFormProps) {
 	const locale = useAppLocale()
+	const router = useRouter()
+	const [isPublishing, startPublishingTransition] = React.useTransition()
 	const {
 		canPublish,
 		canSubmit,
+		difficultyOptions,
 		dispatchers,
 		draft,
 		hasRoleError,
@@ -42,6 +47,23 @@ export function CreateEventForm(props: CreateEventFormProps) {
 		selectedTemplate,
 		statusMessage,
 	} = useCreateEventDraft(props)
+
+	function handlePublish() {
+		if (!canPublish || isPublishing) {
+			return
+		}
+
+		startPublishingTransition(async () => {
+			const result = await createScheduledEventAction(draft)
+
+			if (result.status === 'success') {
+				router.push('/profile?tab=my-events')
+				return
+			}
+
+			dispatchers.setStatusMessage(result.message)
+		})
+	}
 
 	return (
 		<div className={eventUi.shell}>
@@ -79,7 +101,7 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						addon={draft.addon}
 						addons={props.eventCatalog.addons}
 						difficulty={draft.difficulty}
-						difficultyOptions={props.eventCatalog.difficulties}
+						difficultyOptions={difficultyOptions}
 						onActivityTypeChange={dispatchers.setActivityType}
 						onAddonChange={dispatchers.setAddon}
 						onDifficultyChange={dispatchers.setDifficulty}
@@ -118,7 +140,7 @@ export function CreateEventForm(props: CreateEventFormProps) {
 
 				<aside className={eventUi.previewStack}>
 					<EventPreviewCard
-						difficultyOptions={props.eventCatalog.difficulties}
+						difficultyOptions={difficultyOptions}
 						draft={draft}
 						leaderName={leaderName}
 						leaderRealm={leaderRealm}
@@ -134,17 +156,20 @@ export function CreateEventForm(props: CreateEventFormProps) {
 
 					<Button
 						className={eventUi.actionPrimary}
-						disabled={!canPublish}
-						onClick={() => dispatchers.submitDraft('publish')}
+						aria-busy={isPublishing}
+						disabled={!canPublish || isPublishing}
+						onClick={handlePublish}
 						size='lg'
 						type='button'
 					>
 						<Sparkles className='size-5' aria-hidden='true' />
-						{t(locale, 'events.publishEvent')}
+						{isPublishing
+							? t(locale, 'events.publishingEvent')
+							: t(locale, 'events.publishEvent')}
 					</Button>
 					<Button
 						className={eventUi.actionSecondary}
-						disabled={!canSubmit}
+						disabled={!canSubmit || isPublishing}
 						onClick={() => dispatchers.submitDraft('template')}
 						size='lg'
 						type='button'

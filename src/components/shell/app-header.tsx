@@ -41,6 +41,7 @@ async function getHeaderUser(): Promise<AppHeaderUser | null> {
       topCharacter?.name ??
       session.user.name ??
       t(locale, "header.playerFallback"),
+    isAdmin: session.user.isAdmin,
   };
 }
 

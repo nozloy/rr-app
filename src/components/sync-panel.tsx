@@ -61,7 +61,7 @@ export function SyncPanel() {
             {state.status === "reauth" ? (
               <Button
                 className="mt-3"
-                onClick={() => signIn("battlenet", { callbackUrl: "/dashboard" })}
+                onClick={() => signIn("battlenet", { callbackUrl: "/profile" })}
                 type="button"
                 variant="outline"
               >

@@ -9,9 +9,14 @@ function activity(
   kind: "RAID" | "DUNGEON" | "OPEN_WORLD",
   sortOrder: number,
   isActive = true,
+  difficultyOptions: CatalogDifficultyRecord[] = [],
 ) {
   return {
     artPath: `/${kind.toLowerCase()}/${slug}.jpg`,
+    difficultyOptions: difficultyOptions.map((difficulty, index) => ({
+      difficulty,
+      sortOrder: index,
+    })),
     isActive,
     kind,
     nameEn: `${slug} en`,
@@ -45,6 +50,13 @@ const difficulties: CatalogDifficultyRecord[] = [
     slug: "mythic",
     sortOrder: 2,
   },
+  {
+    isActive: true,
+    labelEn: "Flexible Mythic",
+    labelRu: "Гибкий Мифический",
+    slug: "flex-mythic",
+    sortOrder: 3,
+  },
 ];
 
 describe("activity catalog", () => {
@@ -53,10 +65,19 @@ describe("activity catalog", () => {
       {
         isActive: true,
         items: [
-          { activity: activity("second-raid", "RAID", 1), sortOrder: 1 },
+          {
+            activity: activity("second-raid", "RAID", 1, true, [
+              difficulties[1],
+              difficulties[3],
+            ]),
+            sortOrder: 1,
+          },
           { activity: activity("first-raid", "RAID", 0), sortOrder: 0 },
           { activity: activity("inactive-raid", "RAID", 2, false), sortOrder: 2 },
-          { activity: activity("farm", "OPEN_WORLD", 0), sortOrder: 3 },
+          {
+            activity: { ...activity("farm", "OPEN_WORLD", 0), artPath: "" },
+            sortOrder: 3,
+          },
         ],
         kind: "EXPANSION",
         nameEn: "Midnight",
@@ -97,6 +118,7 @@ describe("activity catalog", () => {
     ]);
     expect(catalog.optionsByAddon.midnight["open-world"][0]).toMatchObject({
       activityType: "open-world",
+      artPath: "/home/raid-reminder-mark.png",
       name: "farm ru",
     });
     expect(catalog.optionsByAddon.midnight.season[0]).toMatchObject({
@@ -104,6 +126,16 @@ describe("activity catalog", () => {
       slug: "season-dungeon",
       tag: "ПОДЗЕМЕЛЬЕ",
     });
+    expect(
+      catalog.difficultiesByActivitySlug["first-raid"].map(
+        (option) => option.difficulty,
+      ),
+    ).toEqual(["normal", "heroic", "mythic"]);
+    expect(
+      catalog.difficultiesByActivitySlug["second-raid"].map(
+        (option) => option.label,
+      ),
+    ).toEqual(["Героик", "Гибкий Мифический"]);
   });
 
   it("keeps inactive groups out of the form catalog", () => {
@@ -128,5 +160,6 @@ describe("activity catalog", () => {
 
     expect(catalog.addons).toEqual([]);
     expect(catalog.optionsByAddon).toEqual({});
+    expect(catalog.difficultiesByActivitySlug).toEqual({});
   });
 });

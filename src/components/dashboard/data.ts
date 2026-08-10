@@ -36,7 +36,7 @@ function dashboardRaid(slug: string, fallbackIndex: number): RaidDefinition {
 
 export const dashboardNavItems = [
   { label: "Главная", href: "/" },
-  { label: "Кабинет", href: "/dashboard" },
+  { label: "Кабинет", href: "/profile" },
   { label: "Создать баннер", href: "/banners/new" },
   { label: "Импорт", href: "/banners/import" },
   { label: "Проверить кд", href: "/raidcheck" },

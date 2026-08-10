@@ -137,6 +137,7 @@ export default async function NewBannerPage({
     avatarUrl: topCharacter?.avatarUrl ?? topCharacter?.thumbnailUrl ?? session.user.image ?? null,
     displayName:
       topCharacter?.name ?? session.user.name ?? t(locale, "header.playerFallback"),
+    isAdmin: session.user.isAdmin,
   };
   const defaultCharacter = characters[0];
   const defaultDungeon = currentSeasonDungeons[0];
@@ -158,7 +159,7 @@ export default async function NewBannerPage({
                   </p>
                 </div>
                 <Button asChild variant="outline">
-                  <Link href="/dashboard">
+                  <Link href="/profile">
                     <ArrowLeft className="size-4" aria-hidden="true" />
                     {t(locale, "banners.backToDashboard")}
                   </Link>
@@ -231,7 +232,7 @@ export default async function NewBannerPage({
               </p>
             </div>
             <Button asChild variant="outline">
-              <Link href="/dashboard">
+              <Link href="/profile">
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 {t(locale, "banners.backToDashboard")}
               </Link>
@@ -515,7 +516,7 @@ export default async function NewBannerPage({
                   {t(locale, "banners.createBanner")}
                 </SubmitButton>
                 <Button asChild variant="outline">
-                  <Link href="/dashboard">{t(locale, "common.cancel")}</Link>
+                  <Link href="/profile">{t(locale, "common.cancel")}</Link>
                 </Button>
               </div>
             </form>

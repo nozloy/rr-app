@@ -5,9 +5,9 @@ setfenv(1, RR.Env)
 -- SlashCommands.lua
 _G.SLASH_RAIDREMINDER1 = "/rr"
 _G.SLASH_RAIDREMINDER2 = "/raidreminder"
-SlashCmdList.RAIDREMINDER = ShowExportFrame
+SlashCmdList.RAIDREMINDER = RR.UI.ShowExportFrame
 
 _G.SLASH_RAIDREMINDER_RAIDS1 = "/rraid"
-SlashCmdList.RAIDREMINDER_RAIDS = ShowRaidLockoutFrame
+SlashCmdList.RAIDREMINDER_RAIDS = RR.UI.ShowRaidLockoutFrame
 
 print(string.format(InterfaceText("loadMessage"), ADDON_NAME))

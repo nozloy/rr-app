@@ -11,6 +11,9 @@ type BattleNetProfile = Profile & {
   battletag?: string;
 };
 
+const ADMIN_BATTLE_TAG = "ДикийОпоссум#21251";
+const ADMIN_BATTLENET_PROVIDER_ACCOUNT_ID = "1171677661";
+
 const providers = hasRequiredRuntimeEnv()
   ? [
       BattleNetProvider({
@@ -58,7 +61,10 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async session({ session, user }) {
       if (session.user) {
+        const userWithAdmin = user as User & { isAdmin?: boolean };
+
         session.user.id = user.id;
+        session.user.isAdmin = userWithAdmin.isAdmin ?? false;
       }
 
       return session;
@@ -130,19 +136,32 @@ export const authOptions: NextAuthOptions = {
         profile?.name ??
         battleNetProfile?.battle_tag ??
         battleNetProfile?.battletag;
+      const isKnownAdmin =
+        account?.provider === "battlenet" &&
+        (account.providerAccountId === ADMIN_BATTLENET_PROVIDER_ACCOUNT_ID ||
+          battleTag === ADMIN_BATTLE_TAG);
 
-      if (
-        account?.provider !== "battlenet" ||
-        !user.id ||
-        !battleTag ||
-        user.name === battleTag
-      ) {
+      if (account?.provider !== "battlenet" || !user.id) {
+        return;
+      }
+
+      const data: { name?: string; isAdmin?: boolean } = {};
+
+      if (battleTag && user.name !== battleTag) {
+        data.name = battleTag;
+      }
+
+      if (isKnownAdmin) {
+        data.isAdmin = true;
+      }
+
+      if (Object.keys(data).length === 0) {
         return;
       }
 
       await prisma.user.update({
         where: { id: user.id },
-        data: { name: battleTag },
+        data,
       });
     },
   },

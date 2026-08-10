@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
 import { SiteFooter } from "@/components/home/site-footer";
+import { ConditionalSiteFooter } from "@/components/shell/conditional-site-footer";
 import { LocaleProvider } from "@/components/shell/locale-provider";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,9 @@ export default async function RootLayout({
         <LocaleProvider locale={locale}>
           <div className="site-shell">
             <div className="site-shell-content">{children}</div>
-            <SiteFooter locale={locale} />
+            <ConditionalSiteFooter>
+              <SiteFooter locale={locale} />
+            </ConditionalSiteFooter>
           </div>
         </LocaleProvider>
       </body>

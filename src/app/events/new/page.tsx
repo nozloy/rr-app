@@ -65,6 +65,7 @@ export default async function NewEventPage() {
       session.user.image ??
       null,
     displayName,
+    isAdmin: session.user.isAdmin,
   };
 
   return (

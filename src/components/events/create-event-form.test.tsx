@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LocaleProvider } from '@/components/shell/locale-provider'
 import { CreateEventForm } from './create-event-form'
@@ -10,6 +10,21 @@ type MockImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
 	priority?: boolean
 	src: string
 }
+
+const { createScheduledEventActionMock, pushMock } = vi.hoisted(() => ({
+	createScheduledEventActionMock: vi.fn(),
+	pushMock: vi.fn(),
+}))
+
+vi.mock('@/actions/events', () => ({
+	createScheduledEventAction: createScheduledEventActionMock,
+}))
+
+vi.mock('next/navigation', () => ({
+	useRouter: () => ({
+		push: pushMock,
+	}),
+}))
 
 vi.mock('next/image', async () => {
 	const ReactModule = await import('react')
@@ -49,13 +64,27 @@ const eventCatalog: EventCatalog = {
 		{ difficulty: 'heroic', label: 'Героик' },
 		{ difficulty: 'mythic', label: 'Мифик' },
 	],
+	difficultiesByActivitySlug: {
+		'march-on-queldanas': [
+			{ difficulty: 'normal', label: 'Нормал' },
+			{ difficulty: 'heroic', label: 'Героик' },
+			{ difficulty: 'mythic', label: 'Мифик' },
+			{ difficulty: 'flex-mythic', label: 'Гибкий Мифический' },
+		],
+		'nerubar-palace': [
+			{ difficulty: 'normal', label: 'Нормал' },
+			{ difficulty: 'heroic', label: 'Героик' },
+			{ difficulty: 'mythic', label: 'Мифик' },
+			{ difficulty: 'flex-mythic', label: 'Гибкий Мифический' },
+		],
+	},
 	optionsByAddon: {
 		midnight: {
 			dungeon: [],
 			'open-world': [
 				{
 					activityType: 'open-world',
-					artPath: '/activities/farm_styled_16x9.jpg',
+					artPath: '/activities/farm_styled_16x9.png',
 					name: 'Фарм',
 					shortName: 'Фарм',
 					slug: 'farm',
@@ -79,7 +108,7 @@ const eventCatalog: EventCatalog = {
 			'open-world': [
 				{
 					activityType: 'open-world',
-					artPath: '/activities/farm_styled_16x9.jpg',
+					artPath: '/activities/farm_styled_16x9.png',
 					name: 'Фарм',
 					shortName: 'Фарм',
 					slug: 'farm',
@@ -115,6 +144,10 @@ function renderCreateEventForm() {
 }
 
 describe('CreateEventForm', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
 	it('defaults to normal difficulty and updates the preview when changed', async () => {
 		const user = userEvent.setup()
 
@@ -150,5 +183,66 @@ describe('CreateEventForm', () => {
 		await user.click(mythicButton)
 
 		expect(screen.getByText('Мифик', { selector: 'strong' })).toBeInTheDocument()
+
+		await user.click(screen.getByRole('button', { name: 'Мифик' }))
+		const flexMythicButton = screen.getByRole('button', {
+			name: 'Гибкий Мифический',
+		})
+		await user.click(flexMythicButton)
+
+		expect(
+			screen.getByText('Гибкий Мифический', { selector: 'strong' }),
+		).toBeInTheDocument()
+	})
+
+	it('publishes the draft and redirects to the profile events tab', async () => {
+		const user = userEvent.setup()
+		createScheduledEventActionMock.mockResolvedValue({
+			eventId: 'event-1',
+			message: 'Событие сохранено.',
+			status: 'success',
+		})
+
+		renderCreateEventForm()
+
+		await user.click(
+			screen.getByRole('button', { name: 'Опубликовать событие' }),
+		)
+
+		await waitFor(() => {
+			expect(createScheduledEventActionMock).toHaveBeenCalledWith(
+				expect.objectContaining({
+					activityType: 'raid',
+					addon: 'midnight',
+					characterId: 'character-1',
+					date: '2026-06-28',
+					difficulty: 'normal',
+					selectedInstanceSlugs: ['march-on-queldanas'],
+					time: '20:30',
+				}),
+			)
+		})
+		expect(pushMock).toHaveBeenCalledWith('/profile?tab=my-events')
+	})
+
+	it('shows a server error when publish fails', async () => {
+		const user = userEvent.setup()
+		createScheduledEventActionMock.mockResolvedValue({
+			message: 'Одна или несколько выбранных активностей недоступны.',
+			status: 'error',
+		})
+
+		renderCreateEventForm()
+
+		await user.click(
+			screen.getByRole('button', { name: 'Опубликовать событие' }),
+		)
+
+		expect(
+			await screen.findByText(
+				'Одна или несколько выбранных активностей недоступны.',
+			),
+		).toBeInTheDocument()
+		expect(pushMock).not.toHaveBeenCalled()
 	})
 })

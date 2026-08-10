@@ -8,17 +8,21 @@ datasource db {
 }
 
 model User {
-  id            String      @id @default(cuid())
-  name          String?
-  email         String?     @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  characters    Character[]
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String?             @unique
+  emailVerified      DateTime?
+  image              String?
+  isAdmin            Boolean             @default(false)
+  isPremium          Boolean             @default(false)
+  premiumExpiresAt   DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accounts           Account[]
+  sessions           Session[]
+  characters         Character[]
   raidCheckBookmarks RaidCheckBookmark[]
+  scheduledEvents    ScheduledEvent[]
 }
 
 enum ActivityKind {
@@ -30,6 +34,29 @@ enum ActivityKind {
 enum ActivityGroupKind {
   EXPANSION
   SEASON
+}
+
+enum ScheduledEventActivityType {
+  RAID
+  DUNGEON
+  SEASON
+  OPEN_WORLD
+}
+
+enum ScheduledEventLeaderMode {
+  CHARACTER
+  MANUAL
+}
+
+enum ScheduledEventStatus {
+  PUBLISHED
+}
+
+enum EventPublishTarget {
+  DISCORD
+  TELEGRAM
+  APP
+  CUSTOM
 }
 
 model Account {
@@ -70,52 +97,53 @@ model VerificationToken {
 }
 
 model Character {
-  id           String   @id @default(cuid())
-  userId       String
-  characterId  BigInt
-  name         String
-  realm        String
-  realmSlug    String
-  className    String
-  raceName     String
-  factionName  String
-  level        Int
-  activeSpec   String?
-  itemLevel    Int
-  thumbnailUrl String?
-  avatarUrl    String?
-  isActive     Boolean  @default(true)
-  lastSyncedAt DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  userId          String
+  characterId     BigInt
+  name            String
+  realm           String
+  realmSlug       String
+  className       String
+  raceName        String
+  factionName     String
+  level           Int
+  activeSpec      String?
+  itemLevel       Int
+  thumbnailUrl    String?
+  avatarUrl       String?
+  isActive        Boolean          @default(true)
+  lastSyncedAt    DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduledEvents ScheduledEvent[]
 
   @@unique([userId, characterId])
   @@index([userId, isActive])
 }
 
 model WowCharacter {
-  id             String    @id @default(cuid())
-  name           String
-  serverSlug     String
-  serverRegion   String
-  warcraftLogsId Int?
-  lastFetchedAt  DateTime?
-  rankingsJson   Json?
-  gearJson       Json?
-  averageParse   Float?
-  bestParse      Float?
-  raidStatsJson  Json?
-  raiderIoProfileJson Json?
-  raiderIoScore Float?
-  raiderIoProfileUrl String?
-  raiderIoFetchedAt DateTime?
-  blizzardEquipmentJson Json?
-  blizzardEquippedItemLevel Int?
-  blizzardTopItemJson Json?
+  id                         String    @id @default(cuid())
+  name                       String
+  serverSlug                 String
+  serverRegion               String
+  warcraftLogsId             Int?
+  lastFetchedAt              DateTime?
+  rankingsJson               Json?
+  gearJson                   Json?
+  averageParse               Float?
+  bestParse                  Float?
+  raidStatsJson              Json?
+  raiderIoProfileJson        Json?
+  raiderIoScore              Float?
+  raiderIoProfileUrl         String?
+  raiderIoFetchedAt          DateTime?
+  blizzardEquipmentJson      Json?
+  blizzardEquippedItemLevel  Int?
+  blizzardTopItemJson        Json?
   blizzardEquipmentFetchedAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   @@unique([name, serverSlug, serverRegion])
   @@index([serverRegion, serverSlug])
@@ -137,22 +165,24 @@ model RaidCheckBookmark {
 }
 
 model Activity {
-  id                   String              @id @default(cuid())
-  slug                 String              @unique
+  id                   String                   @id @default(cuid())
+  slug                 String                   @unique
   kind                 ActivityKind
   nameRu               String
   nameEn               String
   shortNameRu          String
   shortNameEn          String
   artPath              String
-  aliases              String[]            @default([])
+  aliases              String[]                 @default([])
   warcraftLogsZoneId   Int?
   warcraftLogsZoneName String?
-  isActive             Boolean             @default(true)
-  sortOrder            Int                 @default(0)
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  isActive             Boolean                  @default(true)
+  sortOrder            Int                      @default(0)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  difficultyOptions    ActivityDifficultyOption[]
   groupItems           ActivityGroupItem[]
+  scheduledEventItems  ScheduledEventActivity[]
 
   @@index([kind, isActive, sortOrder])
 }
@@ -163,6 +193,7 @@ model ActivityGroup {
   kind      ActivityGroupKind
   nameRu    String
   nameEn    String
+  artPath   String?
   startsAt  DateTime?
   endsAt    DateTime?
   isActive  Boolean             @default(true)
@@ -189,14 +220,85 @@ model ActivityGroupItem {
 }
 
 model EventDifficultyOption {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  labelRu   String
-  labelEn   String
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String           @id @default(cuid())
+  slug            String           @unique
+  labelRu         String
+  labelEn         String
+  isActive        Boolean          @default(true)
+  sortOrder       Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  activityOptions ActivityDifficultyOption[]
+  scheduledEvents ScheduledEvent[]
 
   @@index([isActive, sortOrder])
+}
+
+model ActivityDifficultyOption {
+  id           String                @id @default(cuid())
+  activityId   String
+  difficultyId String
+  sortOrder    Int                   @default(0)
+  createdAt    DateTime              @default(now())
+  activity     Activity              @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  difficulty   EventDifficultyOption @relation(fields: [difficultyId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, difficultyId])
+  @@index([activityId, sortOrder])
+  @@index([difficultyId])
+}
+
+model ScheduledEvent {
+  id                String                     @id @default(cuid())
+  userId            String
+  addonSlug         String
+  activityType      ScheduledEventActivityType
+  difficultyId      String
+  startsAt          DateTime
+  localDate         String
+  localTime         String
+  timeZone          String                     @default("Europe/Moscow")
+  leaderMode        ScheduledEventLeaderMode
+  leaderCharacterId String?
+  leaderName        String
+  leaderRealm       String
+  tankMin           Int
+  tankMax           Int
+  healerMin         Int
+  healerMax         Int
+  damageMin         Int
+  damageMax         Int
+  hasPaidSlots      Boolean                    @default(false)
+  paidSlots         Int                        @default(0)
+  paidSlotPrice     Int                        @default(0)
+  hasUnroll         Boolean                    @default(false)
+  unrollItemIds     String[]                   @default([])
+  unrollTemplateId  String?
+  publishTargets    EventPublishTarget[]       @default([])
+  status            ScheduledEventStatus       @default(PUBLISHED)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaderCharacter   Character?                 @relation(fields: [leaderCharacterId], references: [id], onDelete: SetNull)
+  difficulty        EventDifficultyOption      @relation(fields: [difficultyId], references: [id], onDelete: Restrict)
+  activities        ScheduledEventActivity[]
+
+  @@index([userId, startsAt])
+  @@index([status, startsAt])
+  @@index([difficultyId])
+  @@index([leaderCharacterId])
+}
+
+model ScheduledEventActivity {
+  id         String         @id @default(cuid())
+  eventId    String
+  activityId String
+  sortOrder  Int            @default(0)
+  createdAt  DateTime       @default(now())
+  event      ScheduledEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, activityId])
+  @@index([activityId])
+  @@index([eventId, sortOrder])
 }

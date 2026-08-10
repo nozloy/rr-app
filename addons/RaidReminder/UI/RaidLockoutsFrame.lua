@@ -287,3 +287,5 @@ function ShowRaidLockoutFrame()
   raidLockoutFrame:Show()
   RefreshRaidLockoutFrame()
 end
+
+RR.UI.ShowRaidLockoutFrame = ShowRaidLockoutFrame

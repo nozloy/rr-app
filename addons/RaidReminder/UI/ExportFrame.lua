@@ -18,9 +18,9 @@ function RefreshExport(scanMode)
     return
   end
 
-  local fields = GetExportFields()
-  editBox:SetText(BuildExportString(fields))
-  RefreshRaidCheck(fields, scanMode or GEAR_SCAN_MODE.full)
+  local fields = RR.Group.GetExportFields()
+  editBox:SetText(RR.Export.BuildExportString(fields))
+  RR.Readiness.Refresh(fields, scanMode or GEAR_SCAN_MODE.full)
   SelectExportText()
 end
 
@@ -190,3 +190,6 @@ function ShowExportFrame()
     C_Timer.After(0, SelectExportText)
   end
 end
+
+RR.UI.RefreshExport = RefreshExport
+RR.UI.ShowExportFrame = ShowExportFrame

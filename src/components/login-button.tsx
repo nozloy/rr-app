@@ -18,7 +18,7 @@ export function LoginButton({
   return (
     <Button
       disabled={disabled}
-      onClick={() => signIn("battlenet", { callbackUrl: "/dashboard" })}
+      onClick={() => signIn("battlenet", { callbackUrl: "/profile" })}
       size={size}
       type="button"
       variant={variant}

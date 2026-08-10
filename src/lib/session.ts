@@ -15,3 +15,13 @@ export async function requireSession() {
 
   return session;
 }
+
+export async function requireAdminSession() {
+  const session = await requireSession();
+
+  if (!session.user.isAdmin) {
+    redirect("/profile");
+  }
+
+  return session;
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer } from 'react'
 import { useAppLocale } from '@/components/shell/locale-provider'
 import { t } from '@/lib/i18n'
 import {
@@ -11,6 +11,7 @@ import {
 import type {
 	CreateEventDraft,
 	CreateEventFormProps,
+	DifficultyOption,
 	EventActivityType,
 	EventDifficulty,
 	EventPublishTarget,
@@ -133,6 +134,67 @@ function createInitialState({
 		},
 		statusMessage: null,
 	}
+}
+
+function getDifficultyKey(option: DifficultyOption) {
+	return option.difficulty
+}
+
+function getDifficultyOptionsForSelection({
+	activityType,
+	defaultDifficulties,
+	difficultiesByActivitySlug,
+	selectedInstances,
+}: {
+	activityType: EventActivityType
+	defaultDifficulties: DifficultyOption[]
+	difficultiesByActivitySlug: CreateEventFormProps['eventCatalog']['difficultiesByActivitySlug']
+	selectedInstances: Array<{ slug: string }>
+}) {
+	if (activityType !== 'raid' || selectedInstances.length === 0) {
+		return defaultDifficulties
+	}
+
+	const allowedByRaid = selectedInstances.map(instance => {
+		const configured = difficultiesByActivitySlug[instance.slug]
+
+		return configured && configured.length > 0 ? configured : defaultDifficulties
+	})
+	const allowedKeys = allowedByRaid.map(options =>
+		new Set(options.map(getDifficultyKey)),
+	)
+	const mergedOptions = new Map<string, DifficultyOption>()
+
+	for (const options of allowedByRaid) {
+		for (const option of options) {
+			mergedOptions.set(option.difficulty, option)
+		}
+	}
+
+	const firstAllowed = allowedKeys[0]
+
+	if (!firstAllowed) {
+		return defaultDifficulties
+	}
+
+	const intersection = Array.from(mergedOptions.values())
+		.filter(option => allowedKeys.every(keys => keys.has(option.difficulty)))
+		.sort((a, b) => {
+			const defaultA = defaultDifficulties.findIndex(
+				option => option.difficulty === a.difficulty,
+			)
+			const defaultB = defaultDifficulties.findIndex(
+				option => option.difficulty === b.difficulty,
+			)
+
+			if (defaultA !== -1 || defaultB !== -1) {
+				return (defaultA === -1 ? 999 : defaultA) - (defaultB === -1 ? 999 : defaultB)
+			}
+
+			return a.label.localeCompare(b.label)
+		})
+
+	return intersection.length > 0 ? intersection : defaultDifficulties
 }
 
 function updateRole(
@@ -409,6 +471,33 @@ export function useCreateEventDraft({
 	const selectedInstances = instanceOptions.filter(instance =>
 		draft.selectedInstanceSlugs.includes(instance.slug),
 	)
+	const difficultyOptions = useMemo(
+		() =>
+			getDifficultyOptionsForSelection({
+				activityType: draft.activityType,
+				defaultDifficulties: eventCatalog.difficulties,
+				difficultiesByActivitySlug: eventCatalog.difficultiesByActivitySlug,
+				selectedInstances,
+			}),
+		[
+			draft.activityType,
+			eventCatalog.difficulties,
+			eventCatalog.difficultiesByActivitySlug,
+			selectedInstances,
+		],
+	)
+	const hasSelectedDifficulty = difficultyOptions.some(
+		option => option.difficulty === draft.difficulty,
+	)
+
+	useEffect(() => {
+		if (!hasSelectedDifficulty && difficultyOptions[0]) {
+			dispatch({
+				difficulty: difficultyOptions[0].difficulty,
+				type: 'set-difficulty',
+			})
+		}
+	}, [draft.difficulty, difficultyOptions, hasSelectedDifficulty])
 	const fallbackOpenWorldInstance =
 		instanceOptionsByType['open-world'][0] ??
 		Object.values(eventCatalog.optionsByAddon).find(
@@ -460,6 +549,7 @@ export function useCreateEventDraft({
 	return {
 		canPublish,
 		canSubmit,
+		difficultyOptions,
 		dispatchers: {
 			removeInstance: (slug: string) =>
 				dispatch({ slug, type: 'remove-instance' }),
@@ -499,6 +589,8 @@ export function useCreateEventDraft({
 				dispatch({ date, type: 'set-date-time' }),
 			setLeaderMode: (mode: LeaderMode) =>
 				dispatch({ mode, type: 'set-leader-mode' }),
+			setStatusMessage: (message: string) =>
+				dispatch({ message, type: 'submit' }),
 			setManualLeaderName: (value: string) =>
 				dispatch({
 					field: 'manualLeaderName',
