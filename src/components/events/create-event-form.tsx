@@ -2,10 +2,15 @@
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Sparkles } from 'lucide-react'
-import { createScheduledEventAction } from '@/actions/events'
+import { Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+	createScheduledEventAction,
+	updateScheduledEventAction,
+} from '@/actions/events'
 import { useAppLocale } from '@/components/shell/locale-provider'
 import { Button } from '@/components/ui/button'
+import { EventTemplateManager } from './event-template-manager'
 import {
 	DateTimeSection,
 	EventParamsSection,
@@ -54,14 +59,27 @@ export function CreateEventForm(props: CreateEventFormProps) {
 		}
 
 		startPublishingTransition(async () => {
-			const result = await createScheduledEventAction(draft)
+			const result =
+				props.mode === 'edit' && props.eventId && props.eventVersion
+					? await updateScheduledEventAction({
+							...draft,
+							eventId: props.eventId,
+							version: props.eventVersion,
+						})
+					: await createScheduledEventAction(draft)
 
 			if (result.status === 'success') {
-				router.push('/profile?tab=my-events')
+				if (result.warnings.length > 0) {
+					toast.warning(result.warnings.join(' '))
+				} else {
+					toast.success(result.message)
+				}
+				router.push(`/events/${result.eventId}${props.mode === 'edit' ? '?updated=1' : '?created=1'}`)
 				return
 			}
 
 			dispatchers.setStatusMessage(result.message)
+			toast.error(result.message)
 		})
 	}
 
@@ -69,7 +87,13 @@ export function CreateEventForm(props: CreateEventFormProps) {
 		<div className={eventUi.shell}>
 			<section className={eventUi.hero}>
 				<div>
-					<h1 className={eventUi.heroTitle}>{t(locale, 'events.heroTitle')}</h1>
+					<h1 className={eventUi.heroTitle}>
+						{props.mode === 'edit'
+							? locale === 'ru'
+								? 'Редактировать событие'
+								: 'Edit event'
+							: t(locale, 'events.heroTitle')}
+					</h1>
 					<p className={eventUi.heroCopy}>
 						{t(locale, 'events.heroCopy')}
 					</p>
@@ -93,17 +117,26 @@ export function CreateEventForm(props: CreateEventFormProps) {
 						onDateChange={dispatchers.setDate}
 						onDateTimeChange={dispatchers.setDateTime}
 						onTimePartChange={dispatchers.setTimePart}
+						onTimeZoneChange={dispatchers.setTimeZone}
 						time={draft.time}
+						timeZone={draft.timeZone}
 					/>
 
 					<EventParamsSection
 						activityType={draft.activityType}
 						addon={draft.addon}
 						addons={props.eventCatalog.addons}
+						contentScope={draft.contentScope}
+						contentScopes={props.eventCatalog.contentScopes.filter(option =>
+							Boolean(
+								props.eventCatalog.optionsByAddon[draft.addon]?.[option.value],
+							),
+						)}
 						difficulty={draft.difficulty}
 						difficultyOptions={difficultyOptions}
 						onActivityTypeChange={dispatchers.setActivityType}
 						onAddonChange={dispatchers.setAddon}
+						onContentScopeChange={dispatchers.setContentScope}
 						onDifficultyChange={dispatchers.setDifficulty}
 					/>
 
@@ -150,6 +183,7 @@ export function CreateEventForm(props: CreateEventFormProps) {
 					/>
 
 					<PublishTargetsBar
+						channelAvailability={props.channelAvailability}
 						onTargetToggle={dispatchers.togglePublishTarget}
 						publishTargets={draft.publishTargets}
 					/>
@@ -164,20 +198,23 @@ export function CreateEventForm(props: CreateEventFormProps) {
 					>
 						<Sparkles className='size-5' aria-hidden='true' />
 						{isPublishing
-							? t(locale, 'events.publishingEvent')
-							: t(locale, 'events.publishEvent')}
+							? props.mode === 'edit'
+								? 'Сохраняем…'
+								: t(locale, 'events.publishingEvent')
+							: props.mode === 'edit'
+								? 'Сохранить изменения'
+								: t(locale, 'events.publishEvent')}
 					</Button>
-					<Button
-						className={eventUi.actionSecondary}
+					<EventTemplateManager
+						channelAvailability={props.channelAvailability}
+						characters={props.characters}
+						defaultTimeZone={props.defaultTimeZone}
 						disabled={!canSubmit || isPublishing}
-						onClick={() => dispatchers.submitDraft('template')}
-						size='lg'
-						type='button'
-						variant='outline'
-					>
-						<Save className='size-5' aria-hidden='true' />
-						{t(locale, 'events.saveAsTemplate')}
-					</Button>
+						draft={draft}
+						eventCatalog={props.eventCatalog}
+						onLoad={dispatchers.replaceDraft}
+						templates={props.templates}
+					/>
 
 					{statusMessage ? (
 						<p className={eventUi.statusNote}>{statusMessage}</p>

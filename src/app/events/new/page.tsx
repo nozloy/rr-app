@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
-import {
-  CreateEventForm,
-  type EventCharacterOption,
-} from "@/components/events/create-event-form";
+import { CreateEventForm } from "@/components/events/create-event-form";
 import styles from "@/components/events/create-event-form.module.css";
 import { AppHeader } from "@/components/shell/app-header";
 import { getEventCatalog } from "@/lib/activity-catalog";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n-server";
+import { getEventChannelAvailability } from "@/lib/event-publication";
+import { toEventTemplateDto } from "@/lib/event-templates";
+import { DEFAULT_EVENT_TIME_ZONE, getTomorrowInputDate } from "@/lib/event-time";
+import {
+  getPreferredCharacter,
+  orderCharactersByPreference,
+} from "@/lib/main-character";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -15,26 +19,14 @@ export const metadata: Metadata = {
   title: "Создать рейд | RaidReminder",
 };
 
-function toInputDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function getTomorrowInputDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-
-  return toInputDate(date);
-}
-
 export default async function NewEventPage() {
   const locale = await getRequestLocale();
   const session = await requireSession();
-  const [characters, eventCatalog]: [EventCharacterOption[], Awaited<ReturnType<typeof getEventCatalog>>] =
-    await Promise.all([
+  const [account, rawCharacters, eventCatalog, rawTemplates] = await Promise.all([
+      prisma.user.findUnique({
+        select: { mainCharacterId: true, timeZone: true },
+        where: { id: session.user.id },
+      }),
       prisma.character.findMany({
         where: {
           isActive: true,
@@ -46,6 +38,7 @@ export default async function NewEventPage() {
           avatarUrl: true,
           className: true,
           id: true,
+          isActive: true,
           itemLevel: true,
           name: true,
           realm: true,
@@ -53,9 +46,20 @@ export default async function NewEventPage() {
         },
       }),
       getEventCatalog(locale),
+      prisma.eventTemplate.findMany({
+        orderBy: [{ updatedAt: "desc" }],
+        where: { userId: session.user.id },
+      }),
     ]);
-
-  const topCharacter = characters[0] ?? null;
+  const orderedCharacters = orderCharactersByPreference(
+    rawCharacters,
+    account?.mainCharacterId,
+  );
+  const topCharacter = getPreferredCharacter(
+    orderedCharacters,
+    account?.mainCharacterId,
+  );
+  const characters = orderedCharacters;
   const displayName =
     topCharacter?.name ?? session.user.name ?? t(locale, "header.playerFallback");
   const headerUser = {
@@ -67,15 +71,22 @@ export default async function NewEventPage() {
     displayName,
     isAdmin: session.user.isAdmin,
   };
+  const defaultTimeZone = account?.timeZone ?? DEFAULT_EVENT_TIME_ZONE;
+  const templates = rawTemplates
+    .map(toEventTemplateDto)
+    .filter((template): template is NonNullable<typeof template> => template !== null);
 
   return (
     <main className={styles.createEventPage} id="top">
       <AppHeader user={headerUser} />
       <CreateEventForm
+        channelAvailability={getEventChannelAvailability()}
         characters={characters}
-        defaultDate={getTomorrowInputDate()}
+        defaultDate={getTomorrowInputDate(defaultTimeZone)}
+        defaultTimeZone={defaultTimeZone}
         displayName={displayName}
         eventCatalog={eventCatalog}
+        templates={templates}
       />
     </main>
   );

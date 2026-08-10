@@ -85,17 +85,45 @@ describe("activity catalog", () => {
         slug: "midnight",
         sortOrder: 0,
       },
+      {
+        isActive: true,
+        items: [],
+        kind: "EXPANSION",
+        nameEn: "The War Within",
+        nameRu: "The War Within",
+        slug: "the-war-within",
+        sortOrder: 1,
+      },
     ];
     const seasonGroups: CatalogGroupRecord[] = [
       {
         isActive: true,
         items: [
+          {
+            activity: activity("season-two-dungeon", "DUNGEON", 0),
+            sortOrder: 0,
+          },
+          {
+            activity: activity("season-two-raid", "RAID", 0),
+            sortOrder: 1,
+          },
+        ],
+        kind: "SEASON",
+        nameEn: "Season 2 · Midnight",
+        nameRu: "Сезон 2 · Midnight",
+        slug: "midnight-season-2",
+        sortOrder: 1,
+      },
+      {
+        isActive: true,
+        items: [
+          { activity: activity("season-one-raid", "RAID", 0), sortOrder: 0 },
           { activity: activity("season-dungeon", "DUNGEON", 0), sortOrder: 0 },
         ],
         kind: "SEASON",
-        nameEn: "Current season",
-        nameRu: "Текущий сезон",
-        slug: "current-season",
+        nameEn: "Season 1 · Midnight",
+        nameRu: "Сезон 1 · Midnight",
+        slug: "midnight-season-1",
         sortOrder: 0,
       },
     ];
@@ -105,26 +133,58 @@ describe("activity catalog", () => {
       "ru",
     );
 
-    expect(catalog.addons).toEqual([{ label: "Midnight", value: "midnight" }]);
+    expect(catalog.addons).toEqual([
+      { label: "Midnight", value: "midnight" },
+      { label: "The War Within", value: "the-war-within" },
+    ]);
     expect(catalog.defaultAddon).toBe("midnight");
+    expect(catalog.defaultContentScope).toBe("midnight-season-2");
+    expect(catalog.contentScopes).toEqual([
+      { label: "Сезон 2", value: "midnight-season-2" },
+      { label: "Сезон 1", value: "midnight-season-1" },
+      { label: "Все", value: "expansion" },
+    ]);
     expect(catalog.difficulties.map((option) => option.label)).toEqual([
       "Нормал",
       "Героик",
       "Мифик",
     ]);
-    expect(catalog.optionsByAddon.midnight.raid.map((option) => option.slug)).toEqual([
-      "first-raid",
-      "second-raid",
-    ]);
-    expect(catalog.optionsByAddon.midnight["open-world"][0]).toMatchObject({
+    expect(
+      catalog.optionsByAddon.midnight.expansion.raid.map((option) => option.slug),
+    ).toEqual(["first-raid", "second-raid"]);
+    expect(catalog.optionsByAddon.midnight.expansion["open-world"][0]).toMatchObject({
       activityType: "open-world",
       artPath: "/home/raid-reminder-mark.png",
       name: "farm ru",
     });
-    expect(catalog.optionsByAddon.midnight.season[0]).toMatchObject({
-      activityType: "season",
+    expect(
+      catalog.optionsByAddon.midnight["midnight-season-2"].dungeon.map(
+        (option) => option.slug,
+      ),
+    ).toEqual(["season-two-dungeon"]);
+    expect(
+      catalog.optionsByAddon.midnight["midnight-season-2"].raid.map(
+        (option) => option.slug,
+      ),
+    ).toEqual(["season-two-raid"]);
+    expect(
+      catalog.optionsByAddon.midnight["midnight-season-1"].dungeon[0],
+    ).toMatchObject({
+      activityType: "dungeon",
       slug: "season-dungeon",
       tag: "ПОДЗЕМЕЛЬЕ",
+    });
+    expect(
+      catalog.optionsByAddon.midnight["midnight-season-1"].raid.map(
+        (option) => option.slug,
+      ),
+    ).toEqual(["season-one-raid"]);
+    expect(catalog.optionsByAddon["the-war-within"]).toEqual({
+      expansion: {
+        dungeon: [],
+        "open-world": [],
+        raid: [],
+      },
     });
     expect(
       catalog.difficultiesByActivitySlug["first-raid"].map(
@@ -159,6 +219,10 @@ describe("activity catalog", () => {
     );
 
     expect(catalog.addons).toEqual([]);
+    expect(catalog.defaultContentScope).toBe("expansion");
+    expect(catalog.contentScopes).toEqual([
+      { label: "All", value: "expansion" },
+    ]);
     expect(catalog.optionsByAddon).toEqual({});
     expect(catalog.difficultiesByActivitySlug).toEqual({});
   });

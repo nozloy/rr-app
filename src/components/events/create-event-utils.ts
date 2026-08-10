@@ -85,7 +85,7 @@ export function getSeasonDungeonOptions(
 	locale: AppLocale = 'ru',
 ): EventInstanceOption[] {
 	return currentSeasonDungeons.map(dungeon => ({
-		activityType: 'season',
+		activityType: 'dungeon',
 		artPath: dungeon.artPath,
 		name: getLocalizedDungeonName(dungeon, locale),
 		shortName: dungeon.shortName,

@@ -404,5 +404,19 @@
     "source": "Wowhead",
     "pageUrl": "https://www.wowhead.com/guide/midnight/raids/sporefall-overview-location-rewards-boss",
     "imageUrl": "https://wow.zamimg.com/uploads/guide/header/675a1121b7a2db0b8c36a74176c6b4f8b20bcb95.jpg"
+  },
+  {
+    "slug": "venomous-abyss",
+    "name": "The Venomous Abyss",
+    "source": "Wowhead",
+    "pageUrl": "https://www.wowhead.com/ptr/guide/midnight/raids/the-venomous-abyss-overview-location-rewards-bosses",
+    "imageUrl": "https://wow.zamimg.com/uploads/guide/header/9ee78a923c147797e674597931de05f25eab1247.jpg"
+  },
+  {
+    "slug": "tidebound-grotto",
+    "name": "The Tidebound Grotto",
+    "source": "Wowhead",
+    "pageUrl": "https://www.wowhead.com/ptr/guide/midnight/nymrissa-wavecaller-tidebound-grotto-lair-boss-strategy-rewards",
+    "imageUrl": "https://wow.zamimg.com/uploads/guide/header/78505cd339948ac9ade920ec21aa8b2ba5bc3b0a.jpg"
   }
 ]

@@ -106,7 +106,7 @@ describe('create event utils', () => {
 		const options = getSeasonDungeonOptions()
 
 		expect(options).toHaveLength(currentSeasonDungeons.length)
-		expect(options.every(option => option.activityType === 'season')).toBe(true)
+		expect(options.every(option => option.activityType === 'dungeon')).toBe(true)
 		expect(new Set(options.map(option => option.slug))).toEqual(
 			new Set(currentSeasonDungeons.map(dungeon => dungeon.slug)),
 		)
@@ -122,13 +122,20 @@ describe('create event utils', () => {
 		)
 	})
 
-	it('keeps Altar of Fangs out of the current season dungeon tab', () => {
+	it('uses the Midnight Season 2 dungeon rotation', () => {
 		expect(currentExpansionDungeons.map(dungeon => dungeon.slug)).toContain(
 			'altar-of-fangs',
 		)
-		expect(currentSeasonDungeons.map(dungeon => dungeon.slug)).not.toContain(
+		expect(currentSeasonDungeons.map(dungeon => dungeon.slug)).toEqual([
 			'altar-of-fangs',
-		)
+			'murder-row',
+			'den-of-nalorakk',
+			'blinding-vale',
+			'voidscar-arena',
+			'ruby-life-pools',
+			'kings-rest',
+			'temple-of-sethraliss',
+		])
 	})
 
 	it('uses english raid abbreviations for midnight raid short labels', () => {

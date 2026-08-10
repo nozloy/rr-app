@@ -85,6 +85,12 @@ describe('raids', () => {
 			'/raids/the_voidspire_styled_16x9.png',
 		)
 		expect(getRaidByName('Споропад')?.slug).toBe('sporefall')
+		expect(getRaidByName('Ядовитая бездна')?.slug).toBe('venomous-abyss')
+		expect(getRaidByName('Приливный Грот')?.slug).toBe('tidebound-grotto')
+		expect(getRaidByName('The Tidebound Grotto')?.names).toEqual({
+			en: 'Приливный Грот',
+			ru: 'Приливный Грот',
+		})
 	})
 
 	it('finds configured raids by slug', () => {
@@ -103,7 +109,7 @@ describe('raids', () => {
 	})
 
 	it('keeps the retail raid catalog unique and backed by 16:9 image assets', () => {
-		expect(allRaidInstances).toHaveLength(58)
+		expect(allRaidInstances).toHaveLength(60)
 		expect(legacyRaidInstances).toHaveLength(54)
 		expect(new Set(allRaidInstances.map(raid => raid.slug)).size).toBe(
 			allRaidInstances.length,

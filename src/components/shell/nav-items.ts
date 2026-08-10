@@ -1,5 +1,6 @@
 import {
   CalendarPlus,
+  CalendarDays,
   Home,
   LayoutDashboard,
   SearchCheck,
@@ -17,6 +18,11 @@ export type HeaderNavItem = {
 export function getHeaderNavItems(locale: AppLocale): HeaderNavItem[] {
   return [
     { href: "/", icon: Home, label: t(locale, "header.home") },
+    {
+      href: "/events",
+      icon: CalendarDays,
+      label: locale === "ru" ? "События" : "Events",
+    },
     {
       href: "/raidcheck",
       icon: SearchCheck,

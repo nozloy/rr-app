@@ -5,6 +5,7 @@ import { useAppLocale } from '@/components/shell/locale-provider'
 import { t } from '@/lib/i18n'
 import {
 	defaultRoleRanges,
+	dungeonRoleRanges,
 	getRoleFields,
 	unrollTemplates,
 } from './create-event-data'
@@ -13,7 +14,9 @@ import type {
 	CreateEventFormProps,
 	DifficultyOption,
 	EventActivityType,
+	EventContentScope,
 	EventDifficulty,
+	EventInstanceOption,
 	EventPublishTarget,
 	EventRole,
 	LeaderMode,
@@ -49,11 +52,24 @@ type CreateEventDraftAction =
 			activityType: EventActivityType
 			selectedInstanceSlugs: string[]
 	  }
+	| {
+			type: 'set-content-scope'
+			contentScope: EventContentScope
+			activityType: EventActivityType
+			selectedInstanceSlugs: string[]
+	  }
 	| { type: 'toggle-instance'; slug: string }
 	| { type: 'remove-instance'; slug: string }
-	| { type: 'set-addon'; addon: string; selectedInstanceSlugs: string[] }
+	| {
+			type: 'set-addon'
+			addon: string
+			activityType: EventActivityType
+			contentScope: EventContentScope
+			selectedInstanceSlugs: string[]
+	  }
 	| { type: 'set-difficulty'; difficulty: EventDifficulty }
 	| { type: 'set-date'; date: string }
+	| { type: 'set-time-zone'; timeZone: string }
 	| { type: 'set-date-time'; date: Date }
 	| { type: 'set-time-part'; part: 'hour' | 'minute'; value: string }
 	| { type: 'update-role-input'; role: EventRole; value: string }
@@ -68,6 +84,7 @@ type CreateEventDraftAction =
 			target: EventPublishTarget
 			checked: boolean
 	  }
+	| { type: 'replace-draft'; draft: CreateEventDraft; message?: string }
 	| { type: 'submit'; message: string }
 
 function clearStatus(state: CreateEventDraftState): CreateEventDraftState {
@@ -86,20 +103,34 @@ function createInitialState({
 	defaultDate,
 	displayName,
 	eventCatalog,
-}: CreateEventFormProps): CreateEventDraftState {
+	initialDraft,
+	defaultTimeZone,
+}: Pick<
+	CreateEventFormProps,
+	'characters' | 'defaultDate' | 'defaultTimeZone' | 'displayName' | 'eventCatalog' | 'initialDraft'
+>): CreateEventDraftState {
 	const defaultTemplate = unrollTemplates[0] ?? null
 	const defaultUnrollItemIds = defaultTemplate?.itemIds ?? ['249343']
 	const defaultUnrollTemplateId = defaultTemplate?.id ?? 'custom'
 	const defaultAddon =
 		eventCatalog.defaultAddon || eventCatalog.addons[0]?.value || ''
-	const defaultRaidOptions = eventCatalog.optionsByAddon[defaultAddon]?.raid ?? []
+	const defaultContentScope =
+		eventCatalog.defaultContentScope ||
+		eventCatalog.contentScopes[0]?.value ||
+		'expansion'
+	const defaultOptionsByType =
+		eventCatalog.optionsByAddon[defaultAddon]?.[defaultContentScope] ??
+		emptyInstanceOptions
+	const defaultActivityType = resolveActivityType(defaultOptionsByType, 'raid')
+	const defaultInstanceOptions = defaultOptionsByType[defaultActivityType]
 	const defaultDifficulty =
 		eventCatalog.difficulties[0]?.difficulty ?? 'normal'
 
-	return {
-		draft: {
-			activityType: 'raid',
+	const draft: CreateEventDraft = initialDraft ?? {
+			activityType: defaultActivityType,
 			addon: defaultAddon,
+			clientRequestId: crypto.randomUUID(),
+			contentScope: defaultContentScope,
 			characterId: characters[0]?.id ?? '',
 			date: defaultDate,
 			difficulty: defaultDifficulty,
@@ -112,25 +143,28 @@ function createInitialState({
 			paidSlots: 2,
 			publishTargets: {
 				app: true,
-				custom: false,
-				discord: true,
-				telegram: true,
+				discord: false,
+				telegram: false,
 			},
 			roles: {
 				damage: { ...defaultRoleRanges.damage },
 				healer: { ...defaultRoleRanges.healer },
 				tank: { ...defaultRoleRanges.tank },
 			},
-			selectedInstanceSlugs: defaultRaidOptions.map(option => option.slug),
+			selectedInstanceSlugs: defaultInstanceOptions.map(option => option.slug),
 			time: '20:30',
+			timeZone: defaultTimeZone,
 			unrollInput: defaultUnrollItemIds.join(', '),
 			unrollItemIds: defaultUnrollItemIds,
 			unrollTemplateId: defaultUnrollTemplateId,
-		},
+		}
+
+	return {
+		draft,
 		roleInputValues: {
-			damage: formatRange(defaultRoleRanges.damage),
-			healer: formatRange(defaultRoleRanges.healer),
-			tank: formatRange(defaultRoleRanges.tank),
+			damage: formatRange(draft.roles.damage),
+			healer: formatRange(draft.roles.healer),
+			tank: formatRange(draft.roles.tank),
 		},
 		statusMessage: null,
 	}
@@ -214,6 +248,28 @@ function updateRole(
 	}
 }
 
+function getDungeonRolePreset(
+	currentActivityType: EventActivityType,
+	nextActivityType: EventActivityType,
+) {
+	if (currentActivityType === 'dungeon' || nextActivityType !== 'dungeon') {
+		return null
+	}
+
+	return {
+		roleInputValues: {
+			damage: formatRange(dungeonRoleRanges.damage),
+			healer: formatRange(dungeonRoleRanges.healer),
+			tank: formatRange(dungeonRoleRanges.tank),
+		},
+		roles: {
+			damage: { ...dungeonRoleRanges.damage },
+			healer: { ...dungeonRoleRanges.healer },
+			tank: { ...dungeonRoleRanges.tank },
+		},
+	}
+}
+
 function createEventDraftReducer(
 	state: CreateEventDraftState,
 	action: CreateEventDraftAction,
@@ -222,6 +278,18 @@ function createEventDraftReducer(
 		return {
 			...state,
 			statusMessage: action.message,
+		}
+	}
+
+	if (action.type === 'replace-draft') {
+		return {
+			draft: action.draft,
+			roleInputValues: {
+				damage: formatRange(action.draft.roles.damage),
+				healer: formatRange(action.draft.roles.healer),
+				tank: formatRange(action.draft.roles.tank),
+			},
+			statusMessage: action.message ?? null,
 		}
 	}
 
@@ -252,15 +320,43 @@ function createEventDraftReducer(
 					[action.field]: action.value,
 				},
 			}
-		case 'set-activity-type':
+		case 'set-activity-type': {
+			const dungeonRolePreset = getDungeonRolePreset(
+				current.draft.activityType,
+				action.activityType,
+			)
+
 			return {
 				...current,
 				draft: {
 					...current.draft,
 					activityType: action.activityType,
+					roles: dungeonRolePreset?.roles ?? current.draft.roles,
 					selectedInstanceSlugs: action.selectedInstanceSlugs,
 				},
+				roleInputValues:
+					dungeonRolePreset?.roleInputValues ?? current.roleInputValues,
 			}
+		}
+		case 'set-content-scope': {
+			const dungeonRolePreset = getDungeonRolePreset(
+				current.draft.activityType,
+				action.activityType,
+			)
+
+			return {
+				...current,
+				draft: {
+					...current.draft,
+					activityType: action.activityType,
+					contentScope: action.contentScope,
+					roles: dungeonRolePreset?.roles ?? current.draft.roles,
+					selectedInstanceSlugs: action.selectedInstanceSlugs,
+				},
+				roleInputValues:
+					dungeonRolePreset?.roleInputValues ?? current.roleInputValues,
+			}
+		}
 		case 'toggle-instance': {
 			const isSelected =
 				current.draft.selectedInstanceSlugs.includes(action.slug)
@@ -296,15 +392,26 @@ function createEventDraftReducer(
 				},
 			}
 		}
-		case 'set-addon':
+		case 'set-addon': {
+			const dungeonRolePreset = getDungeonRolePreset(
+				current.draft.activityType,
+				action.activityType,
+			)
+
 			return {
 				...current,
 				draft: {
 					...current.draft,
+					activityType: action.activityType,
 					addon: action.addon,
+					contentScope: action.contentScope,
+					roles: dungeonRolePreset?.roles ?? current.draft.roles,
 					selectedInstanceSlugs: action.selectedInstanceSlugs,
 				},
+				roleInputValues:
+					dungeonRolePreset?.roleInputValues ?? current.roleInputValues,
 			}
+		}
 		case 'set-difficulty':
 			return {
 				...current,
@@ -319,6 +426,14 @@ function createEventDraftReducer(
 				draft: {
 					...current.draft,
 					date: action.date,
+				},
+			}
+		case 'set-time-zone':
+			return {
+				...current,
+				draft: {
+					...current.draft,
+					timeZone: action.timeZone,
 				},
 			}
 		case 'set-date-time':
@@ -441,28 +556,52 @@ function createEventDraftReducer(
 	}
 }
 
+type InstanceOptionsByType = Record<EventActivityType, EventInstanceOption[]>
+
+const emptyInstanceOptions: InstanceOptionsByType = {
+	dungeon: [],
+	'open-world': [],
+	raid: [],
+}
+
+function resolveActivityType(
+	optionsByType: InstanceOptionsByType,
+	preferredType: EventActivityType,
+) {
+	if (optionsByType[preferredType].length > 0) {
+		return preferredType
+	}
+
+	return (
+		(['raid', 'dungeon', 'open-world'] as const).find(
+			activityType => optionsByType[activityType].length > 0,
+		) ?? preferredType
+	)
+}
+
 export function useCreateEventDraft({
 	characters,
 	defaultDate,
+	defaultTimeZone,
 	displayName,
 	eventCatalog,
+	initialDraft,
 }: CreateEventFormProps) {
 	const locale = useAppLocale()
 	const roleFields = useMemo(() => getRoleFields(locale), [locale])
 	const [state, dispatch] = useReducer(
 		createEventDraftReducer,
-		{ characters, defaultDate, displayName, eventCatalog },
+		{ characters, defaultDate, defaultTimeZone, displayName, eventCatalog, initialDraft },
 		createInitialState,
 	)
 	const { draft, roleInputValues, statusMessage } = state
-	const instanceOptionsByType =
+	const instanceOptionsByScope =
 		eventCatalog.optionsByAddon[draft.addon] ??
 		eventCatalog.optionsByAddon[eventCatalog.defaultAddon] ?? {
-			dungeon: [],
-			'open-world': [],
-			raid: [],
-			season: [],
+			expansion: emptyInstanceOptions,
 		}
+	const instanceOptionsByType =
+		instanceOptionsByScope[draft.contentScope] ?? emptyInstanceOptions
 	const selectedCharacter =
 		characters.find(character => character.id === draft.characterId) ??
 		characters[0] ??
@@ -500,9 +639,10 @@ export function useCreateEventDraft({
 	}, [draft.difficulty, difficultyOptions, hasSelectedDifficulty])
 	const fallbackOpenWorldInstance =
 		instanceOptionsByType['open-world'][0] ??
-		Object.values(eventCatalog.optionsByAddon).find(
-			options => options['open-world'][0],
-		)?.['open-world'][0]
+		Object.values(eventCatalog.optionsByAddon)
+			.flatMap(optionsByScope => Object.values(optionsByScope))
+			.find(optionsByType => optionsByType['open-world'][0])
+			?.['open-world'][0]
 	const previewInstance =
 		selectedInstances[0] ??
 		instanceOptions[0] ??
@@ -530,7 +670,6 @@ export function useCreateEventDraft({
 		})
 		.filter((error): error is string => error !== null)
 	const hasRoleError = roleErrors.length > 0
-	const hasPublishTarget = Object.values(draft.publishTargets).some(Boolean)
 	const leaderName =
 		draft.leaderMode === 'character'
 			? (selectedCharacter?.name ?? '')
@@ -544,13 +683,15 @@ export function useCreateEventDraft({
 		leaderRealm.length > 0 &&
 		selectedInstances.length > 0 &&
 		!hasRoleError
-	const canPublish = canSubmit && hasPublishTarget
+	const canPublish = canSubmit
 
 	return {
 		canPublish,
 		canSubmit,
 		difficultyOptions,
-		dispatchers: {
+			dispatchers: {
+			replaceDraft: (nextDraft: CreateEventDraft, message?: string) =>
+				dispatch({ draft: nextDraft, message, type: 'replace-draft' }),
 			removeInstance: (slug: string) =>
 				dispatch({ slug, type: 'remove-instance' }),
 			selectUnrollTemplate: (templateId: string) =>
@@ -569,13 +710,40 @@ export function useCreateEventDraft({
 					type: 'set-activity-type',
 				})
 			},
-			setAddon: (addon: string) => {
+			setContentScope: (contentScope: EventContentScope) => {
 				const nextOptionsByType =
-					eventCatalog.optionsByAddon[addon] ?? instanceOptionsByType
-				const nextOptions = nextOptionsByType[draft.activityType]
+					instanceOptionsByScope[contentScope] ?? emptyInstanceOptions
+				const activityType = resolveActivityType(
+					nextOptionsByType,
+					draft.activityType,
+				)
+				const nextOptions = nextOptionsByType[activityType]
 
 				dispatch({
+					activityType,
+					contentScope,
+					selectedInstanceSlugs: nextOptions[0] ? [nextOptions[0].slug] : [],
+					type: 'set-content-scope',
+				})
+			},
+			setAddon: (addon: string) => {
+				const nextOptionsByScope =
+					eventCatalog.optionsByAddon[addon] ?? instanceOptionsByScope
+				const contentScope = nextOptionsByScope[draft.contentScope]
+					? draft.contentScope
+					: 'expansion'
+				const nextOptionsByType =
+					nextOptionsByScope[contentScope] ?? emptyInstanceOptions
+				const activityType = resolveActivityType(
+					nextOptionsByType,
+					draft.activityType,
+				)
+				const nextOptions = nextOptionsByType[activityType]
+
+				dispatch({
+					activityType,
 					addon,
+					contentScope,
 					selectedInstanceSlugs: nextOptions[0] ? [nextOptions[0].slug] : [],
 					type: 'set-addon',
 				})
@@ -611,6 +779,8 @@ export function useCreateEventDraft({
 				dispatch({ checked, type: 'set-paid-slots-enabled' }),
 			setTimePart: (part: 'hour' | 'minute', value: string) =>
 				dispatch({ part, type: 'set-time-part', value }),
+			setTimeZone: (timeZone: string) =>
+				dispatch({ timeZone, type: 'set-time-zone' }),
 			setUnrollEnabled: (checked: boolean) =>
 				dispatch({ checked, type: 'set-unroll-enabled' }),
 			submitDraft: (action: SubmitAction) => {

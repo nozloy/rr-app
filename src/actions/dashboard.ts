@@ -37,8 +37,10 @@ export async function syncCharactersAction(
 
   const result = await syncCharactersForUser(session.user.id, locale);
 
+  revalidatePath("/", "layout");
   revalidatePath("/profile");
   revalidatePath("/banners/new");
+  revalidatePath("/events/new");
 
   return {
     status: result.status,

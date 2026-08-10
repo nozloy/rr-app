@@ -22,17 +22,20 @@ import {
 	UsersRound,
 	X,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
+import { TZDate } from '@date-fns/tz'
 import {
 	getActivityTabs,
 	getCalendarMonthNames,
@@ -51,6 +54,8 @@ import type {
 	EventAddonOption,
 	EventActivityType,
 	EventCharacterOption,
+	EventContentScope,
+	EventContentScopeOption,
 	EventDifficulty,
 	EventInstanceOption,
 	EventPublishTarget,
@@ -60,6 +65,7 @@ import type {
 	UnrollTemplate,
 } from './create-event-types'
 import { eventUi } from './create-event-ui'
+import { TimeZoneCombobox } from './time-zone-combobox'
 import {
 	addMonths,
 	formatDate,
@@ -344,10 +350,6 @@ export function LeaderSection({
 								</small>
 							</span>
 						</button>
-						<Badge className={eventUi.premiumBadge} variant='arcane'>
-							<Crown className='size-3' aria-hidden='true' />
-							Premium
-						</Badge>
 					</div>
 
 					<div className={eventUi.inlineFields}>
@@ -416,7 +418,9 @@ type DateTimeSectionProps = {
 	onDateChange: (date: string) => void
 	onDateTimeChange: (date: Date) => void
 	onTimePartChange: (part: 'hour' | 'minute', value: string) => void
+	onTimeZoneChange: (timeZone: string) => void
 	time: string
+	timeZone: string
 }
 
 export function DateTimeSection({
@@ -424,7 +428,9 @@ export function DateTimeSection({
 	onDateChange,
 	onDateTimeChange,
 	onTimePartChange,
+	onTimeZoneChange,
 	time,
+	timeZone,
 }: DateTimeSectionProps) {
 	const locale = useAppLocale()
 	const calendarMonthNames = getCalendarMonthNames(locale)
@@ -447,13 +453,13 @@ export function DateTimeSection({
 	}
 
 	function setDateTimeWithOffset(minutes: number) {
-		const nextDate = new Date()
+		const nextDate = TZDate.tz(timeZone, new Date())
 		nextDate.setMinutes(nextDate.getMinutes() + minutes)
 		setDateTimeFromDate(nextDate)
 	}
 
 	function setTodayEvening() {
-		const nextDate = new Date()
+		const nextDate = TZDate.tz(timeZone, new Date())
 		nextDate.setHours(20, 30, 0, 0)
 		setDateTimeFromDate(nextDate)
 	}
@@ -611,6 +617,10 @@ export function DateTimeSection({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</label>
+				<label className={eventUi.dateTimeField}>
+					<span className='sr-only'>Часовой пояс</span>
+					<TimeZoneCombobox onChange={onTimeZoneChange} value={timeZone} />
+				</label>
 				<div className={eventUi.dateShortcuts}>
 					<Button
 						className={eventUi.shortcutButton}
@@ -658,10 +668,13 @@ type EventParamsSectionProps = {
 	activityType: EventActivityType
 	addon: string
 	addons: EventAddonOption[]
+	contentScope: EventContentScope
+	contentScopes: EventContentScopeOption[]
 	difficulty: EventDifficulty
 	difficultyOptions: DifficultyOption[]
 	onActivityTypeChange: (activityType: EventActivityType) => void
 	onAddonChange: (addon: string) => void
+	onContentScopeChange: (contentScope: EventContentScope) => void
 	onDifficultyChange: (difficulty: EventDifficulty) => void
 }
 
@@ -669,10 +682,13 @@ export function EventParamsSection({
 	activityType,
 	addon,
 	addons,
+	contentScope,
+	contentScopes,
 	difficulty,
 	difficultyOptions,
 	onActivityTypeChange,
 	onAddonChange,
+	onContentScopeChange,
 	onDifficultyChange,
 }: EventParamsSectionProps) {
 	const locale = useAppLocale()
@@ -682,14 +698,18 @@ export function EventParamsSection({
 	const selectedDifficultyLabel =
 		difficultyOptions.find(option => option.difficulty === difficulty)
 			?.label ?? t(locale, 'events.difficultyNormal')
+	const selectedContentScopeLabel =
+		contentScopes.find(option => option.value === contentScope)?.label ??
+		contentScope
 	const [isAddonMenuOpen, setIsAddonMenuOpen] = useState(false)
+	const [isContentScopeMenuOpen, setIsContentScopeMenuOpen] = useState(false)
 	const [isDifficultyMenuOpen, setIsDifficultyMenuOpen] = useState(false)
 
 	return (
 		<section className={eventUi.panel}>
 			<SectionTitle number={3}>{t(locale, 'events.sectionAddon')}</SectionTitle>
 			<div className={eventUi.paramsGrid}>
-				<label>
+				<div>
 					<DropdownMenu
 						modal={false}
 						open={isAddonMenuOpen}
@@ -711,34 +731,81 @@ export function EventParamsSection({
 							className={eventUi.addonDropdown}
 							sideOffset={6}
 						>
-							<div className={eventUi.addonOptions}>
+							<DropdownMenuGroup className={eventUi.addonOptions}>
 								{addons.map(option => {
 									const isSelected = option.value === addon
 
 									return (
-										<button
+										<DropdownMenuItem
 											aria-pressed={isSelected}
 											className={eventUi.addonOption(isSelected)}
 											key={option.value}
-											onClick={() => {
+											onSelect={() => {
 												onAddonChange(option.value)
 												setIsAddonMenuOpen(false)
 											}}
-											type='button'
 										>
 											<span>{option.label}</span>
 											{isSelected ? (
 												<Check className='size-4' aria-hidden='true' />
 											) : null}
-										</button>
+										</DropdownMenuItem>
 									)
 								})}
-							</div>
+							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-				</label>
+				</div>
 
-				<label>
+				<div>
+					<DropdownMenu
+						modal={false}
+						open={isContentScopeMenuOpen}
+						onOpenChange={setIsContentScopeMenuOpen}
+					>
+						<DropdownMenuTrigger asChild>
+							<Button
+								aria-label={selectedContentScopeLabel}
+								className={eventUi.addonTrigger}
+								type='button'
+								variant='ghost'
+							>
+								<span>{selectedContentScopeLabel}</span>
+								<ChevronDown className='size-4' aria-hidden='true' />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align='start'
+							className={eventUi.addonDropdown}
+							sideOffset={6}
+						>
+							<DropdownMenuGroup className={eventUi.addonOptions}>
+								{contentScopes.map(option => {
+									const isSelected = option.value === contentScope
+
+									return (
+										<DropdownMenuItem
+											aria-pressed={isSelected}
+											className={eventUi.addonOption(isSelected)}
+											key={option.value}
+											onSelect={() => {
+												onContentScopeChange(option.value)
+												setIsContentScopeMenuOpen(false)
+											}}
+										>
+											<span>{option.label}</span>
+											{isSelected ? (
+												<Check className='size-4' aria-hidden='true' />
+											) : null}
+										</DropdownMenuItem>
+									)
+								})}
+							</DropdownMenuGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+
+				<div>
 					<DropdownMenu
 						modal={false}
 						open={isDifficultyMenuOpen}
@@ -760,51 +827,59 @@ export function EventParamsSection({
 							className={eventUi.difficultyDropdown}
 							sideOffset={6}
 						>
-							<div className={eventUi.addonOptions}>
+							<DropdownMenuGroup className={eventUi.addonOptions}>
 								{difficultyOptions.map(option => {
 									const isSelected = option.difficulty === difficulty
 
 									return (
-										<button
+										<DropdownMenuItem
 											aria-pressed={isSelected}
 											className={eventUi.addonOption(isSelected)}
 											key={option.difficulty}
-											onClick={() => {
+											onSelect={() => {
 												onDifficultyChange(option.difficulty)
 												setIsDifficultyMenuOpen(false)
 											}}
-											type='button'
 										>
 											<span>{option.label}</span>
 											{isSelected ? (
 												<Check className='size-4' aria-hidden='true' />
 											) : null}
-										</button>
+										</DropdownMenuItem>
 									)
 								})}
-							</div>
+							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-				</label>
+				</div>
 
-				<div className={eventUi.typeTabs} role='group' aria-label={t(locale, 'events.activityTypeAria')}>
+				<ToggleGroup
+					aria-label={t(locale, 'events.activityTypeAria')}
+					className={eventUi.typeTabs}
+					onValueChange={value => {
+						if (value) {
+							onActivityTypeChange(value as EventActivityType)
+						}
+					}}
+					spacing={0}
+					type='single'
+					value={activityType}
+				>
 					{activityTabs.map(tab => {
 						const Icon = tab.icon
 
 						return (
-							<button
-								aria-pressed={activityType === tab.type}
-								className={eventUi.typeTab(activityType === tab.type)}
+							<ToggleGroupItem
+								className={eventUi.typeTab}
 								key={tab.type}
-								onClick={() => onActivityTypeChange(tab.type)}
-								type='button'
+								value={tab.type}
 							>
 								<Icon className='size-4 shrink-0' aria-hidden='true' />
 								{tab.label}
-							</button>
+							</ToggleGroupItem>
 						)
 					})}
-				</div>
+				</ToggleGroup>
 			</div>
 		</section>
 	)
@@ -1046,10 +1121,6 @@ export function PaidSlotsSection({
 						onCheckedChange={onPaidSlotsEnabledChange}
 						thumbClassName={eventUi.paidSwitchThumb}
 					/>
-					<Badge className={eventUi.premiumBadge} variant='arcane'>
-						<Crown className='size-3' aria-hidden='true' />
-						Premium
-					</Badge>
 				</div>
 			</div>
 
@@ -1130,10 +1201,6 @@ export function UnrollSection({
 						onCheckedChange={onUnrollEnabledChange}
 						thumbClassName={eventUi.paidSwitchThumb}
 					/>
-					<Badge className={eventUi.premiumBadge} variant='arcane'>
-						<Crown className='size-3' aria-hidden='true' />
-						Premium
-					</Badge>
 				</div>
 			</div>
 
@@ -1341,7 +1408,7 @@ export function EventPreviewCard({
 					<CalendarDays className='size-4' aria-hidden='true' />
 					<span className={eventUi.previewSummaryLabel}>{t(locale, 'events.previewDateTime')}</span>
 					<strong className={eventUi.previewSummaryValue}>
-						{formatDate(draft.date)} {locale === 'ru' ? 'в' : 'at'} {draft.time}
+						{formatDate(draft.date)} {locale === 'ru' ? 'в' : 'at'} {draft.time} ({draft.timeZone})
 					</strong>
 				</div>
 				<div className={eventUi.previewSummaryItem}>
@@ -1399,11 +1466,13 @@ export function EventPreviewCard({
 }
 
 type PublishTargetsBarProps = {
+	channelAvailability: { discord: boolean; telegram: boolean }
 	onTargetToggle: (target: EventPublishTarget, checked: boolean) => void
 	publishTargets: Record<EventPublishTarget, boolean>
 }
 
 export function PublishTargetsBar({
+	channelAvailability,
 	onTargetToggle,
 	publishTargets,
 }: PublishTargetsBarProps) {
@@ -1416,16 +1485,19 @@ export function PublishTargetsBar({
 				{publishTargetFields.map(target => {
 					const Icon = publishIconComponents[target.icon]
 					const isChecked = publishTargets[target.key]
+					const isAvailable =
+						target.key === 'app' || channelAvailability[target.key]
 
 					return (
 						<Button
-							aria-label={target.label}
+							aria-label={`${target.label}: ${isAvailable ? target.note : 'не настроен'}`}
 							aria-pressed={isChecked}
 							className={eventUi.publishTarget(target.key, isChecked)}
+							disabled={!isAvailable}
 							key={target.key}
 							onClick={() => onTargetToggle(target.key, !isChecked)}
 							size='icon'
-							title={target.label}
+							title={isAvailable ? `${target.label} — ${target.note}` : `${target.label} не настроен на сервере`}
 							type='button'
 							variant='ghost'
 						>
@@ -1440,15 +1512,11 @@ export function PublishTargetsBar({
 					)
 				})}
 			</div>
-			<Button
-				aria-label={t(locale, 'events.publishChannelsSettings')}
-				className={eventUi.publishSettings}
-				size='icon'
-				type='button'
-				variant='ghost'
-			>
-				<Settings className='size-5' aria-hidden='true' />
-			</Button>
+			{!channelAvailability.discord || !channelAvailability.telegram ? (
+				<small className='text-right text-xs text-event-copy'>
+					Недоступные каналы не настроены администратором
+				</small>
+			) : null}
 		</section>
 	)
 }
@@ -1457,7 +1525,6 @@ type PublishIconComponent = (props: SVGProps<SVGSVGElement>) => ReactNode
 
 const publishIconComponents: Record<string, PublishIconComponent | null> = {
 	app: null,
-	custom: CustomChannelsIcon,
 	discord: DiscordIcon,
 	telegram: TelegramIcon,
 }
@@ -1493,8 +1560,4 @@ function TelegramIcon(props: SVGProps<SVGSVGElement>) {
 			/>
 		</svg>
 	)
-}
-
-function CustomChannelsIcon(props: SVGProps<SVGSVGElement>) {
-	return <Plus {...props} />
 }

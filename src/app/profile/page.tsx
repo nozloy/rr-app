@@ -1,10 +1,12 @@
-import {
-  DashboardPageView,
-  type DashboardProfileTab,
-} from "@/components/dashboard/dashboard-page";
+import { ProfilePageView } from "@/components/profile/profile-page";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n-server";
+import {
+  getPreferredCharacter,
+  orderCharactersByPreference,
+} from "@/lib/main-character";
 import { prisma } from "@/lib/prisma";
+import { getProfileTab } from "@/lib/profile-tabs";
 import { requireSession } from "@/lib/session";
 
 type ProfilePageProps = {
@@ -13,19 +15,20 @@ type ProfilePageProps = {
   }>;
 };
 
-function getProfileTab(value: string | string[] | undefined): DashboardProfileTab {
-  const tab = Array.isArray(value) ? value[0] : value;
-
-  return tab === "my-events" ? "my-events" : "overview";
-}
-
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-  const locale = await getRequestLocale();
-  const session = await requireSession();
-  const params = await searchParams;
+  const [locale, session, params] = await Promise.all([
+    getRequestLocale(),
+    requireSession(),
+    searchParams,
+  ]);
   const activeTab = getProfileTab(params.tab);
+  const now = new Date();
 
-  const [characters, scheduledEvents] = await Promise.all([
+  const [account, rawCharacters, scheduledEvents] = await Promise.all([
+    prisma.user.findUnique({
+      select: { mainCharacterId: true },
+      where: { id: session.user.id },
+    }),
     prisma.character.findMany({
       where: { userId: session.user.id },
       orderBy: [{ isActive: "desc" }, { itemLevel: "desc" }, { name: "asc" }],
@@ -39,22 +42,31 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           orderBy: [{ sortOrder: "asc" }],
         },
         difficulty: true,
+        deliveries: true,
       },
       orderBy: [{ startsAt: "asc" }],
       where: {
-        status: "PUBLISHED",
         userId: session.user.id,
       },
     }),
   ]);
+  const mainCharacterId = account?.mainCharacterId ?? null;
+  const characters = orderCharactersByPreference(rawCharacters, mainCharacterId);
+  const mainCharacter = getPreferredCharacter(characters, mainCharacterId);
+  const displayName =
+    session.user.name ?? t(locale, "header.playerFallback");
 
   return (
-    <DashboardPageView
+    <ProfilePageView
       activeTab={activeTab}
       characters={characters}
-      displayName={session.user.name ?? t(locale, "header.playerFallback")}
+      displayName={displayName}
+      fallbackAvatarUrl={session.user.image}
       isAdmin={session.user.isAdmin}
       locale={locale}
+      mainCharacter={mainCharacter}
+      mainCharacterId={mainCharacterId}
+      now={now}
       scheduledEvents={scheduledEvents}
     />
   );

@@ -4,6 +4,10 @@
 
 Do not run production builds automatically.
 
+By default, limit validation to the smallest set of primary, high-value checks needed to confirm the requested change. Run only checks that directly cover the affected code or behavior, and avoid redundant or broad verification.
+
+Do not run exhaustive validation automatically, including full test suites, repository-wide linting or type checking, broad regression checks, or comprehensive audits. Perform full validation only when the user explicitly requests it.
+
 By default, avoid running:
 
 - `npm run build`

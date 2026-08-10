@@ -12,6 +12,10 @@ const { prismaMock, blizzardApiMock, MockBattleNetAuthError } = vi.hoisted(
           upsert: vi.fn(),
           updateMany: vi.fn(),
         },
+        user: {
+          findUnique: vi.fn(),
+          update: vi.fn(),
+        },
       },
       blizzardApiMock: {
         getBattleNetAccount: vi.fn(),
@@ -47,6 +51,7 @@ describe("syncCharactersForUser", () => {
     });
     blizzardApiMock.getValidAccessToken.mockResolvedValue("token");
     prismaMock.character.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.user.findUnique.mockResolvedValue(null);
     blizzardApiMock.fetchPublicCharacterSummary.mockResolvedValue({
       itemLevel: null,
       activeSpec: null,
@@ -240,5 +245,22 @@ describe("syncCharactersForUser", () => {
 
     expect(result.status).toBe("reauth");
     expect(result.message).toContain("Battle.net");
+  });
+
+  it("clears a selected main character after it becomes inactive", async () => {
+    blizzardApiMock.fetchAccountCharacters.mockResolvedValue([]);
+    prismaMock.user.findUnique.mockResolvedValue({
+      mainCharacterId: "character-1",
+      mainCharacter: { isActive: false },
+    });
+    prismaMock.user.update.mockResolvedValue({});
+
+    const result = await syncCharactersForUser("user-1");
+
+    expect(result.status).toBe("success");
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      data: { mainCharacterId: null },
+      where: { id: "user-1" },
+    });
   });
 });

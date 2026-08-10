@@ -2,6 +2,7 @@ import { AppHeaderClient, type AppHeaderUser } from "@/components/shell/app-head
 import { hasRequiredRuntimeEnv } from "@/lib/env";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
+import { getPreferredCharacter } from "@/lib/main-character";
 import { prisma } from "@/lib/prisma";
 import { getOptionalSession } from "@/lib/session";
 
@@ -18,18 +19,28 @@ async function getHeaderUser(): Promise<AppHeaderUser | null> {
     return null;
   }
 
-  const topCharacter = await prisma.character.findFirst({
-    where: {
-      isActive: true,
-      userId: session.user.id,
-    },
-    orderBy: [{ itemLevel: "desc" }, { name: "asc" }],
-    select: {
-      avatarUrl: true,
-      name: true,
-      thumbnailUrl: true,
-    },
-  });
+  const [account, characters] = await Promise.all([
+    prisma.user.findUnique({
+      select: { mainCharacterId: true },
+      where: { id: session.user.id },
+    }),
+    prisma.character.findMany({
+      where: { userId: session.user.id },
+      orderBy: [{ isActive: "desc" }, { itemLevel: "desc" }, { name: "asc" }],
+      select: {
+        avatarUrl: true,
+        id: true,
+        isActive: true,
+        itemLevel: true,
+        name: true,
+        thumbnailUrl: true,
+      },
+    }),
+  ]);
+  const topCharacter = getPreferredCharacter(
+    characters,
+    account?.mainCharacterId,
+  );
 
   return {
     avatarUrl:

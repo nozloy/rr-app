@@ -104,9 +104,9 @@ export const eventUi = {
 		'pointer-events-none invisible absolute left-0 top-[calc(100%+0.45rem)] z-20 w-[min(24rem,calc(100vw-3rem))] rounded-md border border-event-panel-border bg-[#061327] px-3 py-2 text-xs leading-relaxed text-[#d9e8ff] opacity-0 shadow-[0_14px_34px_rgba(0,0,0,0.45)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
 	dateTimeField: 'grid min-w-0 gap-2',
 	dateTimeRow:
-		'mt-3 grid items-center gap-3 min-[1180px]:grid-cols-[minmax(15rem,0.9fr)_minmax(12rem,0.72fr)_minmax(30rem,1.6fr)] min-[761px]:grid-cols-2 max-[760px]:grid-cols-1',
+		'mt-3 grid items-center gap-3 min-[1180px]:grid-cols-3 min-[761px]:grid-cols-2 max-[760px]:grid-cols-1',
 	dateShortcuts:
-		'grid min-w-0 grid-cols-2 gap-2 min-[1180px]:grid-cols-4 min-[761px]:col-span-2 min-[1180px]:col-span-1',
+		'grid min-w-0 grid-cols-2 gap-2 min-[1180px]:grid-cols-4 min-[761px]:col-span-2 min-[1180px]:col-span-3',
 	shortcutButton:
 		'h-12 min-w-0 rounded-lg border-event-panel-border-strong bg-transparent px-2 text-sm font-medium text-[#eaf2ff] hover:border-event-cyan/55 hover:bg-[#0c1f40] hover:text-white',
 	dateTrigger: cn(
@@ -164,7 +164,7 @@ export const eventUi = {
 	paidSwitchThumb:
 		'!size-[1.05rem] !bg-[radial-gradient(circle_at_35%_30%,#ffffff,#d9ccff_58%,#bba1ff)] !shadow-[0_0_10px_rgba(215,182,255,0.48)] group-data-checked/switch:!translate-x-[1.55rem]',
 	paramsGrid:
-		'mt-3 grid gap-3 min-[1180px]:grid-cols-[12.5rem_12.5rem_minmax(0,1fr)] min-[761px]:grid-cols-[12.5rem_12.5rem]',
+		'mt-3 grid gap-3 min-[1280px]:grid-cols-[12.5rem_15rem_12.5rem_minmax(0,1fr)] min-[761px]:grid-cols-3',
 	premiumBadge:
 		'!inline-flex !w-fit items-center gap-1 !border-event-legendary/60 !bg-event-legendary/15 !text-[#ffb45c] shadow-[inset_0_0_14px_rgba(255,128,0,0.12),0_0_12px_rgba(255,128,0,0.10)]',
 	previewCard: cn(panelSurface, 'min-w-0 rounded-lg p-4'),
@@ -201,13 +201,8 @@ export const eventUi = {
 			target === 'telegram' && 'bg-[#38bdf8]/10',
 			target === 'app' &&
 				'border-[#7e47ff]/30 bg-[radial-gradient(circle_at_50%_42%,rgba(126,71,255,0.30),rgba(3,12,27,0.92)_68%)]',
-			target === 'custom' &&
-				'border-event-panel-border-strong bg-event-panel-surface-soft text-event-copy hover:border-event-legendary/40 hover:bg-event-legendary/10 hover:text-[#ffb45c]',
 			isSelected &&
 				'border-event-fel/70 bg-[linear-gradient(180deg,rgba(102,255,0,0.24),rgba(13,78,19,0.44))] text-[#eaffd1] opacity-100 shadow-event-fel',
-			target === 'custom' &&
-				isSelected &&
-				'border-event-legendary/80 bg-[linear-gradient(180deg,rgba(255,128,0,0.30),rgba(87,42,0,0.42))] text-[#fff6e8] shadow-event-legendary',
 		),
 	publishTargets: 'flex items-center gap-2',
 	roleCard:
@@ -285,11 +280,7 @@ export const eventUi = {
 	textInput: textInputSurface,
 	embeddedInput: embeddedInputSurface,
 	typeTabs:
-		'grid overflow-hidden rounded-lg border border-event-panel-border min-[761px]:col-span-2 min-[1180px]:col-span-1 min-[761px]:grid-cols-[0.85fr_1.25fr_0.9fr_0.9fr] max-[760px]:grid-cols-1',
-	typeTab: (isActive: boolean) =>
-		cn(
-			'flex h-12 items-center justify-center gap-2 border-r border-event-panel-border bg-[rgba(3,13,27,0.62)] px-3 font-medium text-event-copy transition-colors last:border-r-0 hover:bg-[#0c1f40] hover:text-white max-[760px]:justify-start max-[760px]:border-b max-[760px]:border-r-0 max-[760px]:last:border-b-0',
-			isActive &&
-				'bg-[linear-gradient(180deg,#8d56ff,#572ed0)] text-white shadow-[inset_0_0_18px_rgba(255,255,255,0.12)]',
-		),
+		'grid w-full grid-cols-3 overflow-hidden rounded-lg border border-event-panel-border min-[761px]:col-span-3 min-[1280px]:col-span-1 max-[760px]:grid-cols-1',
+	typeTab:
+		'h-12 w-full min-w-0 rounded-none border-r border-event-panel-border bg-[rgba(3,13,27,0.62)] px-3 text-sm font-medium text-event-copy last:border-r-0 hover:bg-[#0c1f40] hover:text-white data-[state=on]:bg-[linear-gradient(180deg,#8d56ff,#572ed0)] data-[state=on]:text-white data-[state=on]:shadow-[inset_0_0_18px_rgba(255,255,255,0.12)] max-[760px]:justify-start max-[760px]:border-b max-[760px]:border-r-0 max-[760px]:last:border-b-0',
 }

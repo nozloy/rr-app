@@ -1,4 +1,5 @@
 import type { AppLocale } from "@/lib/i18n";
+import { midnightSeasonTwoDungeonSlugs } from "@/lib/activity-catalog-source";
 
 export type DungeonLocalizedNames = {
   en: string;
@@ -106,7 +107,7 @@ const midnightDungeons: DungeonDefinition[] = [
   },
 ];
 
-const legacySeasonDungeons: DungeonDefinition[] = [
+const seasonOneLegacyDungeons: DungeonDefinition[] = [
   {
     slug: "algethar-academy",
     name: "Академия Алгет'ар",
@@ -149,14 +150,53 @@ const legacySeasonDungeons: DungeonDefinition[] = [
   },
 ];
 
-export const currentExpansionDungeons = midnightDungeons;
-export const currentSeasonDungeons: DungeonDefinition[] = [
-  ...midnightDungeons.slice(0, 4),
-  ...legacySeasonDungeons,
+const seasonTwoLegacyDungeons: DungeonDefinition[] = [
+  {
+    slug: "ruby-life-pools",
+    name: "Рубиновые Омуты",
+    shortName: "RLP",
+    artPath: "/dungeons/ruby_life_pools_styled_16x9.png",
+    names: {
+      en: "Ruby Life Pools",
+      ru: "Рубиновые Омуты",
+    },
+  },
+  {
+    slug: "kings-rest",
+    name: "Гробница королей",
+    shortName: "KR",
+    artPath: "/dungeons/kings_rest_styled_16x9.png",
+    names: {
+      en: "King's Rest",
+      ru: "Гробница королей",
+    },
+  },
+  {
+    slug: "temple-of-sethraliss",
+    name: "Храм Сетралис",
+    shortName: "TOS",
+    artPath: "/dungeons/temple_of_sethraliss_styled_16x9.png",
+    names: {
+      en: "Temple of Sethraliss",
+      ru: "Храм Сетралис",
+    },
+  },
 ];
+
+export const currentExpansionDungeons = midnightDungeons;
+const currentSeasonDungeonBySlug = new Map(
+  [...midnightDungeons, ...seasonTwoLegacyDungeons].map((dungeon) => [
+    dungeon.slug,
+    dungeon,
+  ]),
+);
+export const currentSeasonDungeons = midnightSeasonTwoDungeonSlugs
+  .map((slug) => currentSeasonDungeonBySlug.get(slug))
+  .filter((dungeon): dungeon is DungeonDefinition => dungeon !== undefined);
 export const allDungeonInstances = [
   ...currentExpansionDungeons,
-  ...legacySeasonDungeons,
+  ...seasonOneLegacyDungeons,
+  ...seasonTwoLegacyDungeons,
 ];
 
 export function getDungeonBySlug(slug: string) {

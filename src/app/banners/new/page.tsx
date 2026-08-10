@@ -30,6 +30,10 @@ import {
 } from "@/lib/dungeons";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n-server";
+import {
+  getPreferredCharacter,
+  orderCharactersByPreference,
+} from "@/lib/main-character";
 import { getPartyNeeds } from "@/lib/party-slots";
 import { prisma } from "@/lib/prisma";
 import {
@@ -124,15 +128,27 @@ export default async function NewBannerPage({
   const builderSteps = getBuilderSteps(locale);
   const session = await requireSession();
   const query = await searchParams;
-  const characters = await prisma.character.findMany({
-    where: {
-      userId: session.user.id,
-      isActive: true,
-    },
-    orderBy: [{ itemLevel: "desc" }, { name: "asc" }],
-  });
-
-  const topCharacter = characters[0] ?? null;
+  const [account, rawCharacters] = await Promise.all([
+    prisma.user.findUnique({
+      select: { mainCharacterId: true },
+      where: { id: session.user.id },
+    }),
+    prisma.character.findMany({
+      where: {
+        userId: session.user.id,
+        isActive: true,
+      },
+      orderBy: [{ itemLevel: "desc" }, { name: "asc" }],
+    }),
+  ]);
+  const characters = orderCharactersByPreference(
+    rawCharacters,
+    account?.mainCharacterId,
+  );
+  const topCharacter = getPreferredCharacter(
+    characters,
+    account?.mainCharacterId,
+  );
   const headerUser = {
     avatarUrl: topCharacter?.avatarUrl ?? topCharacter?.thumbnailUrl ?? session.user.image ?? null,
     displayName:

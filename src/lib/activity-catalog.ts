@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { AppLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import { currentSeasonGroupDefinition } from "@/lib/activity-catalog-source";
 import type {
   EventActivityType,
   EventCatalog,
@@ -61,7 +62,6 @@ const emptyOptionsByType: Record<EventActivityType, EventInstanceOption[]> = {
   dungeon: [],
   "open-world": [],
   raid: [],
-  season: [],
 };
 
 function localizeName(
@@ -139,7 +139,6 @@ function cloneEmptyOptions() {
     dungeon: [...emptyOptionsByType.dungeon],
     "open-world": [...emptyOptionsByType["open-world"]],
     raid: [...emptyOptionsByType.raid],
-    season: [...emptyOptionsByType.season],
   };
 }
 
@@ -188,25 +187,30 @@ export function buildEventCatalogFromRecords(
   const activeExpansionGroups = input.expansionGroups
     .filter((group) => group.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn));
-  const primarySeasonGroup = input.seasonGroups
+  const activeSeasonGroups = input.seasonGroups
     .filter((group) => group.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn))[0];
-  const seasonOptions =
-    primarySeasonGroup?.items
-      ? getActiveSortedItems(primarySeasonGroup).map((item) =>
-          toInstanceOption({
-            activity: item.activity,
-            activityType: "season",
-            locale,
-          }),
-        )
-      : [];
-  const optionsByAddon: EventCatalog["optionsByAddon"] = {};
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn));
+  const primarySeasonGroup =
+    activeSeasonGroups.find(
+      (group) => group.slug === currentSeasonGroupDefinition.slug,
+    ) ?? activeSeasonGroups[0];
+  const orderedSeasonGroups = primarySeasonGroup
+    ? [
+        primarySeasonGroup,
+        ...activeSeasonGroups.filter(
+          (group) => group.slug !== primarySeasonGroup.slug,
+        ),
+      ]
+    : [];
+  const seasonOptionsByScope: Record<
+    string,
+    Record<EventActivityType, EventInstanceOption[]>
+  > = {};
 
-  for (const group of activeExpansionGroups) {
+  for (const seasonGroup of orderedSeasonGroups) {
     const options = cloneEmptyOptions();
 
-    for (const item of getActiveSortedItems(group)) {
+    for (const item of getActiveSortedItems(seasonGroup)) {
       const activityType = activityTypeForKind(item.activity.kind);
       options[activityType].push(
         toInstanceOption({
@@ -217,8 +221,39 @@ export function buildEventCatalogFromRecords(
       );
     }
 
-    options.season = seasonOptions;
-    optionsByAddon[group.slug] = options;
+    seasonOptionsByScope[seasonGroup.slug] = options;
+  }
+  const optionsByAddon: EventCatalog["optionsByAddon"] = {};
+
+  for (const group of activeExpansionGroups) {
+    const expansionOptions = cloneEmptyOptions();
+
+    for (const item of getActiveSortedItems(group)) {
+      const activityType = activityTypeForKind(item.activity.kind);
+      expansionOptions[activityType].push(
+        toInstanceOption({
+          activity: item.activity,
+          activityType,
+          locale,
+        }),
+      );
+    }
+
+    optionsByAddon[group.slug] = {
+      expansion: expansionOptions,
+      ...Object.fromEntries(
+        Object.entries(seasonOptionsByScope)
+          .filter(([scope]) => scope.startsWith(`${group.slug}-season-`))
+          .map(([scope, options]) => [
+            scope,
+            {
+              dungeon: [...options.dungeon],
+              "open-world": [...options["open-world"]],
+              raid: [...options.raid],
+            },
+          ]),
+      ),
+    };
   }
 
   const fallbackAddon = activeExpansionGroups[0]?.slug ?? "";
@@ -244,6 +279,23 @@ export function buildEventCatalogFromRecords(
     })),
     defaultAddon: activeExpansionGroups.find((group) => group.slug === "midnight")
       ?.slug ?? fallbackAddon,
+    defaultContentScope: primarySeasonGroup?.slug ?? "expansion",
+    contentScopes: [
+      ...orderedSeasonGroups.map((group) => {
+        const seasonNumber = /-season-(\d+)$/u.exec(group.slug)?.[1];
+
+        return {
+          label: seasonNumber
+            ? `${t(locale, "events.scopeSeason")} ${seasonNumber}`
+            : localizeName(locale, group),
+          value: group.slug,
+        };
+      }),
+      {
+        label: t(locale, "events.scopeExpansion"),
+        value: "expansion",
+      },
+    ],
     difficulties: standardDifficulties,
     difficultiesByActivitySlug,
     optionsByAddon,

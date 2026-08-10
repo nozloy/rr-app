@@ -1,4 +1,4 @@
-import { CalendarDays, Globe2, Shield, Swords } from "lucide-react";
+import { Globe2, Shield, Swords } from "lucide-react";
 import type { AppLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { openWorldActivityDefinitions } from "@/lib/activity-catalog-source";
@@ -79,7 +79,6 @@ export function getActivityTabs(locale: AppLocale): ActivityTab[] {
   return [
     { icon: Swords, label: t(locale, "events.typeRaid"), type: "raid" },
     { icon: Shield, label: t(locale, "events.typeDungeon"), type: "dungeon" },
-    { icon: CalendarDays, label: t(locale, "events.typeSeason"), type: "season" },
     { icon: Globe2, label: t(locale, "events.typeWorld"), type: "open-world" },
   ];
 }
@@ -190,8 +189,21 @@ export const defaultRoleRanges: Record<EventRole, RoleRange> = {
   tank: { max: 2, min: 2 },
 };
 
+export const dungeonRoleRanges: Record<EventRole, RoleRange> = {
+  damage: { max: 3, min: 3 },
+  healer: { max: 1, min: 1 },
+  tank: { max: 1, min: 1 },
+};
+
 export function getPublishTargetFields(locale: AppLocale): PublishTargetField[] {
   return [
+    {
+      icon: "app",
+      imageSrc: "/home/raid-reminder-mark.png",
+      key: "app",
+      label: locale === "ru" ? "Каталог" : "Catalog",
+      note: locale === "ru" ? "Показывать на сайте" : "Show on site",
+    },
     {
       icon: "discord",
       key: "discord",
@@ -203,22 +215,6 @@ export function getPublishTargetFields(locale: AppLocale): PublishTargetField[] 
       key: "telegram",
       label: "Telegram",
       note: locale === "ru" ? "Пост в чат" : "Chat post",
-    },
-    {
-      icon: "app",
-      imageSrc: "/home/raid-reminder-mark.png",
-      key: "app",
-      label: locale === "ru" ? "Приложение" : "App",
-      note: "Raid Reminder",
-    },
-    {
-      icon: "custom",
-      key: "custom",
-      label: locale === "ru" ? "Свои каналы" : "Custom channels",
-      note:
-        locale === "ru"
-          ? "Пользовательские площадки"
-          : "User-defined platforms",
     },
   ];
 }

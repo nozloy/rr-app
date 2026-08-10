@@ -122,6 +122,7 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			in30MinutesShort: '+30 min',
 			todayEvening: 'Tonight',
 			activityTypeAria: 'Activity type',
+			contentScopeAria: 'Activity range',
 			difficultyAria: 'Difficulty',
 			difficultyNormal: 'Normal',
 			difficultyHeroic: 'Heroic',
@@ -130,6 +131,8 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			typeDungeon: 'Dungeon',
 			typeSeason: 'Season',
 			typeWorld: 'World',
+			scopeSeason: 'Season',
+			scopeExpansion: 'All',
 			instancesHint: 'Select one or more instances of this type.',
 			selectedInstancesAria: 'Selected instances',
 			roleHint:
@@ -546,6 +549,7 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			in30MinutesShort: '+30 мин',
 			todayEvening: 'Вечером',
 			activityTypeAria: 'Вид сбора',
+			contentScopeAria: 'Набор активностей',
 			difficultyAria: 'Сложность',
 			difficultyNormal: 'Нормал',
 			difficultyHeroic: 'Героик',
@@ -554,6 +558,8 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			typeDungeon: 'Подземелье',
 			typeSeason: 'Сезон',
 			typeWorld: 'Мир',
+			scopeSeason: 'Сезон',
+			scopeExpansion: 'Все',
 			instancesHint:
 				'Выберите один или несколько инстансов соответствующего типа.',
 			selectedInstancesAria: 'Выбранные инстансы',

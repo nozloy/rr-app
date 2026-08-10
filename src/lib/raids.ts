@@ -24,10 +24,14 @@ const pngRaidSlugs = new Set([
   "nerubar-palace",
   "liberation-of-undermine",
   "manaforge-omega",
+  "baradin-hold",
+  "antorus-the-burning-throne",
   "march-on-queldanas",
   "the-dreamrift",
   "the-voidspire",
   "sporefall",
+  "venomous-abyss",
+  "tidebound-grotto",
 ]);
 
 function raidArtPath(slug: string) {
@@ -581,6 +585,44 @@ export const currentRaidInstances: RaidDefinition[] = [
     aliases: ["Споропад", "Sporefall", "Rotmire", "Гнилотоп"],
     warcraftLogsZoneId: 50,
     warcraftLogsZoneName: "Sporefall",
+  },
+  {
+    slug: "venomous-abyss",
+    name: "Ядовитая бездна",
+    shortName: "TVA",
+    expansion: "Midnight",
+    artPath: raidArtPath("venomous-abyss"),
+    names: {
+      en: "The Venomous Abyss",
+      ru: "Ядовитая бездна",
+    },
+    aliases: [
+      "Ядовитая бездна",
+      "The Venomous Abyss",
+      "Venomous Abyss",
+      "Ula'tek",
+      "Ула'тек",
+    ],
+    warcraftLogsZoneId: 54,
+    warcraftLogsZoneName: "The Venomous Abyss",
+  },
+  {
+    slug: "tidebound-grotto",
+    name: "Приливный Грот",
+    shortName: "ПГ",
+    expansion: "Midnight",
+    artPath: raidArtPath("tidebound-grotto"),
+    names: {
+      en: "Приливный Грот",
+      ru: "Приливный Грот",
+    },
+    aliases: [
+      "Приливный Грот",
+      "The Tidebound Grotto",
+      "Tidebound Grotto",
+      "Нимрисса Волногон",
+      "Nymrissa Wavecaller",
+    ],
   },
 ];
 

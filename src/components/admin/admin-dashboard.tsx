@@ -156,7 +156,7 @@ export type AdminEventRow = {
   paidSlots: number;
   paidSlotPrice: number;
   publishTargets: Array<"DISCORD" | "TELEGRAM" | "APP" | "CUSTOM">;
-  status: "PUBLISHED";
+  status: "PUBLISHED" | "CANCELLED";
   createdAt: Date;
   difficulty: {
     slug: string;

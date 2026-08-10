@@ -73,7 +73,7 @@ export const openWorldActivityDefinitions = [
 ] as const;
 
 export const dungeonSlugsByAddonSlug: Record<EventAddonSeedSlug, string[]> = {
-  dragonflight: ["algethar-academy"],
+  dragonflight: ["algethar-academy", "ruby-life-pools"],
   midnight: [
     "magisters-terrace",
     "maisara-caverns",
@@ -88,9 +88,53 @@ export const dungeonSlugsByAddonSlug: Record<EventAddonSeedSlug, string[]> = {
   "the-war-within": ["seat-of-the-triumvirate", "skyreach", "pit-of-saron"],
 };
 
-export const currentSeasonGroupDefinition = {
-  slug: "current-season",
-  nameEn: "Current season",
-  nameRu: "Текущий сезон",
-  sortOrder: 0,
-} as const;
+export const eventSeasonDefinitions = [
+  {
+    slug: "midnight-season-2",
+    nameEn: "Season 2 · Midnight",
+    nameRu: "Сезон 2 · Midnight",
+    sortOrder: 0,
+  },
+  {
+    slug: "midnight-season-1",
+    nameEn: "Season 1 · Midnight",
+    nameRu: "Сезон 1 · Midnight",
+    sortOrder: 1,
+  },
+] as const;
+
+export const currentSeasonGroupDefinition = eventSeasonDefinitions[0];
+
+export const midnightSeasonOneRaidSlugs = [
+  "march-on-queldanas",
+  "the-dreamrift",
+  "the-voidspire",
+  "sporefall",
+] as const;
+
+export const midnightSeasonOneDungeonSlugs = [
+  "magisters-terrace",
+  "maisara-caverns",
+  "nexus-point-xenas",
+  "windrunner-spire",
+  "algethar-academy",
+  "seat-of-the-triumvirate",
+  "skyreach",
+  "pit-of-saron",
+] as const;
+
+export const midnightSeasonTwoDungeonSlugs = [
+  "altar-of-fangs",
+  "murder-row",
+  "den-of-nalorakk",
+  "blinding-vale",
+  "voidscar-arena",
+  "ruby-life-pools",
+  "kings-rest",
+  "temple-of-sethraliss",
+] as const;
+
+export const midnightSeasonTwoRaidSlugs = [
+  "venomous-abyss",
+  "tidebound-grotto",
+] as const;

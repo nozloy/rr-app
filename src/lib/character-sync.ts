@@ -200,6 +200,26 @@ export async function syncCharactersForUser(
       });
     }
 
+    const userMainCharacter = await prisma.user.findUnique({
+      select: {
+        mainCharacterId: true,
+        mainCharacter: {
+          select: { isActive: true },
+        },
+      },
+      where: { id: userId },
+    });
+
+    if (
+      userMainCharacter?.mainCharacterId &&
+      !userMainCharacter.mainCharacter?.isActive
+    ) {
+      await prisma.user.update({
+        data: { mainCharacterId: null },
+        where: { id: userId },
+      });
+    }
+
     return {
       status: "success",
       importedCount,

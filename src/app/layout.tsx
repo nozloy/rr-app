@@ -4,6 +4,7 @@ import { JetBrains_Mono } from "next/font/google";
 import { SiteFooter } from "@/components/home/site-footer";
 import { ConditionalSiteFooter } from "@/components/shell/conditional-site-footer";
 import { LocaleProvider } from "@/components/shell/locale-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { getRequestLocale } from "@/lib/i18n-server";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export default async function RootLayout({
               <SiteFooter locale={locale} />
             </ConditionalSiteFooter>
           </div>
+          <Toaster position="top-right" richColors />
         </LocaleProvider>
       </body>
     </html>
