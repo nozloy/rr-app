@@ -51,6 +51,15 @@ describe("blizzard api regions", () => {
     );
   });
 
+  it("forwards optional cancellation for forecast requests", async () => {
+    vi.mocked(fetch).mockImplementation(async () => jsonResponse({ expansions: [] }));
+    const signal = new AbortController().signal;
+    const { fetchCharacterRaidEncounters, fetchCharacterProfile } = await loadApi();
+    await fetchCharacterRaidEncounters("token", "howling-fjord", "Зомбак", "eu", signal);
+    await fetchCharacterProfile("token", "howling-fjord", "Зомбак", "eu", signal);
+    for (const call of vi.mocked(fetch).mock.calls) expect(call[1]?.signal).toBe(signal);
+  });
+
   it("uses US dynamic realm index when resolving realms missing from the local catalog", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(

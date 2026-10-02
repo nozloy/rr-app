@@ -3940,3 +3940,124 @@ textarea {
 		@apply font-sans;
 	}
 }
+
+/* Darkmoon Faire: route-scoped palette, material textures and decorative motion. */
+.darkmoon-page {
+	--background: #160e20;
+	--foreground: #efd9af;
+	--primary: #62258e;
+	--primary-foreground: #fff0c7;
+	--secondary: #35203f;
+	--secondary-foreground: #edd4a4;
+	--muted-foreground: #c0a8bd;
+	--border: #816038;
+	--ring: #f1c878;
+	color: var(--foreground);
+	background: var(--background);
+}
+
+.darkmoon-page [data-icon] { width: 1em; height: 1em; flex-shrink: 0; }
+.darkmoon-backdrop {
+	background: linear-gradient(180deg, #140b2199, #180b2430 22%, #130c1680 65%, #130c18 100%);
+}
+.darkmoon-header { border-bottom: 1px solid #be955647; }
+.darkmoon-title {
+	color: #f3cd80;
+	background: linear-gradient(#fff0bc 15%, #f2cb75 50%, #bd8539 95%);
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	filter: drop-shadow(0 4px 0 #311328) drop-shadow(0 6px 15px #160c21);
+}
+.darkmoon-oracle-halo {
+	background: radial-gradient(ellipse, #973dfa38, transparent 68%);
+	filter: blur(28px);
+}
+.darkmoon-button-frame {
+	background: linear-gradient(120deg, #765024, #eccb79 35%, #8a5a26 65%, #e3bd67);
+	clip-path: polygon(5% 0, 95% 0, 100% 25%, 100% 75%, 95% 100%, 5% 100%, 0 75%, 0 25%);
+	filter: drop-shadow(0 8px 20px #0c051e);
+}
+.darkmoon-button-frame button {
+	background-image: linear-gradient(180deg, #ffffff12, transparent 50%, #18082555);
+	clip-path: polygon(5% 0, 95% 0, 100% 25%, 100% 75%, 95% 100%, 5% 100%, 0 75%, 0 25%);
+	box-shadow: inset 0 0 0 1px #c090e58c, inset 0 0 20px #33113e;
+}
+.darkmoon-button-frame:focus-within { outline: 3px solid var(--ring); outline-offset: 4px; }
+.darkmoon-button-frame button:focus-visible { box-shadow: inset 0 0 0 3px var(--ring); }
+.darkmoon-parchment {
+	--card: transparent;
+	--card-foreground: #392432;
+	--foreground: #392432;
+	--muted-foreground: #766044;
+	--border: #92714940;
+	--ring: #68327b;
+	--secondary: #e1ceb0;
+	--secondary-foreground: #5b4935;
+	--fortune: #47652b;
+	color: var(--foreground);
+	border: 9px solid #483023;
+	border-radius: 11px 5px 9px 6px;
+	background:
+		repeating-linear-gradient(3deg, #92602a04 0px, #92602a04 1px, transparent 1px, transparent 4px),
+		radial-gradient(ellipse at 45% 30%, #f8e7c9, #e9d1a9 65%, #c09b63);
+	box-shadow: 0 0 0 1px #a47d49, 0 0 0 3px #23170f, 0 24px 80px #05020bb3, inset 0 0 0 2px #b48b50, inset 0 0 24px #9969374d;
+}
+.darkmoon-parchment::before, .darkmoon-parchment::after {
+	content: '◆';
+	position: absolute;
+	z-index: 1;
+	left: 5px;
+	right: 5px;
+	color: #b08c4e;
+	font-size: 12px;
+	pointer-events: none;
+	text-shadow: 1px 1px 1px #382419;
+}
+.darkmoon-parchment::before { top: 3px; }
+.darkmoon-parchment::after { bottom: 3px; text-align: right; }
+.darkmoon-parchment-seal {
+	color: #f1cd77;
+	border: 3px solid #a78242;
+	background: radial-gradient(circle at 40% 30%, #6e388b, #311636);
+	box-shadow: 0 0 0 3px #4c3123, 0 5px 10px #3b1e4540;
+}
+.darkmoon-parchment[data-tone='medium'] { --fortune: #956122; }
+.darkmoon-parchment[data-tone='low'] { --fortune: #6b4567; }
+.darkmoon-parchment[data-tone='unknown'] { --fortune: #746279; }
+.darkmoon-chance { color: var(--fortune); }
+.darkmoon-divider { color: #805680; }
+.darkmoon-divider > span:first-child { background: linear-gradient(90deg, transparent, #80568099); }
+.darkmoon-divider > span:last-child { background: linear-gradient(90deg, #80568099, transparent); }
+.darkmoon-wood-strip {
+	color: #f7e4b5;
+	border-block: 1px solid #a8884e;
+	background: repeating-linear-gradient(2deg, #ffffff05 0, #ffffff05 1px, transparent 2px, transparent 7px), linear-gradient(90deg, #37211b, #563725 50%, #37211b);
+	box-shadow: 0 3px 5px #5a33222e, inset 0 0 0 3px #28171365;
+	clip-path: polygon(2% 0, 98% 0, 100% 25%, 100% 75%, 98% 100%, 2% 100%, 0 75%, 0 25%);
+}
+.darkmoon-class-icon {
+	color: #735634;
+	border: 2px solid #b18a47;
+	background: #d9bf95;
+	box-shadow: 0 0 0 1px #73502d;
+}
+.darkmoon-page [data-lockout='clean'] { --secondary: #d5e2af; --secondary-foreground: #365124; }
+.darkmoon-page [data-lockout='locked'] { --secondary: #e4b49e; --secondary-foreground: #793e2e; }
+.darkmoon-footer { color: #b09cae; background: #100a16c9; border-top: 1px solid #b18a4333; }
+.darkmoon-footer span { color: #d3ad64; }
+.darkmoon-spark { color: #e7beff; font-size: 25px; text-shadow: 0 0 16px #b361ff; }
+
+@media (prefers-reduced-motion: no-preference) {
+	.darkmoon-spark { animation: darkmoon-sparkle 5s ease-in-out infinite; }
+	.darkmoon-spark-delayed { animation-delay: 2.5s; }
+	.darkmoon-reveal { animation: darkmoon-reveal 1.5s ease-out both; }
+}
+@keyframes darkmoon-sparkle {
+	0%, 100% { opacity: .25; transform: translateY(5px) scale(.8); }
+	50% { opacity: .85; transform: translateY(-6px) scale(1.1); }
+}
+@keyframes darkmoon-reveal {
+	0% { opacity: 0; box-shadow: 0 0 0 0 #d79bff00; }
+	30% { opacity: .65; background: radial-gradient(circle, #e2a6ff66, #a252fb33 35%, transparent 68%); box-shadow: 0 0 70px 20px #b369ef55; transform: scale(.7); }
+	100% { opacity: 0; box-shadow: 0 0 110px 60px #af62ed00; transform: scale(1.2); }
+}

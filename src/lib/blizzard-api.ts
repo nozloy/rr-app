@@ -195,7 +195,10 @@ async function refreshAccessToken(account: Account) {
   });
 }
 
-export async function getApplicationAccessToken(region: BlizzardRegion = DEFAULT_REGION) {
+export async function getApplicationAccessToken(
+  region: BlizzardRegion = DEFAULT_REGION,
+  signal?: AbortSignal,
+) {
   const cached = applicationTokenCache.get(region);
   if (
     cached &&
@@ -220,6 +223,7 @@ export async function getApplicationAccessToken(region: BlizzardRegion = DEFAULT
     },
     body,
     cache: "no-store",
+    signal,
   });
 
   if (!response.ok) {
@@ -268,6 +272,7 @@ async function blizzardRequest<T>(
   accessToken: string,
   region: BlizzardRegion = DEFAULT_REGION,
   locales: readonly string[] = REGION_CONFIG[region].locales,
+  signal?: AbortSignal,
 ) {
   const config = REGION_CONFIG[region];
   let lastError: Error | null = null;
@@ -281,6 +286,7 @@ async function blizzardRequest<T>(
           Authorization: `Bearer ${accessToken}`,
         },
         cache: "no-store",
+        signal,
       },
     );
 
@@ -356,11 +362,14 @@ export async function fetchCharacterProfile(
   realmSlug: string,
   characterName: string,
   region: BlizzardRegion = DEFAULT_REGION,
+  signal?: AbortSignal,
 ) {
   return blizzardRequest<BlizzardCharacterProfile>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}`,
     accessToken,
     region,
+    REGION_CONFIG[region].locales,
+    signal,
   );
 }
 
@@ -395,11 +404,14 @@ export async function fetchCharacterRaidEncounters(
   realmSlug: string,
   characterName: string,
   region: BlizzardRegion = DEFAULT_REGION,
+  signal?: AbortSignal,
 ) {
   return blizzardRequest<BlizzardCharacterRaidEncounters>(
     `/profile/wow/character/${realmSlug}/${toBattleNetCharacterPath(characterName)}/encounters/raids`,
     accessToken,
     region,
+    REGION_CONFIG[region].locales,
+    signal,
   );
 }
 

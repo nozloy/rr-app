@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   images: {
     localPatterns: [
       {
+        pathname: "/kogda-raid/**",
+      },
+      {
         pathname: "/home/**",
       },
       {
