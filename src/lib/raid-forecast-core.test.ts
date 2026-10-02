@@ -22,7 +22,8 @@ const response = (...instances: BlizzardRaidEncounterInstance[]): BlizzardCharac
 describe("raid forecast", () => {
   it.each([
     ["09:59:59", 1], ["10:00:00", 90], ["16:59:59", 90], ["17:00:00", 90],
-    ["17:30:00", 68], ["18:00:00", 46], ["18:30:00", 23], ["19:00:00", 1], ["23:59:59", 1],
+    ["17:30:00", 75], ["18:00:00", 60], ["18:30:00", 46], ["19:00:00", 31],
+    ["19:30:00", 16], ["19:59:59", 1], ["20:00:00", 1], ["23:59:59", 1],
   ])("calculates the Moscow boundary %s as %i%%", (time, chance) => {
     expect(calculateRaidForecast([{ status: "clean" }], new Date(`2026-10-02T${time}+03:00`)).chance).toBe(chance);
   });
@@ -30,7 +31,7 @@ describe("raid forecast", () => {
   it("uses the same instant regardless of the input timezone", () => {
     const characters = [{ status: "clean" as const }];
     const utc = calculateRaidForecast(characters, new Date("2026-10-02T15:00:00Z"));
-    expect(utc.chance).toBe(46);
+    expect(utc.chance).toBe(60);
     expect(calculateRaidForecast(characters, new Date("2026-10-02T08:00:00-07:00"))).toEqual(utc);
   });
 
@@ -45,7 +46,8 @@ describe("raid forecast", () => {
     expect(calculateRaidForecast([{ status: "locked" }], now)).toMatchObject({ chance: 1, reason: "all_locked" });
     expect(calculateRaidForecast([{ status: "locked" }, { status: "unknown" }], now).chance).toBeNull();
     expect(calculateRaidForecast([], now).chance).toBeNull();
-    expect(calculateRaidForecast([{ status: "unknown" }], new Date("2026-10-02T19:00:00+03:00"))).toMatchObject({ chance: 1, reason: "outside_hours" });
+    expect(calculateRaidForecast([{ status: "unknown" }], new Date("2026-10-02T19:59:59+03:00"))).toMatchObject({ chance: null, reason: "unknown" });
+    expect(calculateRaidForecast([{ status: "unknown" }], new Date("2026-10-02T20:00:00+03:00"))).toMatchObject({ chance: 1, reason: "outside_hours" });
   });
 
   it("finds heroic kills by raid and encounter IDs across all duplicate entries", () => {

@@ -2,9 +2,10 @@ import Image from "next/image";
 import { CircleNotch, Sparkle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 
-export function FortuneScene({ pending, reveal, onReveal }: {
+export function FortuneScene({ pending, reveal, buttonLabel, onReveal }: {
   pending: boolean;
   reveal: number;
+  buttonLabel: string;
   onReveal: () => void;
 }) {
   return (
@@ -18,9 +19,9 @@ export function FortuneScene({ pending, reveal, onReveal }: {
       </div>
       <div className="relative z-30 flex w-full max-w-[410px] flex-col items-center gap-3 px-3">
         <div className="darkmoon-button-frame w-full p-[3px]">
-          <Button onClick={onReveal} disabled={pending} size="lg" className="h-auto min-h-14 w-full rounded-none px-3 py-3" aria-describedby="fortune-button-hint">
+          <Button onClick={onReveal} disabled={pending} aria-busy={pending} size="lg" className="h-auto min-h-14 w-full rounded-none px-3 py-3" aria-describedby="fortune-button-hint">
             {pending ? <CircleNotch data-icon="inline-start" className="motion-safe:animate-spin" aria-hidden="true" /> : <Sparkle data-icon="inline-start" weight="fill" aria-hidden="true" />}
-            <span className="font-serif text-lg font-bold sm:text-xl">{pending ? "Вглядываемся в будущее…" : "А сейчас?"}</span>
+            <span className="min-w-0 text-center font-serif text-lg font-bold whitespace-normal sm:text-xl">{pending ? "Вглядываемся в будущее…" : buttonLabel}</span>
           </Button>
         </div>
         <p id="fortune-button-hint" className="text-center text-xs text-muted-foreground">Загляни в будущее… если осмелишься.</p>

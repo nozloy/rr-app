@@ -10,6 +10,7 @@ import {
 } from "@/lib/raid-forecast-core";
 
 const REFRESH_MS = 5 * 60_000;
+const MANUAL_LOADING_MS = 2_000;
 
 export function useRaidForecast(initialServerNow: string) {
   const [snapshot, setSnapshot] = useState<RaidForecastSnapshot | null>(null);
@@ -33,6 +34,9 @@ export function useRaidForecast(initialServerNow: string) {
     lastAttempt.current = performance.now();
     setPending(true);
     setError(null);
+    const minimumLoading = animate
+      ? new Promise<void>((resolve) => setTimeout(resolve, MANUAL_LOADING_MS))
+      : null;
     if (animate) setReveal((value) => value + 1);
     try {
       const result = await getRaidForecastAction();
@@ -47,6 +51,7 @@ export function useRaidForecast(initialServerNow: string) {
       setSnapshot(null);
       setError("Не удалось проверить персонажей. Попробуйте ещё раз чуть позже.");
     } finally {
+      if (minimumLoading) await minimumLoading;
       busy.current = false;
       if (mounted.current) setPending(false);
     }
@@ -97,6 +102,7 @@ export function useRaidForecast(initialServerNow: string) {
     characters,
     forecast: calculateRaidForecast(characters, now),
     now, pending, reveal, error,
+    buttonLabel: reveal >= 5 ? "Купи рейд сам" : "А сейчас?",
     initialLoading: pending && !snapshot,
     checkedAt: snapshot && currentWeek ? snapshot.checkedAt : null,
     refresh: () => refresh(true),

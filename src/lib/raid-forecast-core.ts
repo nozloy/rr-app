@@ -5,6 +5,9 @@ export const FORECAST_TIME_ZONE = "Europe/Moscow";
 export const FORECAST_REALM = "howling-fjord";
 export const FORECAST_RAID_ID = 1317;
 export const FORECAST_BOSS_ID = 2849;
+const RAID_START_MINUTES = 10 * 60;
+const CHANCE_DECAY_START_MINUTES = 17 * 60;
+const RAID_END_MINUTES = 20 * 60;
 export const FORECAST_CHARACTERS = [
   "Зомбак", "Зомбаксмерти", "Зомбакк", "Зомбакен", "Зомбакзверь",
   "Зомбактьмы", "Зомбакор", "Зомбакдх", "Зомбовоин", "Зомбакнзот",
@@ -100,7 +103,7 @@ export function calculateRaidForecast(
     unknownCount: characters.filter((character) => character.status === "unknown").length,
   };
   const minutes = getMoscowMinutes(now);
-  if (minutes < 600 || minutes >= 1140) {
+  if (minutes < RAID_START_MINUTES || minutes >= RAID_END_MINUTES) {
     return { ...counts, chance: 1, reason: "outside_hours" };
   }
   if (counts.freeCount === 0) {
@@ -108,7 +111,9 @@ export function calculateRaidForecast(
       ? { ...counts, chance: null, reason: "unknown" }
       : { ...counts, chance: 1, reason: "all_locked" };
   }
-  return minutes < 1020
-    ? { ...counts, chance: 90, reason: "available" }
-    : { ...counts, chance: Math.max(1, Math.round(90 - 89 * (minutes - 1020) / 120)), reason: "evening" };
+  if (minutes < CHANCE_DECAY_START_MINUTES) {
+    return { ...counts, chance: 90, reason: "available" };
+  }
+  const eveningProgress = (minutes - CHANCE_DECAY_START_MINUTES) / (RAID_END_MINUTES - CHANCE_DECAY_START_MINUTES);
+  return { ...counts, chance: Math.max(1, Math.round(90 - 89 * eveningProgress)), reason: "evening" };
 }
