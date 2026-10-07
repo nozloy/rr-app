@@ -49,6 +49,17 @@ local function newClient(options)
   env.print = function(message) c.messages[#c.messages + 1] = message end
   env.PlaySound = function() c.sounds = (c.sounds or 0) + 1 end
   env.SendChatMessage = function() error("must not use ordinary chat") end
+  env.CreateColor = function(...) return { ... } end
+  env.GameFontHighlightSmall = {}
+  env.EventRegistry = { callbacks = {} }
+  function env.EventRegistry:RegisterCallback(event, callback, owner)
+    self.callbacks[event] = self.callbacks[event] or {}
+    self.callbacks[event][owner] = callback
+  end
+  function c:editEvent(event)
+    for owner, callback in pairs(env.EventRegistry.callbacks[event] or {}) do callback(owner) end
+  end
+  if options.noEditMode then env.EventRegistry = nil end
 
   local methods = {}
   function methods:SetScript(name, callback) self.scripts[name] = callback end
@@ -60,7 +71,13 @@ local function newClient(options)
     if wasShown and self.scripts.OnHide then self.scripts.OnHide(self) end
   end
   function methods:IsShown() return self.shown end
-  function methods:SetEnabled(value) self.enabled = value end
+  function methods:SetEnabled(value)
+    local changed = self.enabled ~= value
+    self.enabled = value
+    local callback = self.scripts[value and "OnEnable" or "OnDisable"]
+    if changed and callback then callback(self) end
+  end
+  function methods:IsEnabled() return self.enabled end
   function methods:SetText(value) self.text = value end
   function methods:GetText() return self.text or "" end
   local function frame(name)
@@ -71,13 +88,48 @@ local function newClient(options)
   end
   function methods:CreateFontString() return frame() end
   function methods:CreateTexture() return frame() end
-  for _, name in ipairs({ "SetSize", "SetPoint", "SetWidth", "SetFrameStrata", "SetFrameLevel", "SetToplevel",
+  function methods:GetFontString()
+    self.fontString = self.fontString or frame()
+    return self.fontString
+  end
+  function methods:SetFontString(value) self.fontString = value end
+  function methods:GetStringHeight() return self.stringHeight or 14 end
+  function methods:SetSize(width, height) self.width, self.height = width, height end
+  function methods:SetWidth(width) self.width = width end
+  function methods:SetHeight(height) self.height = height end
+  function methods:GetWidth() return self.width or 0 end
+  function methods:GetHeight() return self.height or 0 end
+  function methods:SetPoint(point, relativeTo, relativePoint, x, y)
+    self.point = { point, relativeTo, relativePoint, x, y }
+    if point == "CENTER" and relativeTo == env.UIParent then
+      local parentX, parentY = relativeTo:GetCenter()
+      self.centerX, self.centerY = parentX + x, parentY + y
+    end
+  end
+  function methods:ClearAllPoints() self.point = nil end
+  function methods:GetCenter() return self.centerX, self.centerY end
+  function methods:SetFrameLevel(level) self.frameLevel = level end
+  function methods:GetFrameLevel() return self.frameLevel or 1 end
+  function methods:SetMovable(value) self.movable = value end
+  function methods:SetClampedToScreen(value) self.clamped = value end
+  function methods:SetUserPlaced(value) self.userPlaced = value end
+  function methods:StartMoving() assert(self.movable and not c.combat); self.moving = true end
+  function methods:StopMovingOrSizing() self.moving = false end
+  function methods:SetAlpha(value) self.alpha = value end
+  function methods:CreateAnimationGroup() return frame() end
+  function methods:CreateAnimation() return frame() end
+  function methods:Play() self.playing = true end
+  function methods:Stop() self.playing = false end
+  for _, name in ipairs({ "SetFrameStrata", "SetToplevel", "SetJustifyH", "SetJustifyV", "SetWordWrap",
     "EnableMouse", "SetBackdrop", "SetBackdropColor", "SetBackdropBorderColor", "SetTextColor", "RegisterForClicks",
-    "SetNormalFontObject", "SetHighlightFontObject", "SetDisabledFontObject", "Raise" }) do
+    "SetNormalFontObject", "SetHighlightFontObject", "SetDisabledFontObject", "Raise", "RegisterForDrag",
+    "SetTexture", "SetGradient", "SetFromAlpha", "SetToAlpha", "SetDuration", "SetOrder" }) do
     methods[name] = function() end
   end
   env.CreateFrame = function(_, name) return frame(name) end
   env.UIParent = frame()
+  env.UIParent:SetSize(1920, 1080)
+  env.UIParent.centerX, env.UIParent.centerY = 960, 540
   env.C_Timer = { NewTimer = function(delay, callback)
     local timer = { at = c.now + delay, callback = callback }
     function timer:Cancel() self.cancelled = true end
@@ -502,6 +554,97 @@ test("Actual Blizzard lockdown blocks sending and explicit API refusal is not re
   c:advance(40); c.env.SlashCmdList.RAIDREMINDER("zombakstatus")
   eq(#c.sent, 1)
   assert(table.concat(c.messages, "\n"):find("AddOnMessageLockdown (11)", 1, true))
+end)
+
+test("Edit Mode shows a persistent preview even with notifications disabled and never calls LFG", function()
+  local c = newClient()
+  c:editEvent("EditMode.Enter")
+  local popup, selection = c:popup(), c.env.RaidReminderZombakBannerSelection
+  assert(popup:IsShown() and selection:IsShown())
+  eq(popup.action.enabled, false); eq(popup.dismiss.enabled, false); eq(popup.close.enabled, false)
+  eq(c.state.announcement, nil); eq(c.rr.DB.autoSearchZombakRaids, false)
+  c:click(); c:advance(120)
+  assert(popup:IsShown()); eq(#c.searches, 0); eq(#c.applications, 0); eq(#c.sent, 0)
+  c:editEvent("EditMode.Exit")
+  assert(not popup:IsShown() and not selection:IsShown())
+end)
+
+test("Dragging in Edit Mode persists a UIParent-relative position across reload and supports reset", function()
+  local c = newClient(); c:editEvent("EditMode.Enter")
+  local popup, selection = c:popup(), c.env.RaidReminderZombakBannerSelection
+  selection.scripts.OnDragStart(); assert(popup.moving)
+  popup.centerX, popup.centerY = 1160, 440
+  selection.scripts.OnDragStop(); assert(not popup.moving)
+  eq(c.rr.DB.zombakBannerPosition.x, 200); eq(c.rr.DB.zombakBannerPosition.y, -100)
+  eq(popup.point[2], c.env.UIParent); eq(popup.userPlaced, false)
+  c:editEvent("EditMode.Exit")
+  selection.scripts.OnDragStart(); assert(not popup.moving)
+  local reloaded = newClient({ db = c.rr.DB }); reloaded:editEvent("EditMode.Enter")
+  eq(reloaded:popup().point[4], 200); eq(reloaded:popup().point[5], -100)
+  reloaded.env.RaidReminderZombakBannerSelection.scripts.OnClick(nil, "RightButton")
+  eq(reloaded.rr.DB.zombakBannerPosition, nil); eq(reloaded:popup().point[4], 0); eq(reloaded:popup().point[5], 90)
+  c.env.SlashCmdList.RAIDREMINDER("resetbanner")
+  eq(c.rr.DB.zombakBannerPosition, nil); eq(popup.point[5], 90)
+end)
+
+test("Invalid and off-screen saved positions are recoverable after resolution changes", function()
+  for _, position in ipairs({ "broken", { x = "bad", y = 1 }, { x = 0/0, y = 1 }, { x = math.huge, y = 1 } }) do
+    local c = newClient({ db = { zombakBannerPosition = position } }); c:editEvent("EditMode.Enter")
+    eq(c:popup().point[4], 0); eq(c:popup().point[5], 90)
+  end
+  local c = newClient({ db = { zombakBannerPosition = { x = 5000, y = -5000 } } })
+  c:editEvent("EditMode.Enter")
+  local popup = c:popup()
+  eq(popup.clamped, true)
+  assert(math.abs(popup.point[4]) + popup:GetWidth()/2 < c.env.UIParent:GetWidth()/2)
+  c.env.UIParent:SetSize(800, 600); c:dispatch("DISPLAY_SIZE_CHANGED")
+  assert(math.abs(popup.point[4]) + popup:GetWidth()/2 < 400)
+  assert(math.abs(popup.point[5]) + popup:GetHeight()/2 < 300)
+end)
+
+test("Editing restores a live notification without extending its lifetime or restarting search", function()
+  local c = newClient(); c:found(); c:advance(10); c:editEvent("EditMode.Enter")
+  c:click(); eq(#c.applications, 0)
+  c:advance(10); c:editEvent("EditMode.Exit")
+  eq(c.state.currentZombakResultID, 42); eq(c:popup().action.enabled, true)
+  eq(c:popup().members.text, "17 / 30"); eq(#c.searches, 1)
+  c:advance(70); assert(not c:popup():IsShown()); eq(c.state.announcement, nil)
+end)
+
+test("Incoming and expired notifications cannot replace or close the Edit Mode preview", function()
+  local c = newClient(); c:enable(true); c:editEvent("EditMode.Enter")
+  local previewText = c:popup().activity.text
+  c:message(); eq(c:popup().activity.text, previewText); eq(c:popup().action.enabled, false)
+  c:editEvent("EditMode.Exit"); assert(c:popup():IsShown())
+  assert(c:popup().activity.text ~= previewText); eq(c:popup().action.enabled, true)
+  c:editEvent("EditMode.Enter"); c:advance(90)
+  assert(c:popup():IsShown()); eq(c.state.announcement, nil)
+  c:editEvent("EditMode.Exit"); assert(not c:popup():IsShown())
+  c:editEvent("EditMode.Enter"); c:message({ nonce = "disabled-in-edit" }); c:enable(false)
+  assert(c:popup():IsShown()); c:editEvent("EditMode.Exit"); assert(not c:popup():IsShown())
+end)
+
+test("Combat ends dragging and Edit Mode preview without sending protected requests", function()
+  local c = newClient(); c:editEvent("EditMode.Enter")
+  c.env.RaidReminderZombakBannerSelection.scripts.OnDragStart(); assert(c:popup().moving)
+  c.combat = true; c:dispatch("PLAYER_REGEN_DISABLED")
+  assert(not c:popup().moving and not c:popup():IsShown())
+  c:editEvent("EditMode.Enter"); assert(not c:popup():IsShown())
+  eq(#c.searches, 0); eq(#c.applications, 0)
+end)
+
+test("Closing the compact banner stops its animations and pending work", function()
+  local c = newClient(); c:enable(true); c:message()
+  assert(c:popup().appear.playing and c:popup().glowAnimation.playing)
+  c:popup().dismiss.scripts.OnClick()
+  assert(not c:popup():IsShown() and not c:popup().appear.playing and not c:popup().glowAnimation.playing)
+  eq(c.state.announcement, nil)
+  c:advance(100); eq(#c.searches, 0); eq(#c.applications, 0)
+end)
+
+test("Missing Edit Mode callbacks do not break normal notifications", function()
+  local c = newClient({ noEditMode = true }); c:found()
+  assert(c:popup():IsShown()); c:click(); eq(#c.applications, 1)
 end)
 
 print(string.format("%d targeted addon scenarios passed", tests))

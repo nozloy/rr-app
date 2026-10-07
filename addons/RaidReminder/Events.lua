@@ -25,6 +25,7 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
       RR.Options.Initialize()
     end
   elseif event == "PLAYER_LOGIN" then
+    RR.UI.ZombakRaidEditMode.Initialize()
     RR.Comm.RegisterAddonMessages()
     RR.Comm.UpdateZombakSubscription()
   elseif event == "PLAYER_ENTERING_WORLD" then

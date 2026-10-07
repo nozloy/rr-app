@@ -1,4 +1,5 @@
-import { ClipboardTextIcon, ShieldCheckIcon, UsersThreeIcon, type Icon } from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
+import { ClipboardTextIcon, ShieldCheckIcon, UsersThreeIcon } from "@phosphor-icons/react/dist/ssr";
 import type { AppLocale } from "@/lib/i18n";
 
 export type RaidCheckStep = {

@@ -11,6 +11,8 @@ SlashCmdList.RAIDREMINDER = function(message)
     RR.ZombakRaids.TestPopup()
   elseif command == "zombakstatus" then
     RR.Comm.PrintZombakStatus()
+  elseif command == "resetbanner" then
+    RR.UI.ZombakRaidEditMode.ResetPosition()
   elseif command == "debug" then
     RR.State.debugZombak = not RR.State.debugZombak
     print("[RR] " .. InterfaceText(RR.State.debugZombak and "zombakDebugOn" or "zombakDebugOff"))
