@@ -123,3 +123,58 @@ function GetWhisperLocale(entry)
 
   return "enUS"
 end
+
+-- Lua's ASCII string.lower does not fold Cyrillic. Map Russian UTF-8 pairs
+-- explicitly before folding ASCII (the English realm alias also occurs in APIs).
+local cyrillicLower = {}
+local uppercase = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+local lowercase = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+for index = 1, #uppercase, 2 do
+  cyrillicLower[uppercase:sub(index, index + 1)] = lowercase:sub(index, index + 1)
+end
+
+local function FoldCharacterName(value)
+  local folded = value:gsub("[\208\209][\128-\191]", function(character)
+    return cyrillicLower[character] or character
+  end)
+  -- Limit the C library's locale-sensitive lower() to individual ASCII bytes.
+  return (folded:gsub("[A-Z]", string.lower))
+end
+
+function NormalizeZombakCharacterName(fullName)
+  if (issecretvalue and issecretvalue(fullName)) or type(fullName) ~= "string" or fullName == "" then
+    return nil
+  end
+
+  local name, realm = fullName:match("^([^-]+)%-(.+)$")
+  if not name then
+    name = fullName
+    realm = (GetNormalizedRealmName and GetNormalizedRealmName()) or (GetRealmName and GetRealmName())
+  end
+  if type(realm) ~= "string" or realm == "" then
+    return nil
+  end
+
+  realm = FoldCharacterName(realm):gsub("[ \t\r\n%-]", "")
+  if realm == "рф" or realm == "ревущийфьорд" or realm == "howlingfjord" then
+    realm = "рф"
+  end
+  return FoldCharacterName(name) .. "-" .. realm
+end
+
+local zombakNames = {}
+for _, fullName in ipairs(RR.ZombakCharacters) do
+  zombakNames[NormalizeZombakCharacterName(fullName)] = fullName
+end
+
+function IsZombakCharacter(fullName)
+  local key = NormalizeZombakCharacterName(fullName)
+  return key ~= nil and zombakNames[key] ~= nil
+end
+
+RR.IsZombakCharacter = IsZombakCharacter
+RR.Realm.NormalizeZombakCharacterName = NormalizeZombakCharacterName
+RR.Realm.GetZombakDisplayName = function(fullName)
+  local key = NormalizeZombakCharacterName(fullName)
+  return key and zombakNames[key] or nil
+end

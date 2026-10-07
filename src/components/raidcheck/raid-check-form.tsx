@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   CircleSlash,
   Hourglass,
-  Loader2,
   MoreVertical,
   Search,
   ShieldAlert,
@@ -40,17 +39,23 @@ import {
 import { useAppLocale } from "@/components/shell/locale-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RaidCheckEmpty } from "@/components/raidcheck/raid-check-empty";
+import { RaidCheckSubmit } from "@/components/raidcheck/raid-check-submit";
 import {
   AddonExportParseError,
   parseAddonExportString,
@@ -571,7 +576,13 @@ function RaidCheckImportSummary({
 export function RaidCheckForm() {
   const locale = useAppLocale();
   const exportTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasChosenRaid = useRef(false);
+  const hasChosenDifficulty = useRef(false);
+  const exportInputId = useId();
+  const raidInputId = useId();
+  const difficultyLabelId = useId();
   const [exportText, setExportText] = useState("");
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [selectedDifficultyID, setSelectedDifficultyID] = useState("15");
   const [selectedRaidSlug, setSelectedRaidSlug] = useState(
     currentRaidInstances[0]?.slug ?? "",
@@ -589,6 +600,11 @@ export function RaidCheckForm() {
   const [isDetailsRefreshing, startDetailsRefreshTransition] = useTransition();
   const [isBookmarkPending, startBookmarkTransition] = useTransition();
   const preview = useMemo(() => getPreview(exportText, locale), [exportText, locale]);
+  const exportError = preview.status === "error"
+    ? preview.message
+    : hasAttemptedSubmit && preview.status === "idle"
+      ? t(locale, "raidcheck.pasteFirst")
+      : null;
   const resultStats = getResultStats(result);
   const resultRows = useMemo(
     () => (result?.status === "success" ? result.rows : []),
@@ -622,6 +638,7 @@ export function RaidCheckForm() {
   }, [classFilter, lockoutFilter, resultRows, searchQuery]);
   const difficultyOptions =
     preview.status === "ready" ? preview.options : RAID_CHECK_DIFFICULTIES;
+  const selectedRaid = currentRaidInstances.find((raid) => raid.slug === selectedRaidSlug);
 
   const resizeExportTextarea = useCallback(() => {
     const textarea = exportTextareaRef.current;
@@ -631,7 +648,7 @@ export function RaidCheckForm() {
     }
 
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(190, textarea.scrollHeight)}px`;
+    textarea.style.height = `${Math.max(80, textarea.scrollHeight)}px`;
   }, []);
 
   useEffect(() => {
@@ -640,13 +657,26 @@ export function RaidCheckForm() {
 
   useEffect(() => {
     if (preview.status === "ready") {
-      setSelectedDifficultyID(String(preview.defaultDifficultyID));
-      setSelectedRaidSlug(getDefaultRaidSlug(preview));
+      setSelectedDifficultyID((current) =>
+        hasChosenDifficulty.current && preview.options.some((option) => String(option.id) === current)
+          ? current
+          : String(preview.defaultDifficultyID),
+      );
+      if (!hasChosenRaid.current) {
+        setSelectedRaidSlug(getDefaultRaidSlug(preview));
+      }
     }
   }, [preview]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isPending) return;
+    if (preview.status !== "ready") {
+      setHasAttemptedSubmit(true);
+      exportTextareaRef.current?.focus();
+      return;
+    }
 
     startTransition(async () => {
       const nextResult = await raidCheckAction({
@@ -746,141 +776,111 @@ export function RaidCheckForm() {
     });
   }
 
-  const canSubmit = preview.status === "ready" && Boolean(selectedRaidSlug) && !isPending;
-
   return (
-    <section className="raidcheck-workbench" id="raidcheck-workbench">
-      <Card className="raidcheck-panel raidcheck-input-panel">
+    <section className="raidcheck-workbench" id="raidcheck-workbench" data-has-result={result?.status === "success"}>
+      <Card className="raidcheck-panel raidcheck-input-panel raid-workshop-metal">
+        <CardHeader className="raid-workshop-panel-heading">
+          <CardTitle>{locale === "ru" ? "1. Вставьте строку из аддона" : "1. Paste your addon string"}</CardTitle>
+        </CardHeader>
         <CardContent className="raidcheck-panel-content">
           <form className="raidcheck-form" onSubmit={handleSubmit}>
-            <div className="raidcheck-panel-heading">
-              <div>
-                <div className="eyebrow">{t(locale, "raidcheck.source")}</div>
-                <h2>{t(locale, "raidcheck.addonString")}</h2>
-              </div>
-            </div>
+            <FieldGroup>
+              <Field className="raidcheck-field" data-invalid={Boolean(exportError)}>
+                <FieldLabel className="sr-only" htmlFor={exportInputId}>{t(locale, "raidcheck.addonString")}</FieldLabel>
+                <FieldDescription className="raidcheck-copy" id={exportInputId + "-hint"}>{t(locale, "raidcheck.useFreshExport")}</FieldDescription>
+                <ScrollArea className="raidcheck-textarea-scroll">
+                  <Textarea
+                    id={exportInputId}
+                    aria-describedby={exportInputId + (exportError ? "-hint " + exportInputId + "-error" : "-hint")}
+                    aria-invalid={Boolean(exportError)}
+                    className="raidcheck-textarea"
+                    onChange={(event) => {
+                      setExportText(event.currentTarget.value);
+                      setHasAttemptedSubmit(false);
+                      resetResultState();
+                      window.requestAnimationFrame(resizeExportTextarea);
+                    }}
+                    placeholder="RR1?name=...&realm=...&instance=...&roster=..."
+                    ref={exportTextareaRef}
+                    readOnly={isPending}
+                    value={exportText}
+                  />
+                </ScrollArea>
+                {exportError ? <FieldError id={exportInputId + "-error"}>{exportError}</FieldError> : null}
+                <RaidCheckImportSummary locale={locale} preview={preview} />
+              </Field>
+            </FieldGroup>
 
-            <p className="raidcheck-copy">
-              {t(locale, "raidcheck.useFreshExport")} <code className="code-inline">/rr</code>.
-            </p>
-
-            <label className="raidcheck-field">
-              <span className="field-label">{t(locale, "raidcheck.addonString")}</span>
-              <ScrollArea className="raidcheck-textarea-scroll">
-                <Textarea
-                  className="raidcheck-textarea"
-                  onChange={(event) => {
-                    setExportText(event.currentTarget.value);
+            <h2 className="raid-workshop-step-heading">{locale === "ru" ? "2. Настройте проверку" : "2. Set up your check"}</h2>
+            <FieldGroup className="raid-workshop-settings">
+              <Field className="raidcheck-field" data-disabled={isPending}>
+                <FieldLabel htmlFor={raidInputId}>{t(locale, "raidcheck.raidToCheck")}</FieldLabel>
+                <Select
+                  disabled={isPending}
+                  onValueChange={(value) => {
+                    hasChosenRaid.current = true;
+                    setSelectedRaidSlug(value);
                     resetResultState();
-                    window.requestAnimationFrame(resizeExportTextarea);
                   }}
-                  placeholder="RR1?name=...&realm=...&instance=...&roster=..."
-                  ref={exportTextareaRef}
-                  value={exportText}
-                />
-              </ScrollArea>
-            </label>
-
-            {preview.status === "error" ? (
-              <p className="status-note error">{preview.message}</p>
-            ) : null}
-
-            <RaidCheckImportSummary locale={locale} preview={preview} />
-
-            <label className="raidcheck-field">
-              <span className="field-label">{t(locale, "raidcheck.raidToCheck")}</span>
-              <Select
-                disabled={preview.status !== "ready"}
-                onValueChange={(value) => {
-                  setSelectedRaidSlug(value);
-                  resetResultState();
-                }}
-                value={selectedRaidSlug}
-              >
-                <SelectTrigger className="raidcheck-select">
-                  <SelectValue placeholder={t(locale, "raidcheck.chooseCurrentRaid")} />
-                </SelectTrigger>
-                <SelectContent className="raidcheck-select-content">
-                  <SelectItem value={ALL_SEASON_RAIDS_VALUE}>
-                    <span className="raidcheck-premium-option">
-                      <span>{t(locale, "raidcheck.allSeasonRaids")}</span>
-                      <span className="raidcheck-premium-tag">{t(locale, "raidcheck.summaryPremium")}</span>
-                    </span>
-                  </SelectItem>
-                  {currentRaidInstances.map((raid) => (
-                    <SelectItem key={raid.slug} value={raid.slug}>
-                      {getLocalizedRaidName(raid, locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-
-            <div className="raidcheck-field">
-              <span className="field-label">{t(locale, "raidcheck.difficulty")}</span>
-              <div
-                aria-label={t(locale, "raidcheck.difficulty")}
-                className="raidcheck-difficulty-tabs"
-                role="radiogroup"
-              >
-                {difficultyOptions.map((difficulty) => {
-                  const difficultyID = String(difficulty.id);
-                  const isSelected = selectedDifficultyID === difficultyID;
-
-                  return (
-                    <button
-                      aria-checked={isSelected}
-                      className="raidcheck-difficulty-tab"
-                      data-selected={isSelected ? "true" : undefined}
-                      disabled={preview.status !== "ready"}
-                      key={difficulty.id}
-                      onClick={() => {
-                        setSelectedDifficultyID(difficultyID);
-                        resetResultState();
-                      }}
-                      role="radio"
-                      type="button"
-                    >
+                  value={selectedRaidSlug}
+                >
+                  <SelectTrigger className="raidcheck-select" id={raidInputId}>
+                    {selectedRaid ? <Image className="raid-workshop-raid-icon" src={selectedRaid.artPath} width={36} height={36} alt="" /> : null}
+                    <SelectValue placeholder={t(locale, "raidcheck.chooseCurrentRaid")} />
+                  </SelectTrigger>
+                  <SelectContent className="raidcheck-select-content raid-workshop-select-menu">
+                    <SelectGroup>
+                      <SelectItem value={ALL_SEASON_RAIDS_VALUE}>
+                        <span className="raidcheck-premium-option">
+                          <span>{t(locale, "raidcheck.allSeasonRaids")}</span>
+                          <Badge variant="secondary" className="raidcheck-premium-tag">{t(locale, "raidcheck.summaryPremium")}</Badge>
+                        </span>
+                      </SelectItem>
+                      {currentRaidInstances.map((raid) => (
+                        <SelectItem key={raid.slug} value={raid.slug}>{getLocalizedRaidName(raid, locale)}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field className="raidcheck-field" data-disabled={isPending}>
+                <FieldTitle id={difficultyLabelId}>{t(locale, "raidcheck.difficulty")}</FieldTitle>
+                <ToggleGroup
+                  aria-labelledby={difficultyLabelId}
+                  className="raidcheck-difficulty-tabs"
+                  disabled={isPending}
+                  type="single"
+                  spacing={0}
+                  value={selectedDifficultyID}
+                  onValueChange={(value) => {
+                    if (!value) return;
+                    hasChosenDifficulty.current = true;
+                    setSelectedDifficultyID(value);
+                    resetResultState();
+                  }}
+                >
+                  {difficultyOptions.map((difficulty) => (
+                    <ToggleGroupItem className="raidcheck-difficulty-tab" key={difficulty.id} value={String(difficulty.id)}>
                       {difficulty.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Button
-              className="raidcheck-submit"
-              disabled={!canSubmit}
-              size="lg"
-              type="submit"
-            >
-              {isPending ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Search className="size-4" aria-hidden="true" />
-              )}
-              {t(locale, "raidcheck.submit")}
-            </Button>
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </Field>
+            </FieldGroup>
+            <RaidCheckSubmit locale={locale} disabled={isPending || !selectedRaidSlug} pending={isPending} />
           </form>
         </CardContent>
       </Card>
 
-      <Card className="raidcheck-panel raidcheck-result-panel">
+      <Card className="raidcheck-panel raidcheck-result-panel raid-workshop-metal" aria-busy={isPending}>
+        <CardHeader className="raid-workshop-panel-heading">
+          <CardTitle>{locale === "ru" ? "Результат проверки" : "Check results"}</CardTitle>
+        </CardHeader>
         <CardContent className="raidcheck-panel-content">
           <div className="raidcheck-result-header">
-            <div>
-              <div className="eyebrow">{t(locale, "raidcheck.result")}</div>
-              <h2>{t(locale, "raidcheck.resultTable")}</h2>
-              {result?.status === "success" ? (
-                <p className="raidcheck-copy">
-                  {result.raidName} · {result.difficulty?.label}
-                </p>
-              ) : (
-                <p className="raidcheck-copy">
-                  {t(locale, "raidcheck.resultEmpty")}
-                </p>
-              )}
-            </div>
+            {result?.status === "success" ? (
+              <p className="raidcheck-copy">{result.raidName} · {result.difficulty?.label}</p>
+            ) : null}
             {resultStats ? (
               <div className="raidcheck-result-stats" aria-label={t(locale, "raidcheck.result")}>
                 <div data-tone="blue">
@@ -917,14 +917,14 @@ export function RaidCheckForm() {
           </div>
 
           {result?.warnings.map((warning) => (
-            <p className="status-note warn" key={warning}>
-              <TriangleAlert className="size-4" aria-hidden="true" />
-              {warning}
-            </p>
+            <Alert className="raid-workshop-alert" key={warning}>
+              <TriangleAlert aria-hidden="true" />
+              <AlertDescription>{warning}</AlertDescription>
+            </Alert>
           ))}
 
           {result?.status === "error" ? (
-            <p className="status-note error">{result.message}</p>
+            <Alert variant="destructive" className="raid-workshop-alert"><AlertDescription>{result.message}</AlertDescription></Alert>
           ) : null}
 
           {result?.status === "success" ? (
@@ -940,29 +940,33 @@ export function RaidCheckForm() {
                   />
                 </label>
                 <Select onValueChange={setClassFilter} value={classFilter}>
-                  <SelectTrigger className="raidcheck-filter-select">
+                  <SelectTrigger className="raidcheck-filter-select" aria-label={t(locale, "raidcheck.class")}>
                     <SelectValue placeholder={t(locale, "raidcheck.allClasses")} />
                   </SelectTrigger>
-                  <SelectContent className="raidcheck-select-content">
-                    <SelectItem value="all">{t(locale, "raidcheck.allClasses")}</SelectItem>
-                    {classOptions.map((classFile) => (
-                      <SelectItem key={classFile} value={classFile}>
-                        {getClassLabel(classFile, locale)}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="raidcheck-select-content raid-workshop-select-menu">
+                    <SelectGroup>
+                      <SelectItem value="all">{t(locale, "raidcheck.allClasses")}</SelectItem>
+                      {classOptions.map((classFile) => (
+                        <SelectItem key={classFile} value={classFile}>
+                          {getClassLabel(classFile, locale)}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 <Select onValueChange={setLockoutFilter} value={lockoutFilter}>
-                  <SelectTrigger className="raidcheck-filter-select">
+                  <SelectTrigger className="raidcheck-filter-select" aria-label={t(locale, "raidcheck.lockout")}>
                     <SelectValue placeholder={t(locale, "raidcheck.allLockouts")} />
                   </SelectTrigger>
-                  <SelectContent className="raidcheck-select-content">
-                    <SelectItem value="all">{t(locale, "raidcheck.allLockouts")}</SelectItem>
-                    {Object.entries(getStatusLabels(locale)).map(([status, label]) => (
-                      <SelectItem key={status} value={status}>
-                        {label}
-                      </SelectItem>
-                    ))}
+                  <SelectContent className="raidcheck-select-content raid-workshop-select-menu">
+                    <SelectGroup>
+                      <SelectItem value="all">{t(locale, "raidcheck.allLockouts")}</SelectItem>
+                      {Object.entries(getStatusLabels(locale)).map(([status, label]) => (
+                        <SelectItem key={status} value={status}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -970,6 +974,7 @@ export function RaidCheckForm() {
               <ScrollArea
                 className="raidcheck-table-shell"
                 scrollbarOrientation="horizontal"
+                type="always"
               >
                 <table className="raidcheck-table">
                   <colgroup>
@@ -1012,12 +1017,7 @@ export function RaidCheckForm() {
               </ScrollArea>
             </>
           ) : (
-            <div className="raidcheck-empty-result">
-              <div className="raidcheck-empty-glow" aria-hidden="true" />
-              <Search className="size-9" aria-hidden="true" />
-              <h3>{t(locale, "raidcheck.readyToCheck")}</h3>
-              <p>{t(locale, "raidcheck.readyToCheckCopy")}</p>
-            </div>
+            <RaidCheckEmpty locale={locale} pending={isPending} />
           )}
         </CardContent>
       </Card>

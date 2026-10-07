@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
         pathname: "/home/**",
       },
       {
+        pathname: "/raidcheck/workshop/**",
+      },
+      {
         pathname: "/dungeons/**",
       },
       {

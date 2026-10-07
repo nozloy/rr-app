@@ -4,14 +4,45 @@ setfenv(1, RR.Env)
 
 -- Events.lua
 raidCheckEventFrame = CreateFrame("Frame")
+raidCheckEventFrame:RegisterEvent("ADDON_LOADED")
 raidCheckEventFrame:RegisterEvent("PLAYER_LOGIN")
+raidCheckEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+raidCheckEventFrame:RegisterEvent("CHANNEL_UI_UPDATE")
+raidCheckEventFrame:RegisterEvent("LFG_LIST_ACTIVE_ENTRY_UPDATE")
+raidCheckEventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
+raidCheckEventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULT_UPDATED")
+raidCheckEventFrame:RegisterEvent("LFG_LIST_SEARCH_FAILED")
+raidCheckEventFrame:RegisterEvent("LFG_LIST_APPLICATION_STATUS_UPDATED")
+raidCheckEventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+raidCheckEventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 raidCheckEventFrame:RegisterEvent("CHAT_MSG_ADDON")
 raidCheckEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 raidCheckEventFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
 raidCheckEventFrame:RegisterEvent("INSPECT_READY")
 raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
-  if event == "PLAYER_LOGIN" then
+  if event == "ADDON_LOADED" then
+    if ... == ADDON_NAME then
+      RR.Options.Initialize()
+    end
+  elseif event == "PLAYER_LOGIN" then
     RR.Comm.RegisterAddonMessages()
+    RR.Comm.UpdateZombakSubscription()
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    RR.Comm.UpdateZombakSubscription()
+  elseif event == "CHANNEL_UI_UPDATE" then
+    RR.Comm.HandleChannelUpdate()
+  elseif event == "LFG_LIST_ACTIVE_ENTRY_UPDATE" then
+    RR.ZombakRaids.HandleActiveEntryUpdate(...)
+  elseif event == "LFG_LIST_SEARCH_RESULTS_RECEIVED" then
+    RR.ZombakRaids.HandleSearchResults()
+  elseif event == "LFG_LIST_SEARCH_RESULT_UPDATED" then
+    RR.ZombakRaids.HandleResultUpdated(...)
+  elseif event == "LFG_LIST_SEARCH_FAILED" then
+    RR.ZombakRaids.HandleSearchFailed(...)
+  elseif event == "LFG_LIST_APPLICATION_STATUS_UPDATED" then
+    RR.ZombakRaids.HandleApplicationStatus(...)
+  elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+    RR.ZombakRaids.RefreshPopup()
   elseif event == "CHAT_MSG_ADDON" then
     RR.Comm.HandleAddonMessage(...)
   elseif event == "INSPECT_READY" then

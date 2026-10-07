@@ -35,3 +35,6 @@ raidLockoutContent = nil
 raidLockoutStatus = nil
 raidLockoutRows = {}
 raidLockoutEventFrame = nil
+
+RR.State.ZombakRaid = { seen = {}, latest = {} }
+RR.State.debugZombak = false

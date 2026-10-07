@@ -11,7 +11,7 @@ type AppHeaderProps = {
   user?: AppHeaderUser | null;
 };
 
-async function getHeaderUser(): Promise<AppHeaderUser | null> {
+export async function getHeaderUser(): Promise<AppHeaderUser | null> {
   const session = await getOptionalSession();
   const locale = await getRequestLocale();
 

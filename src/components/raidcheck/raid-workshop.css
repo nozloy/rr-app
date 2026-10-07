@@ -1,0 +1,354 @@
+/* Illustrated layers and metal surfaces are scoped to the raid workshop. */
+.raid-workshop {
+  --raid-gold: #efdc66;
+  --raid-green: #b2f14f;
+  --raid-copy: #d1d0ca;
+  --raid-border: #67513b;
+  background: #100e0b;
+}
+
+.raid-workshop-scenery {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.raid-workshop-environment {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: max(100vh, 1060px);
+  object-fit: cover;
+  object-position: center top;
+  mask-image: linear-gradient(#000 84%, transparent 100%);
+}
+
+.raid-workshop-crates {
+  position: absolute;
+  z-index: 2;
+  right: -28px;
+  bottom: 70px;
+  width: clamp(240px, 29vw, 490px);
+  height: auto;
+  pointer-events: none;
+}
+.raid-workshop:has([data-has-result='true']) .raid-workshop-crates { z-index: -1; }
+
+.raid-workshop-content {
+  position: relative;
+  z-index: 1;
+  width: min(1440px, calc(100% - clamp(40px, 18vw, 300px)));
+  margin: 14px auto 85px;
+  flex: 1;
+}
+
+.raid-workshop-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 24px;
+  min-height: 230px;
+  margin-bottom: 16px;
+}
+
+.raid-workshop-sign { position: relative; container-type: inline-size; }
+.raid-workshop-sign-art img { display: block; width: 100%; height: auto; }
+.raid-workshop-subtitle {
+  position: absolute;
+  left: 23%;
+  right: 22%;
+  top: 81.8%;
+  transform: translateY(-50%);
+  margin: 0;
+  font-size: clamp(12px, 2.65cqw, 19px);
+  font-weight: 400;
+  line-height: 1.23;
+  color: #ecece7;
+  text-shadow: 0 2px 2px #000;
+  text-align: left;
+}
+.raid-workshop-title-en {
+  position: absolute;
+  inset: 25% 15% auto;
+  padding: 2% 0;
+  margin: 0;
+  background: #1b1c15;
+  color: var(--raid-green);
+  font-size: 7cqw;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.raid-workshop .raid-workshop-metal {
+  position: relative;
+  min-width: 0;
+  border: 1px solid #9a6c30;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(133deg, transparent 0 57px, #bba16c05 58px, transparent 59px 116px),
+    radial-gradient(ellipse at 30% 0, #242520 0, #121413 45%, #0b0c0b 100%);
+  box-shadow: inset 0 0 0 3px #161712, inset 0 0 35px #000b, 0 5px 14px #000b;
+  backdrop-filter: none;
+}
+
+.raid-workshop-metal::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  z-index: 2;
+  border: 40px solid transparent;
+  border-image: url('/raidcheck/workshop/panel-frame.webp') 15% / 40px / 0 stretch;
+  pointer-events: none;
+}
+
+.raid-workshop .raid-workshop-addon {
+  min-height: 212px;
+  margin: 0 0 6px;
+  padding: 23px 22px 24px;
+  overflow: visible;
+  background:
+    radial-gradient(ellipse at 79% 23%, #9b20e160, transparent 53%),
+    repeating-linear-gradient(125deg, transparent 0 70px, #a838f53d 71px, transparent 73px 122px),
+    linear-gradient(115deg, #181422 20%, #2f0c4d 100%);
+  box-shadow: inset 0 0 28px #090211, 0 0 30px #8a23dd39;
+}
+.raid-workshop-addon-heading { position: relative; z-index: 3; width: 68%; padding: 0; gap: 8px; }
+.raid-workshop-addon-heading h3 { font-size: clamp(16px, 1.25vw, 19px); line-height: 1.2; font-weight: 700; color: var(--raid-gold); text-transform: uppercase; letter-spacing: 0; }
+.raid-workshop-addon-heading p { font-size: 15px; line-height: 1.3; color: var(--raid-copy); }
+.raid-workshop-addon-content { position: relative; z-index: 3; padding: 15px 0 0; width: 65%; }
+.raid-workshop .raid-workshop-download {
+  min-height: 48px;
+  padding: 10px 24px;
+  gap: 12px;
+  border: 1px solid #c87bff;
+  border-radius: 7px;
+  background: linear-gradient(#a127f1, #6c09c7 55%, #400080);
+  color: #fff4ff;
+  font-size: 20px;
+  font-weight: 700;
+  box-shadow: inset 0 0 8px #d77aff40, 0 0 20px #a020d62a;
+}
+.raid-workshop .raid-workshop-download:hover { background: linear-gradient(#ba4cfc, #771add 55%, #510c96); }
+.raid-workshop-download svg { width: 25px; height: 25px; }
+.raid-workshop-goblin { position: absolute; z-index: 4; width: min(43%, 240px); height: auto; right: -18px; bottom: -5px; pointer-events: none; }
+
+.raid-workshop .raidcheck-process { gap: 20px; margin: 0 0 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.raid-workshop .raidcheck-process-card { overflow: visible; }
+.raid-workshop .raidcheck-process-card::before { content: none; }
+.raid-workshop .raidcheck-process-card::after { inset: -6px; border-image-width: 19px; filter: none; opacity: 1; background: none; width: auto; height: auto; transform: none; }
+.raid-workshop .raidcheck-process-content { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 16px; align-items: center; min-height: 91px; padding: 14px 20px; }
+.raid-workshop .raidcheck-process-content > * { margin: 0; }
+.raid-workshop .raidcheck-process-content h3 { margin: 0 0 3px; font-size: 18px; line-height: 1.1; font-weight: 700; color: var(--raid-gold); letter-spacing: 0; }
+.raid-workshop .raidcheck-process-content p { font-size: 15px; line-height: 1.2; color: var(--raid-copy); margin: 0; }
+.raid-workshop .raidcheck-process-icon { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; border: 1px solid #59683655; color: #efdf43; background: radial-gradient(circle at 40% 30%, #496718, #173511 70%); box-shadow: 0 0 18px #8af41e14, inset 0 1px 4px #baf84038; }
+.raid-workshop .raidcheck-process-icon svg { width: 37px; height: 37px; filter: drop-shadow(0 2px 2px #000); }
+.raid-workshop .raidcheck-process-card[data-tone='blue'] .raidcheck-process-icon { color: #28cdfb; border-color: #318fba60; background: radial-gradient(circle at 40% 30%, #115d77, #072831 70%); box-shadow: 0 0 18px #18ace321; }
+
+.raid-workshop .raidcheck-workbench { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 26px; margin: 0; }
+.raid-workshop .raidcheck-panel { padding: 9px; overflow: visible; }
+.raid-workshop .raid-workshop-panel-heading,
+.raid-workshop .raid-workshop-step-heading {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 10px 18px;
+  border: 1px solid #876537;
+  border-radius: 1px;
+  background: linear-gradient(105deg, #22241f, #11130f 70%);
+  box-shadow: inset 0 1px #ad8a4960, 0 2px 4px #000;
+  color: var(--raid-gold);
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.raid-workshop-panel-heading::before,
+.raid-workshop-panel-heading::after,
+.raid-workshop-step-heading::before,
+.raid-workshop-step-heading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #221e17;
+  border-radius: 50%;
+  background: radial-gradient(at 35% 28%, #c5ad7b, #685335 47%, #201c15 78%);
+  box-shadow: 0 1px 1px #000, 0 -1px 1px #bba27680;
+  transform: translateY(-50%);
+}
+.raid-workshop-panel-heading::before, .raid-workshop-step-heading::before { left: 5px; }
+.raid-workshop-panel-heading::after, .raid-workshop-step-heading::after { right: 5px; }
+.raid-workshop-panel-heading h3 { font: inherit; letter-spacing: 0; margin: 0; }
+.raid-workshop .raidcheck-panel-content { display: block; padding: 14px 18px 12px; min-width: 0; }
+.raid-workshop .raidcheck-form { gap: 12px; }
+.raid-workshop .raidcheck-form > [data-slot='field-group'] { gap: 10px; }
+.raid-workshop .raidcheck-copy { font-size: 15px; line-height: 1.25; font-weight: 400; color: var(--raid-copy); margin: 0; }
+.raid-workshop .raidcheck-field { min-width: 0; gap: 8px; }
+.raid-workshop .raidcheck-field [data-slot='field-label'] { font-size: 15px; line-height: 1.2; font-weight: 500; color: #e8e8df; opacity: 1; }
+.raid-workshop .raidcheck-textarea-scroll { height: 82px; border: 1px solid #727b82; border-radius: 5px; background: linear-gradient(145deg, #151a1c, #0c1011); box-shadow: inset 0 1px 6px #000; }
+.raid-workshop .raidcheck-textarea-scroll:focus-within { border-color: var(--raid-green); box-shadow: 0 0 0 2px #b2f14f28; }
+.raid-workshop .raidcheck-textarea { min-height: 80px; padding: 12px 15px; font-size: 14px; line-height: 1.45; color: #e4e7d9; background: transparent; border: 0; box-shadow: none; overflow-wrap: anywhere; }
+.raid-workshop .raidcheck-textarea::placeholder { color: #a9adb1; }
+.raid-workshop .raidcheck-import-status { min-height: 19px; padding: 0; gap: 6px; border: 0; border-radius: 0; background: none; color: var(--raid-green); font-size: 14px; box-shadow: none; }
+.raid-workshop .raidcheck-import-status svg { color: inherit; width: 16px; height: 16px; flex-shrink: 0; }
+.raid-workshop .raidcheck-import-status[data-state='error'] { color: #f99881; }
+.raid-workshop .raidcheck-import-status-copy { min-width: 0; }
+.raid-workshop .raidcheck-import-status-copy strong { font-size: 14px; }
+.raid-workshop .raidcheck-import-status-copy small { font-size: 13px; color: var(--raid-copy); overflow-wrap: anywhere; }
+.raid-workshop .raid-workshop-step-heading { margin: 0 -18px; }
+.raid-workshop .raid-workshop-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.raid-workshop .raidcheck-select,
+.raid-workshop .raidcheck-filter-select { min-width: 0; height: 42px; border: 1px solid #6d767c; border-radius: 5px; background: linear-gradient(#192023, #0f1314); color: #ededdf; box-shadow: inset 0 1px 3px #000; font: inherit; font-size: 15px; }
+.raid-workshop .raidcheck-select:disabled { opacity: .78; }
+.raid-workshop .raidcheck-select { padding: 0 10px 0 0; gap: 9px; }
+.raid-workshop .raidcheck-select:not(:has(img)) { padding-left: 10px; }
+.raid-workshop .raidcheck-select > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; text-align: left; }
+.raid-workshop-raid-icon { width: 39px; height: 39px; object-fit: cover; border-radius: 4px 0 0 4px; }
+.raid-workshop .raidcheck-difficulty-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 0; padding: 0; border: 1px solid #525f67; border-radius: 5px; background: linear-gradient(#192023, #0e1213); }
+.raid-workshop .raidcheck-difficulty-tab { min-width: 0; min-height: 40px; height: 40px; padding: 0 4px; border: 0; border-right: 1px solid #6b736629; border-radius: 0; background: none; color: #d2d6d6; font-size: 15px; font-weight: 400; box-shadow: none; }
+.raid-workshop .raidcheck-difficulty-tab:last-child { border-right: 0; }
+.raid-workshop .raidcheck-difficulty-tab:disabled { opacity: .8; }
+.raid-workshop .raidcheck-difficulty-tab[data-state='on'] { color: #241602; background: linear-gradient(#ffe072, #efb633 55%, #c78912); box-shadow: inset 0 1px 2px #ffffb8, 0 0 11px #ffc52d4d; font-weight: 600; opacity: 1; }
+.raid-workshop .raidcheck-difficulty-tab:hover:not(:disabled):not([data-state='on']) { color: #fff; background: #343a2a; }
+.raid-workshop-select-menu { border-color: #987b48; background: #171a13; color: #edeedc; }
+.raid-workshop-select-menu [role='option'][data-highlighted] { background: #3a4326; color: #f1e89b; }
+
+.raid-workshop .raid-workshop-submit {
+  position: relative;
+  container-type: inline-size;
+  display: block;
+  width: 96%;
+  max-width: 550px;
+  height: auto;
+  min-height: 0;
+  margin: 0 auto -14px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #102900;
+  box-shadow: none;
+  transition: filter .15s, transform .15s;
+}
+.raid-workshop-submit img { display: block; width: 100%; height: auto; }
+.raid-workshop .raid-workshop-submit:disabled { opacity: .88; cursor: not-allowed; }
+.raid-workshop .raid-workshop-submit:hover:not(:disabled) { background: transparent; filter: brightness(1.12) drop-shadow(0 0 12px #a4ed4830); transform: translateY(-2px); }
+.raid-workshop-submit-label { position: absolute; top: 43.5%; left: 30%; right: 17%; transform: translateY(-50%); font-size: clamp(18px, 5.6cqw, 33px); font-weight: 800; line-height: 1.2; text-transform: uppercase; text-align: center; text-shadow: 0 1px 1px #e5fc5180; }
+.raid-workshop .raid-workshop-submit-arrow { position: absolute; top: 43.5%; right: 12%; transform: translateY(-50%); width: 6%; height: auto; }
+.raid-workshop .raidcheck-result-panel { display: flex; flex-direction: column; min-height: 100%; }
+.raid-workshop .raidcheck-result-panel > .raidcheck-panel-content { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.raid-workshop .raidcheck-result-header { display: grid; gap: 12px; margin: 0; }
+.raid-workshop .raidcheck-result-header:empty { display: none; }
+.raid-workshop .raid-workshop-empty { position: relative; min-height: 340px; padding: 30px 20px 46px; border: 0; background: transparent; }
+.raid-workshop-empty [data-slot='empty-header'] { max-width: 400px; gap: 10px; }
+.raid-workshop-empty h3 { color: var(--raid-green); margin: 0; font-family: var(--font-workshop), sans-serif; font-weight: 700; font-size: 30px; line-height: 1.15; text-transform: uppercase; text-shadow: 0 2px 4px #000; }
+.raid-workshop-empty [data-slot='empty-description'] { color: var(--raid-copy); font-size: 16px; line-height: 1.4; text-wrap: pretty; }
+.raid-workshop .raid-workshop-tools { position: relative; display: grid; place-items: center; width: 140px; height: 140px; margin: 0 0 5px; }
+.raid-workshop-tools img { display: block; width: 140px; height: 140px; }
+.raid-workshop-tools:has(.raid-workshop-spinner) img { opacity: .28; }
+.raid-workshop-tools .raid-workshop-spinner { position: absolute; width: 56px; height: 56px; color: var(--raid-green); }
+.raid-workshop-graffiti { position: absolute; top: 22px; right: 0; margin: 0; transform: rotate(-17deg); color: #8f8e765e; font-size: 19px; line-height: 1.1; text-align: center; pointer-events: none; }
+.raid-workshop .raid-workshop-alert { border-color: #856c3766; background: #3d2a103b; color: var(--raid-gold); }
+.raid-workshop .raid-workshop-alert [data-slot='alert-description'] { color: inherit; font-size: 14px; }
+.raid-workshop .raid-workshop-alert.text-destructive { color: #ffa48e; border-color: #a74332; }
+.raid-workshop .raidcheck-result-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.raid-workshop .raidcheck-result-search { grid-column: 1 / -1; background: #141915; border-color: #5e6953; }
+.raid-workshop .raidcheck-table-shell { border-color: #626148; background: #0e120ed9; }
+.raid-workshop .raidcheck-table { min-width: 540px; }
+.raid-workshop .raidcheck-table-col-character { width: auto; }
+.raid-workshop .raidcheck-table-col-class { width: 60px; }
+.raid-workshop .raidcheck-table-col-lockout { width: 60px; }
+.raid-workshop .raidcheck-table-col-logs { width: 100px; }
+.raid-workshop .raidcheck-table-col-actions { width: 44px; }
+.raid-workshop .raidcheck-table-col-spacer { width: 0; }
+.raid-workshop .raidcheck-table td.raidcheck-table-spacer { padding: 0; }
+.raid-workshop .raidcheck-table thead th { color: #ede3a2; background: #292e1f; border-bottom-color: #626148; }
+.raid-workshop .raidcheck-table tbody tr { background: transparent; }
+.raid-workshop .raidcheck-table tbody tr:hover { background: #30382366; }
+.raid-workshop .raidcheck-table td { border-bottom-color: #6166423d; }
+.raid-workshop .raidcheck-result-stats > div { background: #1d2418; border-color: #69623b; }
+.raid-workshop .workshop-footer { position: relative; z-index: 5; }
+
+@media (min-width: 1800px) {
+  .raid-workshop-content { margin-top: 35px; }
+  .raid-workshop-hero { min-height: 280px; }
+}
+@media (max-width: 1280px) {
+  .raid-workshop-content { width: calc(100% - 72px); }
+  .raid-workshop-addon-heading { width: 66%; }
+  .raid-workshop-addon-heading p { font-size: 14px; }
+  .raid-workshop .raidcheck-process-content { padding: 14px; gap: 10px; grid-template-columns: 48px minmax(0, 1fr); }
+  .raid-workshop .raidcheck-process-icon { width: 48px; height: 48px; }
+  .raid-workshop .raidcheck-process-content p { font-size: 14px; }
+  .raid-workshop .raid-workshop-settings { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (max-width: 1050px) {
+  .raid-workshop-content { width: calc(100% - 56px); margin-top: 14px; margin-bottom: 110px; }
+  .raid-workshop-hero { min-height: 0; grid-template-columns: 1fr; gap: 28px; margin: 0 auto 24px; max-width: 760px; }
+  .raid-workshop-sign { width: min(100%, 720px); margin: 0 auto; }
+  .raid-workshop .raid-workshop-addon { min-height: 190px; margin: 0 12px; padding: 23px; }
+  .raid-workshop-addon-heading { width: 68%; }
+  .raid-workshop-addon-heading h3 { font-size: 19px; }
+  .raid-workshop-goblin { width: 225px; right: 0; bottom: -6px; }
+  .raid-workshop .raidcheck-process { gap: 15px; }
+  .raid-workshop .raidcheck-process-content { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 16px 12px; gap: 10px; }
+  .raid-workshop .raidcheck-process-content h3 { font-size: 18px; }
+  .raid-workshop .raidcheck-process-content p { font-size: 15px; }
+  .raid-workshop .raidcheck-workbench { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .raid-workshop .raid-workshop-settings { grid-template-columns: 1fr 1fr; }
+  .raid-workshop .raid-workshop-submit { max-width: 540px; }
+  .raid-workshop .raid-workshop-empty { min-height: 330px; }
+  .raid-workshop-environment { height: 1100px; width: 100%; object-position: 42% top; opacity: .8; }
+  .raid-workshop-crates { width: 260px; bottom: 80px; right: -40px; z-index: -1; }
+}
+@media (max-width: 600px) {
+  .raid-workshop-content { width: calc(100% - 32px); margin-top: 14px; margin-bottom: 104px; }
+  .raid-workshop-hero { gap: 24px; margin-bottom: 22px; }
+  .raid-workshop-sign-art { aspect-ratio: 4 / 1; overflow: hidden; margin: 0 -8px; }
+  .raid-workshop-subtitle { position: relative; inset: auto; transform: none; margin: 8px 12px 0; padding: 10px 12px; color: #e1e1d6; background: #151611e8; border: 1px solid #755531; border-radius: 2px; font-size: 15px; line-height: 1.35; text-align: center; }
+  .raid-workshop-title-en { top: 12%; font-size: 7cqw; }
+  .raid-workshop .raid-workshop-addon { min-height: 197px; padding: 18px 14px; margin: 0; }
+  .raid-workshop-addon-heading { width: 74%; gap: 7px; }
+  .raid-workshop-addon-heading h3 { font-size: 16px; max-width: 210px; }
+  .raid-workshop-addon-heading p { font-size: 14px; max-width: 190px; }
+  .raid-workshop-addon-content { padding-top: 12px; width: 70%; }
+  .raid-workshop .raid-workshop-download { min-height: 43px; padding: 8px 12px; font-size: 17px; gap: 8px; }
+  .raid-workshop-download svg { width: 21px; height: 21px; }
+  .raid-workshop-goblin { width: 138px; right: -12px; bottom: -4px; }
+  .raid-workshop .raidcheck-process { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 22px; }
+  .raid-workshop .raidcheck-process-content { grid-template-columns: 46px minmax(0, 1fr); gap: 15px; min-height: 84px; padding: 14px 17px; justify-items: start; text-align: left; }
+  .raid-workshop .raidcheck-process-content h3 { font-size: 18px; }
+  .raid-workshop .raidcheck-process-content p { font-size: 14px; }
+  .raid-workshop .raidcheck-process-icon { width: 46px; height: 46px; }
+  .raid-workshop .raidcheck-process-icon svg { width: 31px; height: 31px; }
+  .raid-workshop .raidcheck-panel { padding: 7px; }
+  .raid-workshop-metal::after { inset: -5px; border-image-width: 22px; }
+  .raid-workshop .raid-workshop-panel-heading, .raid-workshop .raid-workshop-step-heading { padding: 11px 16px; font-size: 18px; }
+  .raid-workshop .raidcheck-panel-content { padding: 12px 10px; }
+  .raid-workshop .raid-workshop-step-heading { margin: 0 -10px; }
+  .raid-workshop .raid-workshop-settings { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+  .raid-workshop .raidcheck-copy { font-size: 14px; line-height: 1.35; }
+  .raid-workshop .raidcheck-textarea-scroll { height: 102px; }
+  .raid-workshop .raidcheck-textarea { min-height: 100px; padding: 11px; font-size: 13px; }
+  .raid-workshop .raid-workshop-submit { width: calc(100% + 8px); margin: 1px -4px -10px; }
+  .raid-workshop-submit-label { font-size: 5.7cqw; }
+  .raid-workshop .raid-workshop-empty { min-height: 315px; padding: 36px 6px 28px; }
+  .raid-workshop-empty h3 { font-size: 25px; }
+  .raid-workshop-empty [data-slot='empty-description'] { font-size: 15px; }
+  .raid-workshop-graffiti { top: 9px; right: 2px; font-size: 15px; }
+  .raid-workshop-crates { width: 190px; bottom: 112px; }
+  .raid-workshop-environment { height: 910px; object-position: 37% top; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .raid-workshop .raid-workshop-submit { transition: none; }
+  .raid-workshop .raid-workshop-submit:hover:not(:disabled) { transform: none; }
+}
+
+@media (max-width: 380px) {
+  .raid-workshop-goblin { width: 104px; right: -8px; }
+}

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 export function ConditionalSiteFooter({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname?.startsWith("/dashboard") || pathname === "/kogda-raid") {
+  if (pathname === "/" || pathname === "/raidcheck" || pathname?.startsWith("/dashboard") || pathname === "/kogda-raid") {
     return null;
   }
 

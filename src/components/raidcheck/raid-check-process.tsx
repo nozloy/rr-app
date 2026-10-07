@@ -1,5 +1,5 @@
 import { getRaidCheckSteps } from "@/components/raidcheck/data";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AppLocale } from "@/lib/i18n";
 
 export function RaidCheckProcess({ locale }: { locale: AppLocale }) {
@@ -11,16 +11,16 @@ export function RaidCheckProcess({ locale }: { locale: AppLocale }) {
         const Icon = step.icon;
 
         return (
-          <Card className="raidcheck-process-card" data-tone={step.tone} key={step.label}>
-            <CardContent className="raidcheck-process-content">
+          <Card className="raidcheck-process-card raid-workshop-metal" data-tone={step.tone} key={step.label}>
+            <CardHeader className="raidcheck-process-content">
               <span className="raidcheck-process-icon">
-                <Icon className="size-5" aria-hidden="true" />
+                <Icon weight="duotone" aria-hidden="true" />
               </span>
               <div>
-                <h2>{step.label}</h2>
-                <p>{step.text}</p>
+                <CardTitle>{step.label}</CardTitle>
+                <CardDescription>{step.text}</CardDescription>
               </div>
-            </CardContent>
+            </CardHeader>
           </Card>
         );
       })}

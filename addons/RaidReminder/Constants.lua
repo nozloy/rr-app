@@ -23,6 +23,29 @@ INSPECT_TIMEOUT = 2.8
 INSPECT_DELAY = 0.25
 INSPECT_MAX_ATTEMPTS = 2
 
+ZOMBAK_RAID_EVENT = "ZOMBAK_RAID_CREATED"
+ZOMBAK_RAID_PROTOCOL_VERSION = "1"
+ZOMBAK_RAID_CHANNEL = "RaidReminderZombak"
+ZOMBAK_RAID_CATEGORY_ID = 3
+ZOMBAK_RAID_EVENT_MAX_AGE = 180
+ZOMBAK_RAID_POPUP_TIMEOUT = 90
+ZOMBAK_RAID_SEARCH_TIMEOUT = 15
+ZOMBAK_RAID_RESULT_TIMEOUT = 60
+ZOMBAK_RAID_MAX_ACTIVITIES = 16
+
+RR.ZombakCharacters = {
+  "Зомбак-рф",
+  "Зомбаксмерти-рф",
+  "Зомбакк-рф",
+  "Зомбакен-рф",
+  "Зомбакзверь-рф",
+  "Зомбактьмы-рф",
+  "Зомбакор-рф",
+  "Зомбакдх-рф",
+  "Зомбовоин-рф",
+  "Зомбакнзот-рф",
+}
+
 CLASS_CODES = {
   DEATHKNIGHT = "DK",
   DEMONHUNTER = "DH",

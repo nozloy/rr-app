@@ -1,55 +1,38 @@
-import Image from 'next/image'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { t, type AppLocale } from '@/lib/i18n'
+import Image from "next/image";
+import Link from "next/link";
+import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { t, type AppLocale } from "@/lib/i18n";
+
 export function RaidCheckHero({ locale }: { locale: AppLocale }) {
-	return (
-		<section className='raidcheck-hero' aria-labelledby='raidcheck-title'>
-			<Image
-				src='/home/hero-midnight-citadel.jpg'
-				alt=''
-				fill
-				priority
-				sizes='100vw'
-				className='raidcheck-hero-bg'
-			/>
-			<div className='raidcheck-hero-overlay' aria-hidden='true' />
-
-			<div className='raidcheck-hero-content'>
-				<div className='raidcheck-hero-copy'>
-					<div className='eyebrow'>{t(locale, 'raidcheck.heroEyebrow')}</div>
-					<h1 id='raidcheck-title'>{t(locale, 'raidcheck.title')}</h1>
-					<p>{t(locale, 'raidcheck.heroCopy')}</p>
-				</div>
-
-				<aside
-					className='raidcheck-addon-card'
-					aria-label={t(locale, 'raidcheck.addonDownloadTitle')}
-				>
-					<div className='raidcheck-addon-copy'>
-						<h2>{t(locale, 'raidcheck.addonDownloadTitle')}</h2>
-						<p>{t(locale, 'raidcheck.addonDownloadCopy')}</p>
-						<Button asChild className='raidcheck-addon-cta' size='lg'>
-							<Link
-								href='https://www.curseforge.com/wow/addons/raidreminder'
-								rel='noreferrer'
-								target='_blank'
-							>
-								{t(locale, 'raidcheck.downloadAddon')}
-								<Image
-									src='curseforge.svg'
-									alt=''
-									height={24}
-									width={24}
-									priority
-									sizes='100vw'
-									className='text-white'
-								/>
-							</Link>
-						</Button>
-					</div>
-				</aside>
-			</div>
-		</section>
-	)
+  return (
+    <section className="raid-workshop-hero" aria-labelledby="raidcheck-title">
+      <div className="raid-workshop-sign" data-locale={locale}>
+        <div className="raid-workshop-sign-art">
+          <Image src="/raidcheck/workshop/title-sign.webp" alt="" width={2098} height={749} sizes="(max-width: 700px) 100vw, 50vw" quality={95} priority />
+        </div>
+        <h1 className={locale === "ru" ? "sr-only" : "raid-workshop-title-en"} id="raidcheck-title">{t(locale, "raidcheck.title")}</h1>
+        <p className="raid-workshop-subtitle">{t(locale, "raidcheck.heroCopy")}</p>
+      </div>
+      <Card className="raid-workshop-addon raid-workshop-metal">
+        <CardHeader className="raid-workshop-addon-heading">
+          <CardTitle>{t(locale, "raidcheck.addonDownloadTitle")}</CardTitle>
+          <CardDescription>
+            {t(locale, "raidcheck.addonDownloadCopy")}<br />
+            {locale === "ru" ? "и всегда проверяйте рейды актуальной версией." : "and always check raids with the latest version."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="raid-workshop-addon-content">
+          <Button asChild className="raid-workshop-download" size="lg">
+            <Link href="https://www.curseforge.com/wow/addons/raidreminder" rel="noreferrer" target="_blank">
+              <DownloadSimpleIcon data-icon="inline-start" aria-hidden="true" />
+              {locale === "ru" ? "Скачать аддон" : "Download addon"}
+            </Link>
+          </Button>
+        </CardContent>
+        <Image className="raid-workshop-goblin" src="/raidcheck/workshop/addon-goblin.webp" alt="" width={1254} height={1254} sizes="(max-width: 700px) 140px, 320px" quality={95} priority />
+      </Card>
+    </section>
+  );
 }

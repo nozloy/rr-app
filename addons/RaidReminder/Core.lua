@@ -12,8 +12,11 @@ RR.Export = RR.Export or {}
 RR.Gear = RR.Gear or {}
 RR.Readiness = RR.Readiness or {}
 RR.UI = RR.UI or {}
+RR.Options = RR.Options or {}
+RR.ZombakRaids = RR.ZombakRaids or {}
 RR.Env = RR.Env or {}
 
+_G.RaidReminder = RR
 RR.Env.RR = RR
 RR.Env.ADDON_NAME = ADDON_NAME
 setmetatable(RR.Env, { __index = _G })

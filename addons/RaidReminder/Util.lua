@@ -51,6 +51,16 @@ function SafeCall(callback)
   return nil
 end
 
+function ZombakDebug(message)
+  if RR.State.debugZombak then
+    print("[RR] " .. tostring(message))
+  end
+end
+
+function IsZombakLFGRestricted()
+  return C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown()
+end
+
 function SetTextColor(fontString, colorName)
   local color = STATUS_COLORS[colorName] or STATUS_COLORS.white
   fontString:SetTextColor(color[1], color[2], color[3])
