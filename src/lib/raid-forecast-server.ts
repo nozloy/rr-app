@@ -23,9 +23,9 @@ type ForecastCache = {
   expiresAt: number;
   inFlight: Promise<CachedForecast> | null;
 };
-const globalForForecast = globalThis as typeof globalThis & { raidForecastCacheV3?: ForecastCache };
+const globalForForecast = globalThis as typeof globalThis & { raidForecastCacheV4?: ForecastCache };
 // Share the cooldown and pending request across server module reloads too.
-const cache = globalForForecast.raidForecastCacheV3 ??= { value: null, expiresAt: 0, inFlight: null };
+const cache = globalForForecast.raidForecastCacheV4 ??= { value: null, expiresAt: 0, inFlight: null };
 
 function toCurrentSnapshot(value: CachedForecast, now = new Date()): RaidForecastSnapshot {
   const reset = getEuWeeklyResetStart(now);
@@ -118,7 +118,7 @@ async function fetchSharedForecast(): Promise<CachedForecast> {
 
 // Next's shared Data Cache stores the snapshot; server time is always calculated live.
 // Keep the key stable across weekly resets so they cannot bypass the API cooldown.
-const readCachedForecast = unstable_cache(fetchSharedForecast, ["kogda-raid-forecast-v3"], {
+const readCachedForecast = unstable_cache(fetchSharedForecast, ["kogda-raid-forecast-v4"], {
   revalidate: CACHE_MS / 1_000,
 });
 

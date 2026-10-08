@@ -6,11 +6,10 @@ vi.mock("next/cache", () => ({ unstable_cache: (callback: () => Promise<unknown>
 
 function raidHistory(heroicKill: number, mythicKill: number) {
   return { expansions: [{ instances: [
-    { instance: { id: 1317 }, modes: [{
-      difficulty: { type: "HEROIC" },
-      progress: { encounters: [{ encounter: { id: 2849 }, last_kill_timestamp: heroicKill }] },
-    }] },
     { instance: { id: 1320 }, modes: [{
+      difficulty: { type: "HEROIC" },
+      progress: { encounters: [{ encounter: { id: 2888 }, last_kill_timestamp: heroicKill }] },
+    }, {
       difficulty: { type: "MYTHIC" },
       progress: { encounters: [{ encounter: { id: 2888 }, last_kill_timestamp: mythicKill }] },
     }] },
@@ -24,7 +23,7 @@ async function service() {
 
 describe("forecast data service", () => {
   beforeEach(() => {
-    vi.stubGlobal("raidForecastCacheV3", undefined);
+    vi.stubGlobal("raidForecastCacheV4", undefined);
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
     vi.resetAllMocks();
@@ -88,6 +87,24 @@ describe("forecast data service", () => {
     const result = await getRaidForecast();
     expect(result.charactersByDifficulty.heroic).toHaveLength(10);
     expect(result.charactersByDifficulty.mythic).toHaveLength(10);
+    expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
+  });
+
+  it("does not reuse cached heroic lockouts for the former raid target", async () => {
+    const character = { name: "Зомбак", status: "locked", classId: 10, level: 90, lastKillAt: "2026-10-01T10:00:00.000Z" };
+    vi.stubGlobal("raidForecastCacheV3", {
+      value: {
+        charactersByDifficulty: { heroic: [character], mythic: [character] },
+        resetStart: "2026-09-30T04:00:00.000Z",
+        checkedAt: "2026-10-02T08:59:00.000Z",
+      },
+      expiresAt: Date.now() + 600_000,
+      inFlight: null,
+    });
+    const { getRaidForecast } = await service();
+    const result = await getRaidForecast();
+    expect(result.charactersByDifficulty.heroic).toHaveLength(10);
+    expect(result.charactersByDifficulty.heroic.every((character) => character.status === "clean")).toBe(true);
     expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
   });
 

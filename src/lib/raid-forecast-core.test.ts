@@ -6,7 +6,7 @@ import {
 } from "@/lib/raid-forecast-core";
 import type { BlizzardCharacterRaidEncounters, BlizzardRaidEncounterInstance } from "@/lib/blizzard-api";
 
-function instance(timestamp?: number, difficulty = "HEROIC", raidId = 1317, bossId = 2849): BlizzardRaidEncounterInstance {
+function instance(timestamp?: number, difficulty = "HEROIC", raidId = 1320, bossId = 2888): BlizzardRaidEncounterInstance {
   return {
     instance: { id: raidId, name: "An arbitrary localized name" },
     modes: [{ difficulty: { type: difficulty }, progress: {
@@ -50,10 +50,15 @@ describe("raid forecast", () => {
     expect(calculateRaidForecast([{ status: "unknown" }], new Date("2026-10-02T20:00:00+03:00"))).toMatchObject({ chance: 1, reason: "outside_hours" });
   });
 
-  it("keeps heroic Nymrissa and mythic Nek'zali lockouts independent", () => {
+  it("keeps heroic and mythic Nek'zali lockouts independent", () => {
     const data = response(instance(currentKill), instance(oldKill, "MYTHIC", 1320, 2888));
     expect(getRaidForecastLockout(data, "heroic", now)).toEqual({ status: "locked", lastKillAt: new Date(currentKill).toISOString() });
     expect(getRaidForecastLockout(data, "mythic", now)).toEqual({ status: "clean", lastKillAt: new Date(oldKill).toISOString() });
+  });
+
+  it("ignores the former heroic target when Nek'zali has no current-week kill", () => {
+    const data = response(instance(currentKill, "HEROIC", 1317, 2849), instance(oldKill));
+    expect(getRaidForecastLockout(data, "heroic", now)).toEqual({ status: "clean", lastKillAt: new Date(oldKill).toISOString() });
   });
 
   it("expires a snapshot at the weekly reset", () => {
@@ -64,7 +69,7 @@ describe("raid forecast", () => {
 });
 
 describe.each([
-  { difficulty: "heroic" as const, difficultyType: "HEROIC", raidId: 1317, bossId: 2849 },
+  { difficulty: "heroic" as const, difficultyType: "HEROIC", raidId: 1320, bossId: 2888 },
   { difficulty: "mythic" as const, difficultyType: "MYTHIC", raidId: 1320, bossId: 2888 },
 ])("$difficulty forecast lockouts", ({ difficulty, difficultyType, raidId, bossId }) => {
   const target = (timestamp?: number) => instance(timestamp, difficultyType, raidId, bossId);
