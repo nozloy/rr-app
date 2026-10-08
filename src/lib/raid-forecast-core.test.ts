@@ -1,6 +1,6 @@
 import {
   calculateRaidForecast,
-  getHeroicNymrissaLockout,
+  getRaidForecastLockout,
   isForecastWeekCurrent,
   type RaidForecastSnapshot,
 } from "@/lib/raid-forecast-core";
@@ -50,36 +50,62 @@ describe("raid forecast", () => {
     expect(calculateRaidForecast([{ status: "unknown" }], new Date("2026-10-02T20:00:00+03:00"))).toMatchObject({ chance: 1, reason: "outside_hours" });
   });
 
-  it("finds heroic kills by raid and encounter IDs across all duplicate entries", () => {
-    const data = { expansions: [{ instances: [instance(oldKill)] }, { instances: [instance(currentKill), instance(oldKill)] }] };
-    expect(getHeroicNymrissaLockout(data, now)).toEqual({ status: "locked", lastKillAt: new Date(currentKill).toISOString() });
-  });
-
-  it("ignores other difficulties, bosses, raids and past-week kills", () => {
-    expect(getHeroicNymrissaLockout(response(
-      instance(currentKill, "NORMAL"), instance(currentKill, "MYTHIC"),
-      instance(currentKill, "HEROIC", 9999), instance(currentKill, "HEROIC", 1317, 9999), instance(oldKill),
-    ), now)).toEqual({ status: "clean", lastKillAt: new Date(oldKill).toISOString() });
-  });
-
-  it("handles the exact EU reset boundary and the alternate encounter layout", () => {
-    const reset = new Date("2026-09-30T04:00:00Z");
-    expect(getHeroicNymrissaLockout(response(instance(oldKill)), new Date(reset.getTime() - 1)).status).toBe("locked");
-    expect(getHeroicNymrissaLockout(response(instance(oldKill)), reset).status).toBe("clean");
-    const data = response({ instance: { id: 1317 }, modes: [{ difficulty: { type: "HEROIC" }, encounters: [{ encounter: { id: 2849 }, last_kill_timestamp: reset.getTime() }] }] });
-    expect(getHeroicNymrissaLockout(data, reset).status).toBe("locked");
-  });
-
-  it("treats a successful empty history as free, but rejects malformed history", () => {
-    expect(getHeroicNymrissaLockout({ expansions: [] }, now)).toEqual({ status: "clean", lastKillAt: null });
-    expect(getHeroicNymrissaLockout(response(instance()), now).status).toBe("clean");
-    expect(() => getHeroicNymrissaLockout(null as unknown as BlizzardCharacterRaidEncounters, now)).toThrow();
-    expect(() => getHeroicNymrissaLockout(response(instance(now.getTime() + 1000)), now)).toThrow();
+  it("keeps heroic Nymrissa and mythic Nek'zali lockouts independent", () => {
+    const data = response(instance(currentKill), instance(oldKill, "MYTHIC", 1320, 2888));
+    expect(getRaidForecastLockout(data, "heroic", now)).toEqual({ status: "locked", lastKillAt: new Date(currentKill).toISOString() });
+    expect(getRaidForecastLockout(data, "mythic", now)).toEqual({ status: "clean", lastKillAt: new Date(oldKill).toISOString() });
   });
 
   it("expires a snapshot at the weekly reset", () => {
     const snapshot = { resetStart: "2026-09-23T04:00:00.000Z" } as RaidForecastSnapshot;
     expect(isForecastWeekCurrent(snapshot, new Date("2026-09-30T03:59:59Z"))).toBe(true);
     expect(isForecastWeekCurrent(snapshot, new Date("2026-09-30T04:00:00Z"))).toBe(false);
+  });
+});
+
+describe.each([
+  { difficulty: "heroic" as const, difficultyType: "HEROIC", raidId: 1317, bossId: 2849 },
+  { difficulty: "mythic" as const, difficultyType: "MYTHIC", raidId: 1320, bossId: 2888 },
+])("$difficulty forecast lockouts", ({ difficulty, difficultyType, raidId, bossId }) => {
+  const target = (timestamp?: number) => instance(timestamp, difficultyType, raidId, bossId);
+  const check = (data: BlizzardCharacterRaidEncounters, time = now) => getRaidForecastLockout(data, difficulty, time);
+
+  it("finds the latest target kill across duplicate entries regardless of localized names", () => {
+    const data = { expansions: [{ instances: [target(oldKill)] }, { instances: [target(currentKill), target(oldKill)] }] };
+    expect(check(data)).toEqual({ status: "locked", lastKillAt: new Date(currentKill).toISOString() });
+  });
+
+  it("ignores other difficulties, bosses, raids and past-week kills", () => {
+    expect(check(response(
+      instance(currentKill, "NORMAL", raidId, bossId),
+      instance(currentKill, difficultyType === "HEROIC" ? "MYTHIC" : "HEROIC", raidId, bossId),
+      instance(currentKill, difficultyType, 9999, bossId),
+      instance(currentKill, difficultyType, raidId, 9999),
+      target(oldKill),
+    ))).toEqual({ status: "clean", lastKillAt: new Date(oldKill).toISOString() });
+  });
+
+  it("handles the exact EU reset boundary and the alternate encounter layout", () => {
+    const reset = new Date("2026-09-30T04:00:00Z");
+    expect(check(response(target(oldKill)), new Date(reset.getTime() - 1)).status).toBe("locked");
+    expect(check(response(target(oldKill)), reset).status).toBe("clean");
+    const data = response({ instance: { id: raidId }, modes: [{ difficulty: { type: difficultyType }, encounters: [{ encounter: { id: bossId }, last_kill_timestamp: reset.getTime() }] }] });
+    expect(check(data, reset).status).toBe("locked");
+  });
+
+  it("treats a successful empty history as free, but rejects malformed history", () => {
+    expect(check({ expansions: [] })).toEqual({ status: "clean", lastKillAt: null });
+    expect(check(response(target())).status).toBe("clean");
+    expect(() => check(null as unknown as BlizzardCharacterRaidEncounters)).toThrow();
+    expect(() => check({ expansions: {} } as BlizzardCharacterRaidEncounters)).toThrow();
+  });
+
+  it.each([NaN, Infinity, -1, now.getTime() + 1000])("rejects an invalid kill timestamp: %s", (timestamp) => {
+    expect(() => check(response(target(timestamp)))).toThrow();
+  });
+
+  it("rejects a completed encounter with no kill timestamp", () => {
+    const data = response({ instance: { id: raidId }, modes: [{ difficulty: { type: difficultyType }, encounters: [{ encounter: { id: bossId }, completed_count: 1 }] }] });
+    expect(() => check(data)).toThrow();
   });
 });

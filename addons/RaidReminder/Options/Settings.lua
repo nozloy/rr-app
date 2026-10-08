@@ -18,7 +18,7 @@ function RR.Options.Initialize()
     return
   end
 
-  local category = Settings.RegisterVerticalLayoutCategory("Raid Reminder")
+  local category, layout = Settings.RegisterVerticalLayoutCategory("Raid Reminder")
   local setting = Settings.RegisterAddOnSetting(
     category, "RaidReminder_autoSearchZombakRaids", "autoSearchZombakRaids", RR.DB,
     Settings.VarType.Boolean, InterfaceText("zombakSetting"), false
@@ -30,6 +30,11 @@ function RR.Options.Initialize()
     RR.Comm.UpdateZombakSubscription()
   end)
   Settings.CreateCheckbox(category, setting, InterfaceText("zombakSettingTooltip"))
+  layout:AddInitializer(CreateSettingsButtonInitializer(
+    InterfaceText("zombakBannerSetting"), InterfaceText("zombakEditPosition"),
+    function() RR.UI.ZombakRaidEditMode.OpenFromSettings() end,
+    InterfaceText("zombakEditPositionTooltip"), true
+  ))
   Settings.RegisterAddOnCategory(category)
   RR.Options.category = category
 end

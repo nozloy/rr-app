@@ -73,6 +73,8 @@ local function CreatePopup()
   popup:SetFrameLevel(WINDOW_FRAME_LEVEL)
   popup:SetToplevel(true)
   popup:EnableMouse(true)
+  -- SetUserPlaced(false) also requires a movable frame, before the first ApplyPosition.
+  popup:SetMovable(true)
   popup:SetClampedToScreen(true)
   popup:SetBackdrop(backdrop)
   popup:SetBackdropColor(0.025, 0.04, 0.055, 0.98)

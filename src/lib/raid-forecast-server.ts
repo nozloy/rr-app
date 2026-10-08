@@ -9,8 +9,9 @@ import { getEuWeeklyResetStart } from "@/lib/raid-check-core";
 import {
   createUnknownForecastCharacters,
   FORECAST_REALM,
-  getHeroicNymrissaLockout,
+  getRaidForecastLockout,
   type RaidForecastCharacter,
+  type RaidForecastDifficulty,
   type RaidForecastSnapshot,
 } from "@/lib/raid-forecast-core";
 
@@ -22,22 +23,26 @@ type ForecastCache = {
   expiresAt: number;
   inFlight: Promise<CachedForecast> | null;
 };
-const globalForForecast = globalThis as typeof globalThis & { raidForecastCache?: ForecastCache };
+const globalForForecast = globalThis as typeof globalThis & { raidForecastCacheV3?: ForecastCache };
 // Share the cooldown and pending request across server module reloads too.
-const cache = globalForForecast.raidForecastCache ??= { value: null, expiresAt: 0, inFlight: null };
+const cache = globalForForecast.raidForecastCacheV3 ??= { value: null, expiresAt: 0, inFlight: null };
 
 function toCurrentSnapshot(value: CachedForecast, now = new Date()): RaidForecastSnapshot {
   const reset = getEuWeeklyResetStart(now);
   const resetStart = reset.toISOString();
   // A weekly reset clears old lockouts without bypassing the shared API cooldown.
-  const characters = value.resetStart === resetStart ? value.characters : value.characters.map((character) => (
+  const clearPreviousWeek = (characters: RaidForecastCharacter[]) => characters.map((character) => (
     character.status === "unknown" ? character : {
       ...character,
       status: character.lastKillAt && Date.parse(character.lastKillAt) >= reset.getTime()
         ? "locked" as const : "clean" as const,
     }
   ));
-  return { ...value, characters, resetStart, serverNow: now.toISOString() };
+  const charactersByDifficulty = value.resetStart === resetStart ? value.charactersByDifficulty : {
+    heroic: clearPreviousWeek(value.charactersByDifficulty.heroic),
+    mythic: clearPreviousWeek(value.charactersByDifficulty.mythic),
+  };
+  return { ...value, charactersByDifficulty, resetStart, serverNow: now.toISOString() };
 }
 
 async function checkCharacter(
@@ -53,31 +58,40 @@ async function checkCharacter(
     result.classId = profile.value?.character_class?.id ?? profile.value?.playable_class?.id ?? null;
     result.level = profile.value?.level ?? null;
   }
-  if (encounters.status === "fulfilled") {
-    try {
-      Object.assign(result, getHeroicNymrissaLockout(encounters.value, new Date()));
-    } catch {
-      // Malformed or unavailable data must never count as a free character.
+  const now = new Date();
+  const forDifficulty = (difficulty: RaidForecastDifficulty): RaidForecastCharacter => {
+    if (encounters.status === "fulfilled") {
+      try {
+        return { ...result, ...getRaidForecastLockout(encounters.value, difficulty, now) };
+      } catch {
+        // Invalid data for one difficulty must not hide the other difficulty's result.
+      }
     }
-  }
-  return result;
+    return { ...result };
+  };
+  return { heroic: forDifficulty("heroic"), mythic: forDifficulty("mythic") };
 }
 
 async function fetchForecast(resetStart: string): Promise<CachedForecast> {
-  const characters = createUnknownForecastCharacters();
+  const charactersByDifficulty = {
+    heroic: createUnknownForecastCharacters(),
+    mythic: createUnknownForecastCharacters(),
+  };
   try {
     const accessToken = await getApplicationAccessToken("eu", AbortSignal.timeout(REQUEST_TIMEOUT_MS));
     let next = 0;
     await Promise.all(Array.from({ length: 4 }, async () => {
-      while (next < characters.length) {
+      while (next < charactersByDifficulty.heroic.length) {
         const index = next++;
-        characters[index] = await checkCharacter(characters[index], accessToken);
+        const result = await checkCharacter(charactersByDifficulty.heroic[index], accessToken);
+        charactersByDifficulty.heroic[index] = result.heroic;
+        charactersByDifficulty.mythic[index] = result.mythic;
       }
     }));
   } catch {
     // Keep the fixed roster visible even when credentials or Blizzard are unavailable.
   }
-  return { characters, resetStart, checkedAt: new Date().toISOString() };
+  return { charactersByDifficulty, resetStart, checkedAt: new Date().toISOString() };
 }
 
 async function fetchSharedForecast(): Promise<CachedForecast> {
@@ -104,7 +118,7 @@ async function fetchSharedForecast(): Promise<CachedForecast> {
 
 // Next's shared Data Cache stores the snapshot; server time is always calculated live.
 // Keep the key stable across weekly resets so they cannot bypass the API cooldown.
-const readCachedForecast = unstable_cache(fetchSharedForecast, ["kogda-raid-forecast-v2"], {
+const readCachedForecast = unstable_cache(fetchSharedForecast, ["kogda-raid-forecast-v3"], {
   revalidate: CACHE_MS / 1_000,
 });
 

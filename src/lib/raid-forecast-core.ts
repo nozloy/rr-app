@@ -3,8 +3,10 @@ import { getEuWeeklyResetStart } from "@/lib/raid-check-core";
 
 export const FORECAST_TIME_ZONE = "Europe/Moscow";
 export const FORECAST_REALM = "howling-fjord";
-export const FORECAST_RAID_ID = 1317;
-export const FORECAST_BOSS_ID = 2849;
+export const FORECAST_TARGETS = {
+  heroic: { label: "Героик", difficultyType: "HEROIC", raidId: 1317, bossId: 2849 },
+  mythic: { label: "Мифик", difficultyType: "MYTHIC", raidId: 1320, bossId: 2888 },
+} as const;
 const RAID_START_MINUTES = 10 * 60;
 const CHANCE_DECAY_START_MINUTES = 17 * 60;
 const RAID_END_MINUTES = 20 * 60;
@@ -13,6 +15,7 @@ export const FORECAST_CHARACTERS = [
   "Зомбактьмы", "Зомбакор", "Зомбакдх", "Зомбовоин", "Зомбакнзот",
 ] as const;
 
+export type RaidForecastDifficulty = keyof typeof FORECAST_TARGETS;
 export type RaidForecastStatus = "clean" | "locked" | "unknown";
 export type RaidForecastCharacter = {
   name: string;
@@ -25,7 +28,7 @@ export type RaidForecastSnapshot = {
   serverNow: string;
   checkedAt: string;
   resetStart: string;
-  characters: RaidForecastCharacter[];
+  charactersByDifficulty: Record<RaidForecastDifficulty, RaidForecastCharacter[]>;
 };
 export type RaidForecast = {
   chance: number | null;
@@ -55,8 +58,9 @@ export function createUnknownForecastCharacters(): RaidForecastCharacter[] {
   }));
 }
 
-export function getHeroicNymrissaLockout(
+export function getRaidForecastLockout(
   encounters: BlizzardCharacterRaidEncounters,
+  difficulty: RaidForecastDifficulty,
   now: Date,
 ): Pick<RaidForecastCharacter, "status" | "lastKillAt"> {
   if (!encounters || typeof encounters !== "object" ||
@@ -64,14 +68,15 @@ export function getHeroicNymrissaLockout(
     throw new Error("Invalid raid encounter response");
   }
 
+  const target = FORECAST_TARGETS[difficulty];
   let latestKill = 0;
   for (const expansion of encounters.expansions ?? []) {
     for (const instance of expansion.instances ?? []) {
-      if (instance.instance?.id !== FORECAST_RAID_ID) continue;
+      if (instance.instance?.id !== target.raidId) continue;
       for (const mode of instance.modes ?? []) {
-        if (mode.difficulty?.type !== "HEROIC") continue;
+        if (mode.difficulty?.type !== target.difficultyType) continue;
         for (const boss of mode.progress?.encounters ?? mode.encounters ?? []) {
-          if (boss.encounter?.id !== FORECAST_BOSS_ID) continue;
+          if (boss.encounter?.id !== target.bossId) continue;
           const timestamp = boss.last_kill_timestamp ?? 0;
           if (!Number.isFinite(timestamp) || timestamp < 0 || timestamp > now.getTime() ||
               (!timestamp && (boss.completed_count ?? 0) > 0)) {

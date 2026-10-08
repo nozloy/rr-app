@@ -112,7 +112,10 @@ local function newClient(options)
   function methods:GetFrameLevel() return self.frameLevel or 1 end
   function methods:SetMovable(value) self.movable = value end
   function methods:SetClampedToScreen(value) self.clamped = value end
-  function methods:SetUserPlaced(value) self.userPlaced = value end
+  function methods:SetUserPlaced(value)
+    assert(self.movable or self.resizable, "SetUserPlaced(): Frame is not movable or resizable")
+    self.userPlaced = value
+  end
   function methods:StartMoving() assert(self.movable and not c.combat); self.moving = true end
   function methods:StopMovingOrSizing() self.moving = false end
   function methods:SetAlpha(value) self.alpha = value end
@@ -130,6 +133,30 @@ local function newClient(options)
   env.UIParent = frame()
   env.UIParent:SetSize(1920, 1080)
   env.UIParent.centerX, env.UIParent.centerY = 960, 540
+  env.SettingsPanel = frame()
+  env.SettingsPanel:Hide()
+  function env.SettingsPanel:HasUnappliedSettings() return c.unappliedSettings or false end
+  function env.SettingsPanel:Close(skipTransitionBackToOpeningPanel)
+    eq(skipTransitionBackToOpeningPanel, true)
+    assert(not self:HasUnappliedSettings(), "must preserve pending game settings")
+    c.settingsClosed = (c.settingsClosed or 0) + 1
+    self:Hide()
+  end
+  env.EditModeManagerFrame = frame()
+  env.EditModeManagerFrame:Hide()
+  function env.EditModeManagerFrame:IsEditModeActive() return self.editModeActive or false end
+  function env.EditModeManagerFrame:CanEnterEditMode() return not c.editModeBlocked end
+  env.ShowUIPanel = function(target)
+    eq(target, env.EditModeManagerFrame)
+    assert(c.hardware and not c.combat, "editor must open from the settings click outside combat")
+    assert(not env.SettingsPanel:IsShown(), "close settings before opening the editor")
+    c.editorOpens = (c.editorOpens or 0) + 1
+    if c.preventEditorShow then return end
+    local alreadyActive = target:IsEditModeActive()
+    target:Show()
+    target.editModeActive = true
+    if not alreadyActive then c:editEvent("EditMode.Enter") end
+  end
   env.C_Timer = { NewTimer = function(delay, callback)
     local timer = { at = c.now + delay, callback = callback }
     function timer:Cancel() self.cancelled = true end
@@ -176,7 +203,16 @@ local function newClient(options)
   env.Settings = { VarType = { Boolean = "boolean" } }
   function env.Settings.RegisterVerticalLayoutCategory(name)
     eq(name, "Raid Reminder")
-    return { GetID = function() return 123 end }
+    c.settingsLayout = { initializers = {} }
+    function c.settingsLayout:AddInitializer(initializer)
+      self.initializers[#self.initializers + 1] = initializer
+    end
+    return { GetID = function() return 123 end }, c.settingsLayout
+  end
+  env.CreateSettingsButtonInitializer = function(name, text, callback, tooltip, addSearchTags)
+    assert(#name > 0 and #tooltip > 0); eq(addSearchTags, true)
+    c.editPositionButton = { text = text, callback = callback }
+    return c.editPositionButton
   end
   function env.Settings.RegisterAddOnSetting(category, variable, key, db, kind, label, default)
     eq(key, "autoSearchZombakRaids"); eq(db, env.RaidReminderDB); eq(kind, "boolean"); eq(default, false)
@@ -188,7 +224,7 @@ local function newClient(options)
   end
   function env.Settings.CreateCheckbox(_, setting, tooltip) eq(setting, c.setting); assert(#tooltip > 0) end
   function env.Settings.RegisterAddOnCategory(category) c.category = category end
-  function env.Settings.OpenToCategory(id) c.openedSettings = id end
+  function env.Settings.OpenToCategory(id) c.openedSettings = id; env.SettingsPanel:Show() end
 
   local activity = { fullName = "Шпиль Бездны", categoryID = 3, difficultyID = 15, maxNumPlayers = 30 }
   c.activities = { [101] = activity, [102] = activity, [201] = { categoryID = 2, fullName = "Dungeon" } }
@@ -229,6 +265,11 @@ local function newClient(options)
     if not button.enabled then return end
     self.hardware = true
     button.scripts.OnClick(button, "LeftButton")
+    self.hardware = false
+  end
+  function c:clickEditPosition()
+    self.hardware = true
+    self.editPositionButton.callback()
     self.hardware = false
   end
   function c:message(fields)
@@ -645,6 +686,73 @@ end)
 test("Missing Edit Mode callbacks do not break normal notifications", function()
   local c = newClient({ noEditMode = true }); c:found()
   assert(c:popup():IsShown()); c:click(); eq(#c.applications, 1)
+end)
+
+test("Settings button opens the native editor and preview without enabling notifications", function()
+  local c = newClient()
+  eq(c.editPositionButton.text, "Редактировать положение")
+  eq(c.settingsLayout.initializers[1], c.editPositionButton)
+  c.env.SlashCmdList.RAIDREMINDER("settings"); c:clickEditPosition()
+  eq(c.settingsClosed, 1); eq(c.editorOpens, 1)
+  assert(c.env.EditModeManagerFrame:IsShown() and c:popup():IsShown())
+  assert(c.env.RaidReminderZombakBannerSelection:IsShown())
+  eq(c:popup().action.enabled, false); eq(c.rr.DB.autoSearchZombakRaids, false)
+  eq(c.state.announcement, nil); eq(c.joins, 0)
+  c:advance(120); assert(c:popup():IsShown())
+  c:editEvent("EditMode.Exit"); assert(not c:popup():IsShown())
+  eq(#c.searches, 0); eq(#c.applications, 0); eq(#c.sent, 0)
+end)
+
+test("First preview after login can close and reopen without a prior real or test notification", function()
+  local c = newClient()
+  eq(c:popup(), nil)
+  for _ = 1, 3 do
+    c.env.SlashCmdList.RAIDREMINDER("settings"); c:clickEditPosition()
+    assert(c:popup():IsShown())
+    assert(c.env.RaidReminderZombakBannerSelection:IsShown())
+    c:editEvent("EditMode.Exit")
+    c.env.EditModeManagerFrame.editModeActive = false
+    c.env.EditModeManagerFrame:Hide()
+    assert(not c:popup():IsShown())
+    assert(not c.env.RaidReminderZombakBannerSelection:IsShown())
+  end
+  eq(c.state.announcement, nil); eq(#c.searches, 0); eq(#c.applications, 0)
+end)
+
+test("Settings entry preserves a live raid and restores preview when resuming an active editor", function()
+  local c = newClient(); c:found()
+  c.env.SlashCmdList.RAIDREMINDER("settings"); c:clickEditPosition()
+  eq(c.state.currentZombakResultID, 42); c:click(); eq(#c.applications, 0)
+  c:editEvent("EditMode.Exit")
+  eq(c:popup().action.enabled, true); eq(c.state.currentZombakResultID, 42)
+  -- Native edit mode may remain active while its window is temporarily hidden by Settings.
+  c.env.EditModeManagerFrame:Hide()
+  c.env.SlashCmdList.RAIDREMINDER("settings"); c:clickEditPosition()
+  assert(c.env.RaidReminderZombakBannerSelection:IsShown()); eq(c:popup().action.enabled, false)
+  c:editEvent("EditMode.Exit"); eq(c:popup().action.enabled, true)
+  eq(#c.searches, 1); eq(#c.applications, 0)
+end)
+
+test("Unavailable native editing keeps settings intact and never leaves a stranded preview", function()
+  for _, condition in ipairs({ "combat", "editModeBlocked", "missingEditor", "preventEditorShow" }) do
+    local c = newClient(); c.env.SlashCmdList.RAIDREMINDER("settings")
+    if condition == "missingEditor" then c.env.EditModeManagerFrame = nil else c[condition] = true end
+    c:clickEditPosition()
+    eq(c:popup(), nil); eq(#c.searches, 0); eq(#c.applications, 0)
+    if condition ~= "preventEditorShow" then
+      assert(c.env.SettingsPanel:IsShown()); eq(c.settingsClosed, nil); eq(c.editorOpens, nil)
+    end
+    assert(#c.messages > 1, "explain why editing is unavailable")
+  end
+end)
+
+test("Settings button preserves unapplied game changes and works after the user resolves them", function()
+  local c = newClient(); c.env.SlashCmdList.RAIDREMINDER("settings")
+  c.unappliedSettings = true; c:clickEditPosition()
+  assert(c.env.SettingsPanel:IsShown()); eq(c.settingsClosed, nil); eq(c.editorOpens, nil); eq(c:popup(), nil)
+  assert(c.messages[#c.messages]:find("Примените или отмените", 1, true))
+  c.unappliedSettings = false; c:clickEditPosition()
+  eq(c.settingsClosed, 1); assert(c:popup():IsShown())
 end)
 
 print(string.format("%d targeted addon scenarios passed", tests))

@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Check, LockSimple, QuestionMark } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { RaidForecastCharacter } from "@/lib/raid-forecast-core";
+import { FORECAST_TARGETS, type RaidForecastCharacter, type RaidForecastDifficulty } from "@/lib/raid-forecast-core";
 
 const classes: Record<number, { file: string; label: string }> = {
   1: { file: "warrior", label: "Воин" }, 2: { file: "paladin", label: "Паладин" },
@@ -14,7 +14,8 @@ const classes: Record<number, { file: string; label: string }> = {
   13: { file: "evoker", label: "Пробудитель" },
 };
 
-export function FortuneRoster({ characters, loading }: {
+export function FortuneRoster({ difficulty, characters, loading }: {
+  difficulty: RaidForecastDifficulty;
   characters: RaidForecastCharacter[];
   loading: boolean;
 }) {
@@ -25,7 +26,7 @@ export function FortuneRoster({ characters, loading }: {
         <span className="text-[10px] uppercase tracking-widest opacity-75">Ревущий фьорд</span>
       </div>
       <ScrollArea className="h-[340px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring sm:h-[360px]">
-        <ul className="pr-3 outline-none" aria-label="Недельные КД десяти персонажей" tabIndex={0}>
+        <ul className="pr-3 outline-none" aria-label={`Недельные КД десяти персонажей — ${FORECAST_TARGETS[difficulty].label}`} tabIndex={0}>
           {characters.map((character) => {
             const characterClass = character.classId ? classes[character.classId] : null;
             const status = loading ? "unknown" : character.status;

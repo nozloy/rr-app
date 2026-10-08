@@ -4,6 +4,19 @@ const api = vi.hoisted(() => ({
 vi.mock("@/lib/blizzard-api", () => api);
 vi.mock("next/cache", () => ({ unstable_cache: (callback: () => Promise<unknown>) => callback }));
 
+function raidHistory(heroicKill: number, mythicKill: number) {
+  return { expansions: [{ instances: [
+    { instance: { id: 1317 }, modes: [{
+      difficulty: { type: "HEROIC" },
+      progress: { encounters: [{ encounter: { id: 2849 }, last_kill_timestamp: heroicKill }] },
+    }] },
+    { instance: { id: 1320 }, modes: [{
+      difficulty: { type: "MYTHIC" },
+      progress: { encounters: [{ encounter: { id: 2888 }, last_kill_timestamp: mythicKill }] },
+    }] },
+  ] }] };
+}
+
 async function service() {
   vi.resetModules();
   return import("@/lib/raid-forecast-server");
@@ -11,7 +24,7 @@ async function service() {
 
 describe("forecast data service", () => {
   beforeEach(() => {
-    vi.stubGlobal("raidForecastCache", undefined);
+    vi.stubGlobal("raidForecastCacheV3", undefined);
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
     vi.resetAllMocks();
@@ -27,11 +40,55 @@ describe("forecast data service", () => {
   it("keeps the fixed roster in order and fetches it without a user session", async () => {
     const { getRaidForecast } = await service();
     const result = await getRaidForecast();
-    expect(result.characters).toHaveLength(10);
-    expect(result.characters[0]).toMatchObject({ name: "Зомбак", status: "clean", classId: 10, level: 90 });
-    expect(result.characters[9].name).toBe("Зомбакнзот");
+    for (const characters of Object.values(result.charactersByDifficulty)) {
+      expect(characters).toHaveLength(10);
+      expect(characters[0]).toMatchObject({ name: "Зомбак", status: "clean", classId: 10, level: 90 });
+      expect(characters[9].name).toBe("Зомбакнзот");
+    }
+    expect(result.charactersByDifficulty.heroic.map((character) => character.name))
+      .toEqual(result.charactersByDifficulty.mythic.map((character) => character.name));
     expect(result.resetStart).toBe("2026-09-30T04:00:00.000Z");
     expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledWith("application-token", "howling-fjord", "Зомбак", "eu", expect.any(AbortSignal));
+    expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
+    expect(api.fetchCharacterProfile).toHaveBeenCalledTimes(10);
+  });
+
+  it("calculates independent lockouts from one encounter response and shares profile data", async () => {
+    const currentKill = Date.parse("2026-10-01T10:00:00Z");
+    const oldKill = Date.parse("2026-09-29T10:00:00Z");
+    api.fetchCharacterRaidEncounters.mockResolvedValue(raidHistory(oldKill, currentKill));
+    const { getRaidForecast } = await service();
+    const result = await getRaidForecast();
+    expect(result.charactersByDifficulty.heroic[0]).toMatchObject({
+      status: "clean", lastKillAt: new Date(oldKill).toISOString(), classId: 10, level: 90,
+    });
+    expect(result.charactersByDifficulty.mythic[0]).toMatchObject({
+      status: "locked", lastKillAt: new Date(currentKill).toISOString(), classId: 10, level: 90,
+    });
+    expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
+    expect(api.fetchCharacterProfile).toHaveBeenCalledTimes(10);
+  });
+
+  it.each(["heroic", "mythic"] as const)("isolates malformed %s data from the other difficulty", async (difficulty) => {
+    const kill = Date.parse("2026-10-01T10:00:00Z");
+    api.fetchCharacterRaidEncounters.mockResolvedValue(raidHistory(
+      difficulty === "heroic" ? NaN : kill,
+      difficulty === "mythic" ? NaN : kill,
+    ));
+    const { getRaidForecast } = await service();
+    const { charactersByDifficulty } = await getRaidForecast();
+    expect(charactersByDifficulty[difficulty][0]).toMatchObject({ status: "unknown", lastKillAt: null, classId: 10 });
+    expect(charactersByDifficulty[difficulty === "heroic" ? "mythic" : "heroic"][0])
+      .toMatchObject({ status: "locked", lastKillAt: new Date(kill).toISOString() });
+  });
+
+  it("does not reuse a legacy snapshot left by an older server module", async () => {
+    vi.stubGlobal("raidForecastCache", { value: { characters: [] }, expiresAt: Date.now() + 600_000, inFlight: null });
+    const { getRaidForecast } = await service();
+    const result = await getRaidForecast();
+    expect(result.charactersByDifficulty.heroic).toHaveLength(10);
+    expect(result.charactersByDifficulty.mythic).toHaveLength(10);
+    expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
   });
 
   it("shares in-flight requests, caches for ten minutes, and returns a fresh server clock", async () => {
@@ -57,22 +114,23 @@ describe("forecast data service", () => {
   it("clears previous-week lockouts without bypassing the ten-minute cache or clearing unknown statuses", async () => {
     vi.setSystemTime(new Date("2026-09-30T03:59:59Z"));
     api.fetchCharacterRaidEncounters.mockImplementation((_token: string, _realm: string, name: string) =>
-      name === "Зомбак" ? Promise.reject(new Error("unavailable")) : Promise.resolve({
-        expansions: [{ instances: [{ instance: { id: 1317 }, modes: [{
-          difficulty: { type: "HEROIC" },
-          progress: { encounters: [{ encounter: { id: 2849 }, last_kill_timestamp: Date.parse("2026-09-30T03:00:00Z") }] },
-        }] }] }],
-      }));
+      name === "Зомбак" ? Promise.reject(new Error("unavailable")) : Promise.resolve(raidHistory(
+        Date.parse("2026-09-30T03:00:00Z"), Date.parse("2026-09-30T02:00:00Z"),
+      )));
     const { getRaidForecast } = await service();
     const beforeReset = await getRaidForecast();
-    expect(beforeReset.characters[1].status).toBe("locked");
+    expect(beforeReset.charactersByDifficulty.heroic[1].status).toBe("locked");
+    expect(beforeReset.charactersByDifficulty.mythic[1].status).toBe("locked");
     vi.setSystemTime(new Date("2026-09-30T04:00:00Z"));
     const result = await getRaidForecast();
     expect(result.resetStart).toBe("2026-09-30T04:00:00.000Z");
     expect(result.checkedAt).toBe(beforeReset.checkedAt);
-    expect(result.characters[0].status).toBe("unknown");
-    expect(result.characters.slice(1).every((character) => character.status === "clean")).toBe(true);
-    expect(result.characters[1].lastKillAt).toBe("2026-09-30T03:00:00.000Z");
+    for (const characters of Object.values(result.charactersByDifficulty)) {
+      expect(characters[0].status).toBe("unknown");
+      expect(characters.slice(1).every((character) => character.status === "clean")).toBe(true);
+    }
+    expect(result.charactersByDifficulty.heroic[1].lastKillAt).toBe("2026-09-30T03:00:00.000Z");
+    expect(result.charactersByDifficulty.mythic[1].lastKillAt).toBe("2026-09-30T02:00:00.000Z");
     expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(10);
     vi.setSystemTime(new Date("2026-09-30T04:09:59Z"));
     await getRaidForecast();
@@ -117,19 +175,25 @@ describe("forecast data service", () => {
   it("preserves lockouts if class lookup fails and leaves failed raid lookups unknown", async () => {
     api.fetchCharacterProfile.mockRejectedValue(new Error("profile unavailable"));
     api.fetchCharacterRaidEncounters.mockImplementation((_token: string, _realm: string, name: string) =>
-      name === "Зомбак" ? Promise.reject(new Error("404")) : Promise.resolve({ expansions: [] }));
+      name === "Зомбак" ? Promise.reject(new Error("404")) : Promise.resolve(raidHistory(
+        Date.parse("2026-10-01T10:00:00Z"), Date.parse("2026-10-01T11:00:00Z"),
+      )));
     const { getRaidForecast } = await service();
     const result = await getRaidForecast();
-    expect(result.characters[0]).toMatchObject({ name: "Зомбак", status: "unknown", classId: null });
-    expect(result.characters.slice(1).every((character) => character.status === "clean")).toBe(true);
+    for (const characters of Object.values(result.charactersByDifficulty)) {
+      expect(characters[0]).toMatchObject({ name: "Зомбак", status: "unknown", classId: null });
+      expect(characters.slice(1).every((character) => character.status === "locked" && character.classId === null)).toBe(true);
+    }
   });
 
   it("returns all ten unknown characters for unavailable credentials", async () => {
     api.getApplicationAccessToken.mockRejectedValue(new Error("secret internal detail"));
     const { getRaidForecast } = await service();
     const result = await getRaidForecast();
-    expect(result.characters).toHaveLength(10);
-    expect(result.characters.every((character) => character.status === "unknown")).toBe(true);
+    for (const characters of Object.values(result.charactersByDifficulty)) {
+      expect(characters).toHaveLength(10);
+      expect(characters.every((character) => character.status === "unknown")).toBe(true);
+    }
     expect(JSON.stringify(result)).not.toContain("secret internal detail");
     expect(api.fetchCharacterRaidEncounters).not.toHaveBeenCalled();
     vi.setSystemTime(new Date("2026-10-02T09:09:59Z"));

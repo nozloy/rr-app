@@ -260,7 +260,8 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			gear: 'Gear',
 			noGear: 'Gear snapshot is not available.',
 			refreshLogs: 'Refresh',
-			logsCacheNote: 'Data refreshes automatically at most once every 24 hours. Last update: {date}.',
+			logsCacheNote:
+				'Data refreshes automatically at most once every 24 hours. Last update: {date}.',
 			readyToCheck: 'Ready to check',
 			readyToCheckCopy:
 				'Paste addon export, choose difficulty, and run check. Blizzard requests are handled server-side.',
@@ -618,7 +619,7 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			title: 'Проверка кд рейда',
 			heroEyebrow: 'Raid lockout intelligence',
 			heroCopy:
-				'Вставьте строку из аддона, выберите сложность и проверьте весь состав перед стартом.',
+				'Вставьте строку из аддона и проверьте весь состав перед стартом.',
 			addonDownloadTitle: 'Последняя версия аддона доступна',
 			addonDownloadCopy: 'Скачайте RaidReminder на CurseForge',
 			downloadAddon: 'Скачать',
@@ -688,7 +689,8 @@ const dictionaries: Record<AppLocale, DictionaryNode> = {
 			gear: 'Экипировка',
 			noGear: 'Снимок экипировки недоступен.',
 			refreshLogs: 'Обновить',
-			logsCacheNote: 'Данные обновляются автоматически не чаще раза в 24 часа. Последнее обновление: {date}.',
+			logsCacheNote:
+				'Данные обновляются автоматически не чаще раза в 24 часа. Последнее обновление: {date}.',
 			readyToCheck: 'Готов к проверке',
 			readyToCheckCopy:
 				'Вставьте строку из аддона, выберите сложность и запустите проверку. Запросы к Blizzard выполняются на сервере.',

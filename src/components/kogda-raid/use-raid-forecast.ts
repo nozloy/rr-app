@@ -6,16 +6,17 @@ import {
   calculateRaidForecast,
   createUnknownForecastCharacters,
   isForecastWeekCurrent,
+  type RaidForecastDifficulty,
   type RaidForecastSnapshot,
 } from "@/lib/raid-forecast-core";
 
 const REFRESH_MS = 5 * 60_000;
-const MANUAL_LOADING_MS = 2_000;
 
 export function useRaidForecast(initialServerNow: string) {
   const [snapshot, setSnapshot] = useState<RaidForecastSnapshot | null>(null);
   const [now, setNow] = useState(() => new Date(initialServerNow));
-  const [pending, setPending] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [difficulty, setDifficulty] = useState<RaidForecastDifficulty>("heroic");
   const [reveal, setReveal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const anchor = useRef({ server: Date.parse(initialServerNow), client: performance.now() });
@@ -28,16 +29,11 @@ export function useRaidForecast(initialServerNow: string) {
     anchor.current.server + performance.now() - anchor.current.client,
   ), []);
 
-  const refresh = useCallback(async (animate = false) => {
+  const refresh = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
     lastAttempt.current = performance.now();
-    setPending(true);
     setError(null);
-    const minimumLoading = animate
-      ? new Promise<void>((resolve) => setTimeout(resolve, MANUAL_LOADING_MS))
-      : null;
-    if (animate) setReveal((value) => value + 1);
     try {
       const result = await getRaidForecastAction();
       if (!mounted.current) return;
@@ -51,9 +47,8 @@ export function useRaidForecast(initialServerNow: string) {
       setSnapshot(null);
       setError("Не удалось проверить персонажей. Попробуйте ещё раз чуть позже.");
     } finally {
-      if (minimumLoading) await minimumLoading;
       busy.current = false;
-      if (mounted.current) setPending(false);
+      if (mounted.current) setInitialLoading(false);
     }
   }, []);
 
@@ -96,15 +91,21 @@ export function useRaidForecast(initialServerNow: string) {
     return () => clearTimeout(minuteTimer);
   }, [refresh, serverTime, snapshot?.serverNow]);
 
+  const toggleDifficulty = useCallback(() => {
+    setDifficulty((value) => value === "heroic" ? "mythic" : "heroic");
+    setReveal((value) => value + 1);
+  }, []);
+
   const currentWeek = snapshot ? isForecastWeekCurrent(snapshot, now) : false;
-  const characters = snapshot && currentWeek ? snapshot.characters : createUnknownForecastCharacters();
+  const characters = snapshot && currentWeek
+    ? snapshot.charactersByDifficulty[difficulty]
+    : createUnknownForecastCharacters();
   return {
     characters,
     forecast: calculateRaidForecast(characters, now),
-    now, pending, reveal, error,
-    buttonLabel: reveal >= 5 ? "Купи рейд сам" : "А сейчас?",
-    initialLoading: pending && !snapshot,
+    now, initialLoading, difficulty, reveal, error,
+    buttonLabel: difficulty === "heroic" ? "А мифик?" : "А героик?",
     checkedAt: snapshot && currentWeek ? snapshot.checkedAt : null,
-    refresh: () => refresh(true),
+    toggleDifficulty,
   };
 }

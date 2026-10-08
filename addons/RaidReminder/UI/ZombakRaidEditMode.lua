@@ -46,7 +46,6 @@ end
 
 local function CreateSelection()
   if selection then return end
-  banner:SetMovable(true)
   selection = CreateFrame("Button", "RaidReminderZombakBannerSelection", banner, "BackdropTemplate")
   selection:SetPoint("TOPLEFT", -3, 3)
   selection:SetPoint("BOTTOMRIGHT", 3, -3)
@@ -75,10 +74,10 @@ end
 
 function EditMode.Enter()
   if active or InCombatLockdown() then return end
-  active = true
   banner = RR.UI.ZombakRaidPopup.SetEditing(true)
   CreateSelection()
   selection:Show()
+  active = true
 end
 
 function EditMode.Exit()
@@ -87,6 +86,38 @@ function EditMode.Exit()
   active = false
   selection:Hide()
   RR.UI.ZombakRaidPopup.SetEditing(false)
+end
+
+function EditMode.OpenFromSettings()
+  if InCombatLockdown() then
+    print("[RR] " .. InterfaceText("zombakCombat"))
+    return
+  end
+  if not EditModeManagerFrame and C_AddOns and C_AddOns.LoadAddOn then
+    C_AddOns.LoadAddOn("Blizzard_EditMode")
+  end
+  local manager = EditModeManagerFrame
+  if not manager or not EventRegistry or not manager:CanEnterEditMode() then
+    print("[RR] " .. InterfaceText("zombakEditUnavailable"))
+    return
+  end
+  if SettingsPanel and SettingsPanel:IsShown() then
+    -- Keep unapplied game settings intact instead of hiding their confirmation dialog.
+    if SettingsPanel:HasUnappliedSettings() then
+      print("[RR] " .. InterfaceText("zombakEditApplySettings"))
+      return
+    end
+    SettingsPanel:Close(true)
+    if SettingsPanel:IsShown() then return end
+  end
+  EditMode.Initialize()
+  ShowUIPanel(manager)
+  if manager:IsEditModeActive() then
+    -- Also covers resuming an already active editor after visiting Settings.
+    EditMode.Enter()
+  else
+    print("[RR] " .. InterfaceText("zombakEditUnavailable"))
+  end
 end
 
 function EditMode.Initialize()
