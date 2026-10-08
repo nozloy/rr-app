@@ -535,6 +535,30 @@
 	display: block;
 	width: 100%;
 	height: auto;
+	pointer-events: none;
+}
+.raid-workshop-submit-gear {
+	position: absolute;
+	top: 46%;
+	left: 20%;
+	width: 17%;
+	aspect-ratio: 1;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+.raid-workshop-submit-gear img {
+	/* The illustrated hub sits just above the square sprite's midpoint. */
+	transform-origin: 50% 49%;
+	animation: raid-workshop-gear-spin 1.5s linear infinite;
+	animation-play-state: paused;
+}
+.raid-workshop-submit[aria-busy='true'] .raid-workshop-submit-gear img {
+	animation-play-state: running;
+}
+@keyframes raid-workshop-gear-spin {
+	to {
+		transform: rotate(360deg);
+	}
 }
 .raid-workshop .raid-workshop-submit:disabled {
 	opacity: 0.88;
@@ -547,7 +571,7 @@
 }
 .raid-workshop-submit-label {
 	position: absolute;
-	top: 43.5%;
+	top: 46%;
 	left: 30%;
 	right: 17%;
 	transform: translateY(-50%);
@@ -560,7 +584,7 @@
 }
 .raid-workshop .raid-workshop-submit-arrow {
 	position: absolute;
-	top: 43.5%;
+	top: 46%;
 	right: 12%;
 	transform: translateY(-50%);
 	width: 6%;
@@ -990,6 +1014,9 @@
 	}
 }
 @media (prefers-reduced-motion: reduce) {
+	.raid-workshop-submit-gear img {
+		animation: none;
+	}
 	.raid-workshop .raid-workshop-submit {
 		transition: none;
 	}

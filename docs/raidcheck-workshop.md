@@ -69,6 +69,46 @@ Native size: 1254 × 1254; alpha: true. Generation: exec-dd78d29f-40e6-4678-b8de
 
 Create an entirely original illustration from a blank canvas, no input image. One isolated emblem for a fantasy goblin workshop interface, square 1:1 canvas with genuinely transparent background. A heavy dark weathered iron cog with 10 clearly machined teeth, chipped brass bevels on the lower edges and two silver steel open-ended spanners crossed diagonally across its face. The spanners form a balanced X. Crisp small bolts, metallic highlights, hand-painted Warcraft-style angular game art matching worn dark steel and aged bronze. A few tiny acid-green sparks sit just beside left and right sides of the gear, subtle green rim light from below, but no large haze or fog. Entire emblem centered within 15% transparent safe margins on all sides. High detail at 128px display size, strong clean silhouette. No text, no letters, no square panel, no background, no supporting floor, no border, no perspective tilt, no blur.
 
+## Animated submit button (v2)
+
+The submit button now uses two newly generated transparent images. The existing single-image button is retained as the original design. Both new assets were created from scratch with the built-in `image_gen` tool, then encoded as WebP at quality 95 / alpha quality 100 without resizing.
+
+### submit-button-frame-v2.webp
+
+Path: public/raidcheck/workshop/submit-button-frame-v2.webp
+
+Native size: 2172 × 724; alpha: true. Generation: exec-fe03be7b-4e1e-4752-bcf6-22786a8feab0.
+
+```text
+Use case: stylized-concept. Asset type: production raster artwork for one website action button, genuine transparent alpha.
+Create an entirely NEW design from a blank canvas: one wide 3:1 goblin engineering button BODY ONLY. High quality hand-painted Warcraft-like fantasy game UI art, sharp clean metal edges and crisp small details. Worn golden brass and dark gunmetal, beveled riveted corner plates, compact angular clamps, short black pipes with brass couplings running neatly below the face, tiny purple fittings at the sides. A broad luminous lime/acid green enamel face with subtle fine scratches and a calm evenly lit center, dark enough for near-black HTML lettering to remain readable. Mechanical, substantial, polished game interface rather than photorealism.
+Strict straight-on orthographic view, perfectly horizontal. Canvas aspect 3:1. Entire silhouette including pipes fits in the canvas with 3 percent transparent margins. The main green face occupies roughly x=10% to 91%, y=17% to 72%; its vertical center is y=44%. On the LEFT at x=20%, y=44%, place a simple dark circular recessed mounting plate, diameter 16% of canvas width (48% of canvas height), ready to receive a SEPARATE animated gear image later. This mounting plate has no teeth, no spokes and NO GEAR on it. The area from x=31% to 84% on the face must remain clear green for real HTML text. Below the face, use a compact low pipe assembly in the lower quarter with transparent gaps.
+The panel and mounting plate are opaque; all canvas outside the object and between the pipes is truly transparent, no checkerboard or black background. No letters, no words, no numbers, no arrows, no logos, no drawn gear, no characters, no environment, no UI mockup. No blur, no haze, no detached floating fragments. The object is a single clean separate button body.
+```
+
+### submit-button-gear-v2.webp
+
+Path: public/raidcheck/workshop/submit-button-gear-v2.webp
+
+Native size: 1254 × 1254; alpha: true. Generation: exec-8f1bdf05-49dc-4e5a-8c0d-b3f5f6e9b011.
+
+```text
+Use case: stylized-concept. Asset type: production raster sprite for a rotating website button gear, genuine transparent alpha.
+Create from a blank canvas ONE perfectly centered, strictly front-facing circular goblin engineering GEAR on a square 1:1 canvas. High quality hand-painted Warcraft-like fantasy game interface art. Match this material palette: vivid lime/acid green enamel on the gear face, worn golden brass bevels around the edges and teeth, dark gunmetal inner ring, round aged brass central hub. Eight evenly spaced sturdy mechanical teeth, crisp machined edges, tasteful small scratches and evenly spaced small rivets around the hub. The outline must be mechanically circular and radially balanced, never oval or tilted. All rings, teeth and hub share the exact canvas center. The complete outer silhouette occupies 84% of the square width and height, with equal transparent 8% padding on all four sides.
+This sprite will continuously rotate around its center: use balanced soft frontal lighting with restrained radial highlights, no strong directional cast shadow, no perspective, no extrusion projecting to one side. Make the gear legible at 60 to 100 CSS pixels, bold clean teeth, richly painted metal texture without clutter.
+True transparent alpha outside the entire gear and through the gaps between its teeth. No square background, no mounting plate, no rectangular button, no pipes, no letters, no numbers, no arrow, no spark particles, no glow cloud, no tools, no environment, no other objects, no blur. Deliver only the isolated green-and-brass gear.
+```
+
+The gear wrapper positions the sprite over the circular mount; only the nested image rotates. A persistent 1.5-second clockwise CSS animation starts paused and runs while the button has `aria-busy="true"`. Pausing preserves the current angle between requests. Reduced-motion mode disables rotation while retaining the localized loading label and busy state. The right arrow stays static, and the native submit button blocks repeated activation while pending.
+
+### v2 verification
+
+- The existing three `RaidCheckForm` tests pass.
+- The actual local `/raidcheck` page was checked in headless Chrome at 320, 768 and 1440 CSS pixels in both Russian and English. Idle and pending text fits between the gear and arrow; button dimensions remain stable and the page has no horizontal overflow.
+- Browser-only mocked server-action responses covered a 150 ms success, a 2.2 s success and an error. The gear advances while pending, pauses at the current animation time after success or error, and resumes without resetting. Repeated activation during a pending request sends only one action.
+- Reduced-motion mode shows the busy label without rotation. The right arrow remains static; no browser page errors were observed. Both WebP files preserve genuine alpha transparency. No real character data was requested during these checks.
+- No production build or broad test suite was run.
+
 ## Verification
 
 - Targeted ESLint passed for the changed route, shared shell, form, UI primitives, illustration modules and Next image configuration.
