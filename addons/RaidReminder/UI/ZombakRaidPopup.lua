@@ -65,9 +65,8 @@ local function StopAnimation()
   popup.glow:SetAlpha(0)
 end
 
-local function CreatePopup()
-  if popup then return end
-  popup = CreateFrame("Frame", "RaidReminderZombakRaidPopup", UIParent, "BackdropTemplate")
+local function BuildPopup()
+  local popup = CreateFrame("Frame", "RaidReminderZombakRaidPopup", UIParent, "BackdropTemplate")
   popup:SetSize(WIDTH, 180)
   popup:SetFrameStrata(WINDOW_FRAME_STRATA)
   popup:SetFrameLevel(WINDOW_FRAME_LEVEL)
@@ -152,23 +151,28 @@ local function CreatePopup()
   popup.close:SetFrameLevel(popup:GetFrameLevel() + 2)
   popup.close:SetSize(24, 24)
   popup.close:SetPoint("TOPRIGHT", -3, -3)
-  popup.close:SetScript("OnClick", function() RR.ZombakRaids.Clear() end)
+  popup.close:SetScript("OnClick", function() RR.ZombakRaids.Clear("close_button") end)
   popup.action = CreateButton(popup, 254, InterfaceText("zombakFind"), true)
   popup.action:SetPoint("BOTTOMLEFT", 16, 14)
   popup.action:SetScript("OnClick", RR.ZombakRaids.OnActionClick)
   popup.dismiss = CreateButton(popup, 102, InterfaceText("zombakDismiss"), false)
   popup.dismiss:SetPoint("BOTTOMRIGHT", -16, 14)
-  popup.dismiss:SetScript("OnClick", function() RR.ZombakRaids.Clear() end)
+  popup.dismiss:SetScript("OnClick", function() RR.ZombakRaids.Clear("dismiss_button") end)
   popup:SetScript("OnHide", function()
     StopAnimation()
     if editing then return end
     if timeout then timeout:Cancel(); timeout = nil end
     if notificationVisible then
       notificationVisible = false
-      RR.ZombakRaids.Clear()
+      RR.ZombakRaids.Clear("hidden_or_escape")
     end
   end)
   RR.UI.ZombakRaidEditMode.ApplyPosition(popup)
+  return popup
+end
+
+local function CreatePopup()
+  if not popup then popup = BuildPopup() end
 end
 
 local function RenderView(view)
@@ -194,8 +198,26 @@ function Popup.ResetTimeout()
   if timeout then timeout:Cancel() end
   timeout = C_Timer.NewTimer(ZOMBAK_RAID_POPUP_TIMEOUT, function()
     timeout = nil
-    RR.ZombakRaids.Clear()
+    RR.ZombakRaids.Clear("timeout")
   end)
+end
+
+function Popup.GetBlockReason()
+  if editing then return "banner_editor" end
+  if InCombatLockdown() then return "combat" end
+  if not UIParent:IsShown() then return "UIParent_hidden" end
+  return nil
+end
+
+function Popup.CanNotify()
+  return Popup.GetBlockReason() == nil
+end
+
+function Popup.GetPositionSummary()
+  if not popup then return "not_created" end
+  local x, y = popup:GetCenter()
+  return string.format("shown=%s center=%s,%s screen=%sx%s", tostring(popup:IsShown()),
+    tostring(x), tostring(y), tostring(UIParent:GetWidth()), tostring(UIParent:GetHeight()))
 end
 
 function Popup.Show()
@@ -226,6 +248,7 @@ end
 
 function Popup.SetEditing(value)
   if value == editing then return popup end
+  RR.Diagnostics.Record("BANNER_EDITOR", { active = value })
   if value then
     CreatePopup()
     editing = true
@@ -244,6 +267,7 @@ function Popup.SetEditing(value)
     elseif popup then
       popup:Hide()
     end
+    RR.ZombakRaids.Maintain()
   end
   return popup
 end

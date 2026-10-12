@@ -13,6 +13,8 @@ function RR.Options.Initialize()
   if type(RR.DB.autoSearchZombakRaids) ~= "boolean" then
     RR.DB.autoSearchZombakRaids = false
   end
+  RR.Diagnostics.Initialize()
+  RR.ZombakRaids.InitializeRecovery()
 
   if RR.Options.category or not Settings then
     return
@@ -24,8 +26,10 @@ function RR.Options.Initialize()
     Settings.VarType.Boolean, InterfaceText("zombakSetting"), false
   )
   setting:SetValueChangedCallback(function(_, value)
+    RR.Diagnostics.Record("SETTING", { receiveEnabled = value })
     if not value then
-      RR.ZombakRaids.Clear()
+      RR.ZombakRaids.Clear("setting_disabled")
+      RR.ZombakRaids.ClearPendingNotifications()
     end
     RR.Comm.UpdateZombakSubscription()
   end)

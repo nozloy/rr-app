@@ -16,7 +16,7 @@ function RaidDifficultiesMatch(savedDifficultyId, targetDifficultyId)
   return tonumber(savedDifficultyId) == targetDifficultyId
 end
 
-function GetKilledBossesForRaid(raidName, difficultyId)
+local function ReadKilledBossesForRaid(raidName, difficultyId, instanceID)
   local killedBosses = {}
 
   if not GetNumSavedInstances or not GetSavedInstanceInfo or not GetSavedInstanceEncounterInfo then
@@ -25,21 +25,26 @@ function GetKilledBossesForRaid(raidName, difficultyId)
 
   local savedInstanceCount = GetNumSavedInstances()
   for instanceIndex = 1, savedInstanceCount do
-    local name, _, _, savedDifficultyId, locked, _, _, isRaid, _, _, numEncounters =
+    local name, _, _, savedDifficultyId, locked, _, _, isRaid, _, _, numEncounters, _, _, savedInstanceID =
       GetSavedInstanceInfo(instanceIndex)
+
+    local sameRaid = RaidNamesMatch(name, raidName)
+    if tonumber(instanceID) and tonumber(instanceID) > 0 and tonumber(savedInstanceID) and tonumber(savedInstanceID) > 0 then
+      sameRaid = tonumber(instanceID) == tonumber(savedInstanceID)
+    end
 
     if
       isRaid
       and locked
-      and numEncounters
-      and numEncounters > 0
-      and RaidNamesMatch(name, raidName)
+      and sameRaid
       and RaidDifficultiesMatch(savedDifficultyId, difficultyId)
     then
+      if not numEncounters or numEncounters < 1 then return nil, InterfaceText("lockoutUnavailable") end
       for encounterIndex = 1, numEncounters do
         local bossName, _, isKilled = GetSavedInstanceEncounterInfo(instanceIndex, encounterIndex)
-        if isKilled and bossName and bossName ~= "" then
-          table.insert(killedBosses, bossName)
+        if isKilled == nil then return nil, InterfaceText("lockoutUnavailable") end
+        if isKilled then
+          table.insert(killedBosses, bossName and bossName ~= "" and bossName or InterfaceText("unknown"))
         end
       end
     end
@@ -48,16 +53,23 @@ function GetKilledBossesForRaid(raidName, difficultyId)
   return killedBosses
 end
 
+function GetKilledBossesForRaid(raidName, difficultyId, instanceID)
+  local ok, bosses, errorText = pcall(ReadKilledBossesForRaid, raidName, difficultyId, instanceID)
+  if not ok then return nil, InterfaceText("lockoutUnavailable") end
+  return bosses, errorText
+end
+
 function GetRaidCheckTarget(fields)
   fields = fields or GetExportFields()
   if fields.instanceType ~= "raid" or not fields.instanceName or fields.instanceName == "" then
-    return nil
+    return raidCheckSelectedTarget
   end
 
   return {
     difficultyId = fields.difficultyID or fields.selectedRaidDifficultyID,
     difficultyName = fields.difficultyName or fields.selectedRaidDifficultyName,
     raidName = fields.instanceName,
+    instanceID = fields.instanceID,
   }
 end
 
@@ -78,7 +90,9 @@ function RaidCheckTargetsMatch(left, right)
     return false
   end
 
-  return left.raidName == right.raidName and tostring(left.difficultyId or "") == tostring(right.difficultyId or "")
+  local sameRaid = left.raidName == right.raidName
+  if left.instanceID and right.instanceID then sameRaid = left.instanceID == right.instanceID end
+  return sameRaid and tostring(left.difficultyId or "") == tostring(right.difficultyId or "")
 end
 
 function AddRaidCheckEntryAlias(state, entry, key)
@@ -117,7 +131,6 @@ function FindRaidCheckEntryInState(state, entry)
 
   return state.entryByKey[entry.key]
     or state.entryByKey[BuildCharacterKey(entry.name, entry.realm)]
-    or state.entryByKey[entry.name]
 end
 
 function CopyGearResult(entry, previousEntry)
@@ -240,7 +253,11 @@ function FindRaidCheckEntry(sender)
     return nil
   end
 
-  return raidCheckState.entryByKey[BuildCharacterKeyFromFullName(sender)] or raidCheckState.entryByKey[sender]
+  local name, realm = SplitFullName(sender)
+  local entry = raidCheckState.entryByKey[BuildCharacterKey(name, realm or GetRealmName())]
+  if entry then return entry end
+  local unresolved = raidCheckState.entryByKey[name]
+  if unresolved and not CompactRealmName(unresolved.realm) then return unresolved end
 end
 
 function GetRaidCheckStatusText(entry)
@@ -253,7 +270,7 @@ function GetRaidCheckStatusText(entry)
   end
 
   if entry.status == RAID_CHECK_STATUS.noAddon then
-    return InterfaceText("noAddon")
+    return InterfaceText("noResponse")
   end
 
   if entry.status == RAID_CHECK_STATUS.unavailable then
@@ -261,7 +278,7 @@ function GetRaidCheckStatusText(entry)
       return InterfaceText("notChecked")
     end
 
-    return InterfaceText("unavailable")
+    return InterfaceText("lockoutUnavailable")
   end
 
   return InterfaceText("checking")
@@ -496,6 +513,10 @@ function SetExportFrameMode(mode)
   SetFrameShown(raidCheckStatus, false)
   SetFrameShown(raidCheckProblemFilter, showFullRaidCheck)
   SetFrameShown(raidCheckAddonFilter, showFullRaidCheck and checksLockout)
+  SetFrameShown(raidCheckTargetButton, showFullRaidCheck and checksLockout)
+  if raidCheckTargetButton then
+    raidCheckTargetButton:SetEnabled(select(2, GetInstanceFields()) ~= "raid")
+  end
   SetFrameShown(raidCheckSummary.panel, showFullRaidCheck)
   SetFrameShown(raidCheckSummary.addonCard, showFullRaidCheck and checksLockout)
   if raidCheckSummary.cleanCard then
@@ -911,64 +932,6 @@ function SendRaidReminderWhisper(entry)
   end
 end
 
-function SendRaidCheckResponse(sender, requestId, raidName, difficultyId)
-  if RequestRaidInfo then
-    RequestRaidInfo()
-  end
-
-  local function sendResponse()
-    local killedBosses, errorText = GetKilledBossesForRaid(raidName, difficultyId)
-    local status = RAID_CHECK_STATUS.clean
-    if errorText then
-      status = RAID_CHECK_STATUS.unavailable
-      killedBosses = {}
-    elseif killedBosses and #killedBosses > 0 then
-      status = RAID_CHECK_STATUS.hasLockout
-    end
-
-    SendRaidReminderAddonMessage(
-      BuildAddonMessage("RSP", requestId, status, killedBosses and #killedBosses or 0),
-      "WHISPER",
-      sender
-    )
-
-    for index, bossName in ipairs(killedBosses or {}) do
-      SendRaidReminderAddonMessage(BuildAddonMessage("BOS", requestId, index, bossName), "WHISPER", sender)
-    end
-  end
-
-  if C_Timer and C_Timer.After then
-    C_Timer.After(RAID_CHECK_REPLY_DELAY, sendResponse)
-  else
-    sendResponse()
-  end
-end
-
-function SendRaidCheckRequest(state)
-  if not state or not state.target then
-    return
-  end
-
-  SendRaidReminderAddonMessage(
-    BuildAddonMessage("REQ", state.requestId, state.target.raidName, state.target.difficultyId or ""),
-    GetGroupAddonDistribution()
-  )
-end
-
-function MarkMissingRaidCheckAddons(requestId)
-  if not raidCheckState or raidCheckState.requestId ~= requestId then
-    return
-  end
-
-  for _, entry in ipairs(raidCheckState.entries) do
-    if entry.status == RAID_CHECK_STATUS.pending then
-      entry.status = RAID_CHECK_STATUS.noAddon
-    end
-  end
-
-  RenderRaidCheckRows()
-end
-
 function RefreshRaidCheck(fields, scanMode)
   if not raidCheckContent or not raidCheckStatus then
     return
@@ -977,6 +940,7 @@ function RefreshRaidCheck(fields, scanMode)
   local groupType = GetRaidCheckGroupType()
   if not groupType then
     raidCheckState = nil
+    raidCheckSelectedTarget = nil
     ResetInspectQueue(nil)
     RenderRaidCheckRows(InterfaceText("groupReadinessNoGroup"))
     return
@@ -1005,7 +969,12 @@ function RefreshRaidCheck(fields, scanMode)
   end
 
   raidCheckRequestSerial = raidCheckRequestSerial + 1
-  local requestId = tostring(math.floor((GetTime and GetTime() or 0) * 1000)) .. "-" .. raidCheckRequestSerial
+  local playerKey = GetPlayerCharacterKey() or ""
+  local playerHash = 0
+  for index = 1, #playerKey do playerHash = (playerHash * 33 + playerKey:byte(index)) % 2147483647 end
+  local requestId = playerHash .. ":" .. tostring(math.floor((GetTime and GetTime() or 0) * 1000)) .. "-" .. raidCheckRequestSerial
+  local preserveLockouts = previousState and scanMode == GEAR_SCAN_MODE.roster and not groupTypeChanged and not targetChanged
+  if preserveLockouts then requestId = previousState.requestId end
   local entries = BuildRaidRosterEntries(groupType)
   local state = {
     checksLockout = checksLockout,
@@ -1017,8 +986,20 @@ function RefreshRaidCheck(fields, scanMode)
   }
 
   for _, entry in ipairs(entries) do
+    local previousEntry = FindRaidCheckEntryInState(previousState, entry)
     if scanMode ~= GEAR_SCAN_MODE.full then
-      CopyGearResult(entry, FindRaidCheckEntryInState(previousState, entry))
+      CopyGearResult(entry, previousEntry)
+    end
+    if previousEntry then
+      entry.hasAddon = previousEntry.hasAddon
+      entry.addonVersion = previousEntry.addonVersion
+      if preserveLockouts and previousEntry.lockoutReply then
+        entry.status = previousEntry.status
+        entry.killedBosses = CopyArray(previousEntry.killedBosses)
+        entry.bossesByIndex = previousEntry.bossesByIndex
+        entry.expectedBosses = previousEntry.expectedBosses
+        entry.lockoutReply = true
+      end
     end
 
     AddRaidCheckEntryAlias(state, entry, entry.key)
@@ -1029,9 +1010,10 @@ function RefreshRaidCheck(fields, scanMode)
       entry.status = RAID_CHECK_STATUS.unavailable
     end
 
-    if entry.key == GetPlayerCharacterKey() or entry.name == (UnitName and UnitName("player") or nil) then
+    if entry.key == GetPlayerCharacterKey() or (UnitIsUnit and UnitIsUnit(entry.unit, "player")) then
       state.localEntry = entry
       entry.hasAddon = true
+      entry.addonVersion = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "unknown"
     end
   end
 
@@ -1039,86 +1021,7 @@ function RefreshRaidCheck(fields, scanMode)
   RenderRaidCheckRows()
   RR.Gear.StartInspectScan(state, scanMode)
 
-  if not checksLockout or not target then
-    return
-  end
-
-  if RequestRaidInfo then
-    RequestRaidInfo()
-  end
-
-  if C_Timer and C_Timer.After then
-    C_Timer.After(RAID_CHECK_REPLY_DELAY, function()
-      ApplyLocalRaidCheckResult(requestId)
-    end)
-    C_Timer.After(RAID_CHECK_REPLY_TIMEOUT, function()
-      MarkMissingRaidCheckAddons(requestId)
-    end)
-  else
-    ApplyLocalRaidCheckResult(requestId)
-    MarkMissingRaidCheckAddons(requestId)
-  end
-
-  SendRaidCheckRequest(state)
-end
-
-function HandleRaidCheckResponse(sender, parts)
-  if not raidCheckState or not raidCheckState.checksLockout or parts[2] ~= raidCheckState.requestId then
-    return
-  end
-
-  local entry = FindRaidCheckEntry(sender)
-  if not entry then
-    return
-  end
-
-  local status = parts[3]
-  entry.hasAddon = true
-  entry.killedBosses = {}
-
-  if status == RAID_CHECK_STATUS.hasLockout then
-    entry.status = RAID_CHECK_STATUS.hasLockout
-  elseif status == RAID_CHECK_STATUS.unavailable then
-    entry.status = RAID_CHECK_STATUS.unavailable
-  else
-    entry.status = RAID_CHECK_STATUS.clean
-  end
-
-  RenderRaidCheckRows()
-end
-
-function HandleRaidCheckBoss(sender, parts)
-  if not raidCheckState or not raidCheckState.checksLockout or parts[2] ~= raidCheckState.requestId then
-    return
-  end
-
-  local entry = FindRaidCheckEntry(sender)
-  if not entry then
-    return
-  end
-
-  entry.hasAddon = true
-  table.insert(entry.killedBosses, parts[4] or InterfaceText("unknown"))
-  if #entry.killedBosses > 0 then
-    entry.status = RAID_CHECK_STATUS.hasLockout
-  end
-
-  RenderRaidCheckRows()
-end
-
-function HandleRaidCheckRequest(sender, parts)
-  if IsSenderPlayer(sender) then
-    return
-  end
-
-  local requestId = parts[2]
-  local raidName = parts[3]
-  local difficultyId = tonumber(parts[4])
-  if not requestId or requestId == "" or not raidName or raidName == "" then
-    return
-  end
-
-  SendRaidCheckResponse(sender, requestId, raidName, difficultyId)
+  StartRaidCheckSync(state, preserveLockouts)
 end
 
 RR.Readiness.Refresh = RefreshRaidCheck

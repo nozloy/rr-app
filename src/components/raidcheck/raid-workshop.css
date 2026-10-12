@@ -59,10 +59,11 @@
 	position: relative;
 	container-type: inline-size;
 }
-.raid-workshop-sign-art img {
-	display: block;
-	width: 100%;
-	height: auto;
+.raid-workshop-sign-art {
+	aspect-ratio: 2098 / 749;
+	background: url('/raidcheck/workshop/title-sign.webp') center top / 100% auto no-repeat;
+	pointer-events: none;
+	user-select: none;
 }
 .raid-workshop-subtitle {
 	position: absolute;
@@ -220,7 +221,7 @@
 }
 .raid-workshop .raidcheck-process-content {
 	display: grid;
-	grid-template-columns: 58px minmax(0, 1fr);
+	grid-template-columns: 72px minmax(0, 1fr);
 	gap: 16px;
 	align-items: center;
 	min-height: 91px;
@@ -244,30 +245,15 @@
 	margin: 0;
 }
 .raid-workshop .raidcheck-process-icon {
-	display: grid;
-	place-items: center;
-	width: 58px;
-	height: 58px;
-	border-radius: 50%;
-	border: 1px solid #59683655;
-	color: #efdf43;
-	background: radial-gradient(circle at 40% 30%, #496718, #173511 70%);
-	box-shadow:
-		0 0 18px #8af41e14,
-		inset 0 1px 4px #baf84038;
-}
-.raid-workshop .raidcheck-process-icon svg {
-	width: 37px;
-	height: 37px;
-	filter: drop-shadow(0 2px 2px #000);
-}
-.raid-workshop
-	.raidcheck-process-card[data-tone='blue']
-	.raidcheck-process-icon {
-	color: #28cdfb;
-	border-color: #318fba60;
-	background: radial-gradient(circle at 40% 30%, #115d77, #072831 70%);
-	box-shadow: 0 0 18px #18ace321;
+	display: block;
+	width: 72px;
+	height: 72px;
+	border: 0;
+	border-radius: 0;
+	background: transparent center / contain no-repeat;
+	filter: drop-shadow(0 3px 3px #0009);
+	pointer-events: none;
+	user-select: none;
 }
 
 .raid-workshop .raidcheck-workbench {
@@ -764,11 +750,11 @@
 	.raid-workshop .raidcheck-process-content {
 		padding: 14px;
 		gap: 10px;
-		grid-template-columns: 48px minmax(0, 1fr);
+		grid-template-columns: 64px minmax(0, 1fr);
 	}
 	.raid-workshop .raidcheck-process-icon {
-		width: 48px;
-		height: 48px;
+		width: 64px;
+		height: 64px;
 	}
 	.raid-workshop .raidcheck-process-content p {
 		font-size: 14px;
@@ -927,7 +913,7 @@
 		margin-bottom: 22px;
 	}
 	.raid-workshop .raidcheck-process-content {
-		grid-template-columns: 46px minmax(0, 1fr);
+		grid-template-columns: 64px minmax(0, 1fr);
 		gap: 15px;
 		min-height: 84px;
 		padding: 14px 17px;
@@ -939,14 +925,6 @@
 	}
 	.raid-workshop .raidcheck-process-content p {
 		font-size: 14px;
-	}
-	.raid-workshop .raidcheck-process-icon {
-		width: 46px;
-		height: 46px;
-	}
-	.raid-workshop .raidcheck-process-icon svg {
-		width: 31px;
-		height: 31px;
 	}
 	.raid-workshop .raidcheck-panel {
 		padding: 7px;

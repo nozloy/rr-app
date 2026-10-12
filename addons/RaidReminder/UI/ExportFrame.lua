@@ -118,13 +118,17 @@ function CreateExportFrame()
     raidCheckShowProblemsOnly = self:GetChecked() and true or false
     RenderRaidCheckRows()
   end)
-  raidCheckProblemFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 560, -168)
+  raidCheckProblemFilter:SetPoint("TOPLEFT", frame, "TOPLEFT", 560, -146)
 
   raidCheckAddonFilter = CreateFilterCheckbox(frame, InterfaceText("filterAddon"), raidCheckShowAddonOnly, function(self)
     raidCheckShowAddonOnly = self:GetChecked() and true or false
     RenderRaidCheckRows()
   end)
   raidCheckAddonFilter:SetPoint("LEFT", raidCheckProblemFilter.label, "RIGHT", 28, 0)
+
+  raidCheckTargetButton = CreateStyledButton(frame, 245, 24, InterfaceText("chooseRaidTarget"))
+  raidCheckTargetButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -52, -179)
+  raidCheckTargetButton:SetScript("OnClick", ShowRaidCheckTargetMenu)
 
   local summaryPanel = CreateBorderedPanel(frame, 850, 74, "TOP", frame, "TOP", 0, -214)
   local addonCard = CreateSummaryCard(summaryPanel, "Interface\\Icons\\INV_Misc_GroupNeedMore", InterfaceText("addonSummary"), "white")

@@ -1,0 +1,71 @@
+local ADDON_NAME, RR = ...
+setfenv(1, RR.Env)
+
+local reportFrame
+
+local function CreateReportFrame()
+  local panel = CreateFrame("Frame", "RaidReminderZombakDiagnosticsFrame", UIParent, "BasicFrameTemplateWithInset")
+  panel:SetSize(760, 520)
+  panel:SetPoint("CENTER")
+  panel:SetFrameStrata("DIALOG")
+  panel:SetClampedToScreen(true)
+  panel:SetMovable(true)
+  panel:EnableMouse(true)
+  panel:RegisterForDrag("LeftButton")
+  panel:SetScript("OnDragStart", panel.StartMoving)
+  panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+  RegisterSpecialFrame("RaidReminderZombakDiagnosticsFrame")
+  local title = panel.TitleText or panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("TOP", 0, -8)
+  title:SetText(InterfaceText("zombakReportTitle"))
+  local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  hint:SetPoint("TOPLEFT", 18, -35)
+  hint:SetWidth(724)
+  hint:SetJustifyH("LEFT")
+  hint:SetText(InterfaceText("zombakReportHint"))
+
+  local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", 18, -78)
+  scroll:SetPoint("BOTTOMRIGHT", -34, 52)
+  local text = CreateFrame("EditBox", nil, scroll)
+  text:SetMultiLine(true)
+  text:SetAutoFocus(false)
+  text:SetFontObject(ChatFontNormal)
+  text:SetWidth(690)
+  text:SetHeight(1)
+  text:SetMaxLetters(0)
+  text:SetScript("OnEscapePressed", function() panel:Hide() end)
+  text:SetScript("OnTextChanged", function(self, userInput)
+    if userInput then self:SetText(panel.report or ""); self:HighlightText() end
+  end)
+  scroll:SetScrollChild(text)
+  panel.text, panel.scroll = text, scroll
+  local function Select()
+    text:SetFocus()
+    text:HighlightText()
+  end
+  text:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+  local selectButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  selectButton:SetSize(200, 26)
+  selectButton:SetPoint("BOTTOMLEFT", 18, 16)
+  selectButton:SetText(InterfaceText("zombakReportSelect"))
+  selectButton:SetScript("OnClick", Select)
+  local close = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  close:SetSize(120, 26)
+  close:SetPoint("BOTTOMRIGHT", -18, 16)
+  close:SetText(InterfaceText("close"))
+  close:SetScript("OnClick", function() panel:Hide() end)
+  panel:SetScript("OnHide", function() text:ClearFocus() end)
+  return panel
+end
+
+function RR.UI.ShowZombakReport()
+  if not reportFrame then reportFrame = CreateReportFrame() end
+  reportFrame.report = RR.Diagnostics.BuildReport()
+  reportFrame.text:SetText(reportFrame.report)
+  reportFrame:Show()
+  reportFrame:Raise()
+  reportFrame.text:SetFocus()
+  reportFrame.text:HighlightText()
+  reportFrame.scroll:SetVerticalScroll(0)
+end

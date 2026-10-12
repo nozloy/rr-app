@@ -7,6 +7,8 @@ frame = nil
 editBox = nil
 raidCheckLabel = nil
 raidCheckTargetText = nil
+raidCheckTargetButton = nil
+raidCheckSelectedTarget = nil
 raidCheckHeader = nil
 raidCheckContent = nil
 raidCheckScrollFrame = nil
@@ -36,5 +38,5 @@ raidLockoutStatus = nil
 raidLockoutRows = {}
 raidLockoutEventFrame = nil
 
-RR.State.ZombakRaid = { seen = {}, latest = {} }
+RR.State.ZombakRaid = { seen = {}, latest = {}, latestNonce = {} }
 RR.State.debugZombak = false

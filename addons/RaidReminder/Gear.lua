@@ -18,10 +18,11 @@ function ApplyRaidCheckResult(entry, killedBosses, errorText)
   else
     entry.status = RAID_CHECK_STATUS.clean
   end
+  entry.lockoutReply = not errorText
 end
 
 function ApplyLocalRaidCheckResult(requestId)
-  if not raidCheckState or raidCheckState.requestId ~= requestId then
+  if not raidCheckState or raidCheckState.requestId ~= requestId or not raidCheckState.target then
     return
   end
 
@@ -32,7 +33,8 @@ function ApplyLocalRaidCheckResult(requestId)
 
   local killedBosses, errorText = GetKilledBossesForRaid(
     raidCheckState.target.raidName,
-    raidCheckState.target.difficultyId
+    raidCheckState.target.difficultyId,
+    raidCheckState.target.instanceID
   )
   ApplyRaidCheckResult(entry, killedBosses, errorText)
   RenderRaidCheckRows()

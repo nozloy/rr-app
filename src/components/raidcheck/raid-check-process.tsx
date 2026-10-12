@@ -7,23 +7,21 @@ export function RaidCheckProcess({ locale }: { locale: AppLocale }) {
 
   return (
     <section className="raidcheck-process" aria-label={locale === "ru" ? "Как работает проверка" : "How check works"}>
-      {raidCheckSteps.map((step) => {
-        const Icon = step.icon;
-
-        return (
-          <Card className="raidcheck-process-card raid-workshop-metal" data-tone={step.tone} key={step.label}>
-            <CardHeader className="raidcheck-process-content">
-              <span className="raidcheck-process-icon">
-                <Icon weight="duotone" aria-hidden="true" />
-              </span>
-              <div>
-                <CardTitle>{step.label}</CardTitle>
-                <CardDescription>{step.text}</CardDescription>
-              </div>
-            </CardHeader>
-          </Card>
-        );
-      })}
+      {raidCheckSteps.map((step) => (
+        <Card className="raidcheck-process-card raid-workshop-metal" key={step.label}>
+          <CardHeader className="raidcheck-process-content">
+            <span
+              className="raidcheck-process-icon"
+              style={{ backgroundImage: `url(${step.iconSrc})` }}
+              aria-hidden="true"
+            />
+            <div>
+              <CardTitle>{step.label}</CardTitle>
+              <CardDescription>{step.text}</CardDescription>
+            </div>
+          </CardHeader>
+        </Card>
+      ))}
     </section>
   );
 }

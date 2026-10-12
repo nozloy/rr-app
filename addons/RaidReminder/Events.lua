@@ -8,6 +8,8 @@ raidCheckEventFrame:RegisterEvent("ADDON_LOADED")
 raidCheckEventFrame:RegisterEvent("PLAYER_LOGIN")
 raidCheckEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 raidCheckEventFrame:RegisterEvent("CHANNEL_UI_UPDATE")
+raidCheckEventFrame:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE")
+raidCheckEventFrame:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE_USER")
 raidCheckEventFrame:RegisterEvent("LFG_LIST_ACTIVE_ENTRY_UPDATE")
 raidCheckEventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULTS_RECEIVED")
 raidCheckEventFrame:RegisterEvent("LFG_LIST_SEARCH_RESULT_UPDATED")
@@ -25,14 +27,20 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
       RR.Options.Initialize()
     end
   elseif event == "PLAYER_LOGIN" then
-    RR.UI.ZombakRaidEditMode.Initialize()
+    RR.Diagnostics.Record("PLAYER_LOGIN")
     RR.Comm.RegisterAddonMessages()
     RR.Comm.UpdateZombakSubscription()
+    RR.UI.ZombakRaidEditMode.Initialize()
   elseif event == "PLAYER_ENTERING_WORLD" then
+    RR.Diagnostics.Record("PLAYER_ENTERING_WORLD")
     RR.Comm.UpdateZombakSubscription()
+    RR.Readiness.Resume()
   elseif event == "CHANNEL_UI_UPDATE" then
     RR.Comm.HandleChannelUpdate()
+  elseif event == "CHAT_MSG_CHANNEL_NOTICE" or event == "CHAT_MSG_CHANNEL_NOTICE_USER" then
+    RR.Diagnostics.ChannelNotice(event, ...)
   elseif event == "LFG_LIST_ACTIVE_ENTRY_UPDATE" then
+    RR.Diagnostics.Record("LISTING_EVENT", { created = ... })
     RR.ZombakRaids.HandleActiveEntryUpdate(...)
   elseif event == "LFG_LIST_SEARCH_RESULTS_RECEIVED" then
     RR.ZombakRaids.HandleSearchResults()
@@ -43,16 +51,22 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
   elseif event == "LFG_LIST_APPLICATION_STATUS_UPDATED" then
     RR.ZombakRaids.HandleApplicationStatus(...)
   elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+    RR.Diagnostics.Record(event)
     RR.ZombakRaids.RefreshPopup()
+    if event == "PLAYER_REGEN_ENABLED" then
+      RR.Comm.HandleChannelUpdate()
+      RR.ZombakRaids.Maintain()
+      RR.Readiness.Resume()
+    end
   elseif event == "CHAT_MSG_ADDON" then
     RR.Comm.HandleAddonMessage(...)
   elseif event == "INSPECT_READY" then
     RR.Gear.HandleInspectReady(...)
   elseif event == "GROUP_ROSTER_UPDATE" then
-    if frame and frame:IsShown() then
-      RR.Readiness.Refresh(RR.Group.GetExportFields(), GEAR_SCAN_MODE.roster)
-    end
+    RR.ZombakRaids.Maintain()
+    RR.Readiness.HandleGroupChange()
   elseif event == "UPDATE_INSTANCE_INFO" then
+    RR.Readiness.HandleInstanceInfo()
     if frame and frame:IsShown() then
       local groupType = GetRaidCheckGroupType()
       if groupType ~= "raid" then
@@ -68,8 +82,6 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
       local target = GetRaidCheckTarget(fields)
       if target and (not raidCheckState or not RaidCheckTargetsMatch(raidCheckState.target, target)) then
         RR.Readiness.Refresh(fields, GEAR_SCAN_MODE.full)
-      elseif raidCheckState and raidCheckState.target then
-        ApplyLocalRaidCheckResult(raidCheckState.requestId)
       end
     end
   end

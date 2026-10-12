@@ -1,0 +1,28 @@
+{
+  "generator": "built-in image_gen",
+  "transparent_background": true,
+  "web_export": {
+    "width": 256,
+    "height": 256,
+    "format": "webp",
+    "quality": 95,
+    "alphaQuality": 100
+  },
+  "assets": [
+    {
+      "key": "api",
+      "path": "public/raidcheck/workshop/process-blizzard-api.webp",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated illustrated UI icon for a Warcraft-inspired goblin engineering raid-preparation website, readable at 60-72 CSS pixels. Generate entirely from scratch. Square canvas, genuinely transparent background with real alpha. Hand-painted fantasy game inventory art, chunky angular silhouette, dark forged iron, weathered brass rims, compact rivets, crisp bevels, warm amber light from upper left and subtle acid-green reflected light from below. Match an elaborate dark goblin workshop with riveted metal panels, green alchemy lamps, brass fittings and purple fabric. Detailed but simplified into a strong immediately recognizable silhouette at small size. Object centered, occupies 82% of canvas, 9% transparent safe margin on every side. No enclosing circular medallion, no square tile or frame, no scenery, no floor, no backdrop, no outer haze, no readable text, no letters, no logos, no watermarks. A single distinct icon, never a sheet or multiple variants. Subject: a sturdy dark iron verification shield edged with chipped antique brass and four large rivets. Its inset face is cold enchanted cyan-blue metal. A single thick luminous acid-green checkmark is prominently embossed across the face, clean and readable, suggesting verified raid data. Two small engineering cogs are partially visible behind the upper corners, secondary to the shield. Front view with just enough bevel to show its thickness. Keep the blue face, green check and worn brass clearly separated. Do not draw a letter B or any brand mark."
+    },
+    {
+      "key": "logs",
+      "path": "public/raidcheck/workshop/process-logs.webp",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated illustrated UI icon for a Warcraft-inspired goblin engineering raid-preparation website, readable at 60-72 CSS pixels. Generate entirely from scratch. Square canvas, genuinely transparent background with real alpha. Hand-painted fantasy game inventory art, chunky angular silhouette, dark forged iron, weathered brass rims, compact rivets, crisp bevels, warm amber light from upper left and subtle acid-green reflected light from below. Match an elaborate dark goblin workshop with riveted metal panels, green alchemy lamps, brass fittings and purple fabric. Detailed but simplified into a strong immediately recognizable silhouette at small size. Object centered, occupies 82% of canvas, 9% transparent safe margin on every side. No enclosing circular medallion, no square tile or frame, no scenery, no floor, no backdrop, no outer haze, no readable text, no letters, no logos, no watermarks. A single distinct icon, never a sheet or multiple variants. Subject: a compact rolled parchment combat-log scroll held in a worn brass and dark iron engineering clipboard. Three simple thick upward chart bars on the parchment, subtly glowing warm amber and purple, no writing. A chunky brass-rimmed magnifying glass overlaps the lower right of the scroll; its round cyan-green lens reveals one chart bar beneath it. The scroll and magnifying glass must read as one compact balanced object, a symbol for analyzing combat logs. Near-front view, bold simple shapes."
+    },
+    {
+      "key": "kick",
+      "path": "public/raidcheck/workshop/process-kick.webp",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated illustrated UI icon for a Warcraft-inspired goblin engineering raid-preparation website, readable at 60-72 CSS pixels. Generate entirely from scratch. Square canvas, genuinely transparent background with real alpha. Hand-painted fantasy game inventory art, chunky angular silhouette, dark forged iron, weathered brass rims, compact rivets, crisp bevels, warm amber light from upper left and subtle acid-green reflected light from below. Match an elaborate dark goblin workshop with riveted metal panels, green alchemy lamps, brass fittings and purple fabric. Detailed but simplified into a strong immediately recognizable silhouette at small size. Object centered, occupies 82% of canvas, 9% transparent safe margin on every side. No enclosing circular medallion, no square tile or frame, no scenery, no floor, no backdrop, no outer haze, no readable text, no letters, no logos, no watermarks. A single distinct icon, never a sheet or multiple variants. Subject: one massive humorous goblin engineer's armored boot mid-kick, diagonally pointing toward the upper right. Dark brown leather ankle, chunky riveted black iron toe cap and heel, weathered brass buckles and thick brass-edged sole, a small acid-green glowing bolt on the ankle. Three short warm amber motion streaks behind the heel suggest a decisive kick out of the raid. Strong clean side-profile silhouette, compact within the square. The boot is the entire subject; no person, no leg above the boot opening, no victim, no body, no gore, no floor. Playful cheeky game-inventory icon, not realistic."
+    }
+  ]
+}

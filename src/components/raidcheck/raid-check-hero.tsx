@@ -8,10 +8,10 @@ import { t, type AppLocale } from "@/lib/i18n";
 export function RaidCheckHero({ locale }: { locale: AppLocale }) {
   return (
     <section className="raid-workshop-hero" aria-labelledby="raidcheck-title">
+      <link rel="preload" as="image" href="/raidcheck/workshop/title-sign.webp" fetchPriority="high" />
       <div className="raid-workshop-sign" data-locale={locale}>
-        <div className="raid-workshop-sign-art">
-          <Image src="/raidcheck/workshop/title-sign.webp" alt="" width={2098} height={749} sizes="(max-width: 700px) 100vw, 50vw" quality={95} priority />
-        </div>
+        {/* Keep decorative artwork out of browser image toolbars. */}
+        <div className="raid-workshop-sign-art" aria-hidden="true" />
         <h1 className={locale === "ru" ? "sr-only" : "raid-workshop-title-en"} id="raidcheck-title">{t(locale, "raidcheck.title")}</h1>
         <p className="raid-workshop-subtitle">{t(locale, "raidcheck.heroCopy")}</p>
       </div>

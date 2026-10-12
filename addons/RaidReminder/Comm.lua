@@ -8,7 +8,11 @@ local channelWanted = false
 local channelJoinedByUs = false
 local channelTimer
 local joinAttempts = 0
+local nextJoinAt = 0
+local maintaining = false
 local pendingBroadcast
+local channelOrderPending = false
+local channelOrderReadyAt, channelOrderDeadline, channelOrderSignature
 local transportStatus = { lastSend = "not attempted", lastReceive = "none", prefixResult = "not attempted" }
 
 local function DescribeResult(value, codes)
@@ -23,13 +27,17 @@ end
 local function SetSendStatus(message)
   if transportStatus.lastSend ~= message then
     transportStatus.lastSend = message
+    RR.Diagnostics.Record("SEND_STATE", { reason = message,
+      nonce = pendingBroadcast and pendingBroadcast.announcement.nonce })
     ZombakDebug("Zombak transport: " .. message)
   end
 end
 
 function RR.Comm.RecordZombakReceive(message)
-  transportStatus.lastReceive = message
-  ZombakDebug("Zombak receive: " .. message)
+  if transportStatus.lastReceive ~= message then
+    transportStatus.lastReceive = message
+    ZombakDebug("Zombak receive: " .. message)
+  end
 end
 
 function CleanAddonMessageField(value)
@@ -59,15 +67,24 @@ end
 
 function RegisterAddonMessages()
   if addonMessagePrefixRegistered then
-    return
+    if not C_ChatInfo or not C_ChatInfo.IsAddonMessagePrefixRegistered or
+      C_ChatInfo.IsAddonMessagePrefixRegistered(ADDON_MESSAGE_PREFIX) then return end
+    addonMessagePrefixRegistered = false
   end
 
   if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
-    local result = C_ChatInfo.RegisterAddonMessagePrefix(ADDON_MESSAGE_PREFIX)
+    local ok, result = pcall(C_ChatInfo.RegisterAddonMessagePrefix, ADDON_MESSAGE_PREFIX)
+    if not ok then
+      transportStatus.prefixResult = "registration error: " .. tostring(result)
+      addonMessagePrefixRegistered = false
+      RR.Diagnostics.Change("prefix", "PREFIX", { result = transportStatus.prefixResult, registered = false })
+      return
+    end
     local codes = Enum and Enum.RegisterAddonMessagePrefixResult
     transportStatus.prefixResult = DescribeResult(result, codes)
     addonMessagePrefixRegistered = result == true or (codes and
       (result == codes.Success or result == codes.DuplicatePrefix)) or false
+    RR.Diagnostics.Change("prefix", "PREFIX", { result = transportStatus.prefixResult, registered = addonMessagePrefixRegistered })
   end
 end
 
@@ -104,6 +121,8 @@ end
 function HandleRaidCheckAddonMessage(prefix, message, distribution, sender, ...)
   if IsZombakLFGRestricted() or (issecretvalue and
     (issecretvalue(prefix) or issecretvalue(message) or issecretvalue(sender))) then
+    RR.Comm.RecordZombakReceive("deferred: chat lockdown or secret data; waiting for a fresh announcement")
+    RR.Diagnostics.Change("unreadable", "RX_UNREADABLE", { reason = "lockdown_or_secret; addon/source cannot be identified safely" })
     return
   end
   if prefix ~= ADDON_MESSAGE_PREFIX or type(message) ~= "string" or not sender then
@@ -114,7 +133,8 @@ function HandleRaidCheckAddonMessage(prefix, message, distribution, sender, ...)
 
   local parts = SplitAddonMessage(message)
   local command = parts[1]
-  if command == ZOMBAK_RAID_EVENT then
+  if command == ZOMBAK_RAID_EVENT or command == ZOMBAK_RAID_ACTIVE_EVENT then
+    transportStatus.lastReceiveAt = GetServerTime()
     RR.Comm.RecordZombakReceive("received from " .. sender .. " via " .. tostring(distribution))
   end
   if command == "REQ" then
@@ -137,6 +157,91 @@ local function GetZombakChannelID()
   return channelID and channelID > 0 and channelID or nil
 end
 
+local function ResetChannelOrder()
+  channelOrderPending = true
+  channelOrderReadyAt, channelOrderDeadline, channelOrderSignature = nil, nil, nil
+end
+
+local function ChannelOrderStatus(result, from, to)
+  transportStatus.channelOrder = result
+  RR.Diagnostics.Change("channel_order", "CHANNEL_ORDER", { result = result, from = from, to = to })
+end
+
+local function MoveZombakChannelLast()
+  if not channelOrderPending then return end
+  if InCombatLockdown() or IsZombakLFGRestricted() then
+    ChannelOrderStatus("deferred: combat or chat lockdown")
+    return
+  end
+  if not GetChannelList or not C_ChatInfo or not C_ChatInfo.SwapChatChannelsByChannelIndex then
+    channelOrderPending = false
+    ChannelOrderStatus("unavailable: channel order API")
+    return
+  end
+  local current = GetZombakChannelID()
+  if not current then return end
+  local raw = { GetChannelList() }
+  local channels, seen = {}, {}
+  for i = 1, #raw, 3 do
+    local id, name = raw[i], raw[i + 1]
+    if (issecretvalue and (issecretvalue(id) or issecretvalue(name))) or
+      type(id) ~= "number" or id < 1 or id ~= math.floor(id) or type(name) ~= "string" or seen[id] then
+      ChannelOrderStatus("deferred: channel list unavailable")
+      return
+    end
+    seen[id] = true
+    -- Include disabled zone channels: their reserved numbers still belong to the user.
+    channels[#channels + 1] = { id = id, name = name }
+  end
+  if not seen[current] then
+    ChannelOrderStatus("deferred: waiting for channel list")
+    return
+  end
+  table.sort(channels, function(a, b) return a.id < b.id end)
+  local layout = {}
+  for i, channel in ipairs(channels) do layout[i] = channel.id .. ":" .. channel.name end
+  local signature, now = table.concat(layout, "\t"), GetTime()
+  if not channelOrderDeadline then
+    -- PLAYER_LOGIN can precede General/Trade restoring their slots. Keep delivery
+    -- active while allowing the initial channel list to settle before moving once.
+    channelOrderDeadline, channelOrderReadyAt = now + 15, now + 5
+  elseif signature ~= channelOrderSignature then
+    channelOrderReadyAt = math.min(channelOrderDeadline, math.max(channelOrderReadyAt, now + 2))
+  end
+  channelOrderSignature = signature
+  if now < channelOrderReadyAt then
+    ChannelOrderStatus("waiting for channel list to settle")
+    return
+  end
+
+  -- One move per subscription/reconnection, not a permanent sorting rule that
+  -- would fight manual reordering or other addons that also prefer the last slot.
+  channelOrderPending = false
+  local first = current
+  for _, channel in ipairs(channels) do
+    if channel.id > current then
+      if InCombatLockdown() or IsZombakLFGRestricted() then
+        channelOrderPending = true
+        ChannelOrderStatus("deferred: combat or chat lockdown", first, current)
+        return
+      end
+      if GetZombakChannelID() ~= current then
+        ChannelOrderStatus("stopped: channel order changed concurrently", first, GetZombakChannelID())
+        return
+      end
+      -- Use the native API only. The ChatConfig Lua helper writes ChatTypeInfo
+      -- and can taint the normal chat UI when invoked from addon code.
+      C_ChatInfo.SwapChatChannelsByChannelIndex(current, channel.id)
+      if GetZombakChannelID() ~= channel.id then
+        ChannelOrderStatus("stopped: channel move not applied", first, GetZombakChannelID())
+        return
+      end
+      current = channel.id
+    end
+  end
+  ChannelOrderStatus(first == current and "already last" or "moved to last", first, current)
+end
+
 function RR.Comm.IsZombakChannel(distribution, _, _, localID, channelName)
   return distribution == "CHANNEL" and
     (channelName == ZOMBAK_RAID_CHANNEL or (localID ~= nil and localID == GetZombakChannelID()))
@@ -146,59 +251,126 @@ function RR.Comm.ClearZombakBroadcast()
   pendingBroadcast = nil
 end
 
+function RR.Comm.HasZombakBroadcast()
+  return pendingBroadcast ~= nil
+end
+
 local function FlushZombakBroadcast()
-  if not pendingBroadcast then
+  local broadcast = pendingBroadcast
+  if not broadcast then
     return
   end
-  if GetTime() > pendingBroadcast.expires then
-    SetSendStatus("expired after 30 seconds; previous status: " .. transportStatus.lastSend)
+  local now = GetTime()
+  if now >= broadcast.expires then
+    SetSendStatus("expired after " .. ZOMBAK_RAID_BROADCAST_TIMEOUT .. " seconds; previous status: " .. transportStatus.lastSend)
     pendingBroadcast = nil
+    return
+  elseif now < broadcast.nextAttemptAt then
     return
   end
 
+  if IsZombakLFGRestricted() then
+    SetSendStatus("blocked by InChatMessagingLockdown")
+    return
+  end
+  local active = RR.ZombakRaids.IsAnnouncementActive(broadcast.announcement)
+  if active == nil then
+    SetSendStatus("deferred: current listing data unavailable")
+    return
+  elseif not active then
+    SetSendStatus("cancelled: listing removed, changed, private or no longer led by this character")
+    pendingBroadcast = nil
+    return
+  end
   local channelID = GetZombakChannelID()
   if not channelID then
     SetSendStatus("waiting for channel " .. ZOMBAK_RAID_CHANNEL)
-    return
-  elseif IsZombakLFGRestricted() then
-    SetSendStatus("blocked by InChatMessagingLockdown")
     return
   end
 
   -- AreOutgoingAddonChatMessagesRestricted describes the realm's restriction
   -- policy and can stay true outside lockdown. It is not a standalone live
   -- send gate. Respect the current lockdown above and the actual API result.
-  local result = SendRaidReminderAddonMessage(pendingBroadcast.message, "CHANNEL", tostring(channelID))
+  -- Channel events must not accelerate repeats or retries after throttling.
+  broadcast.nextAttemptAt = now + 5
+  local message = broadcast.message
+  if broadcast.recovery then
+    -- The original creation time orders listings; the seventh field dates this fresh snapshot.
+    message = message .. ADDON_MESSAGE_SEPARATOR .. GetServerTime()
+  end
+  local ok, result = pcall(SendRaidReminderAddonMessage, message, "CHANNEL", tostring(channelID))
+  transportStatus.lastSendAt = GetServerTime()
+  RR.Diagnostics.Record("TX", {
+    nonce = broadcast.announcement.nonce, leader = broadcast.announcement.leader,
+    kind = broadcast.recovery and "ACTIVE" or "CREATED", createdAt = broadcast.announcement.timestamp,
+    channel = channelID, result = ok and DescribeResult(result, Enum and Enum.SendAddonMessageResult) or "error",
+    error = not ok and result or nil,
+  })
+  if not ok then
+    SetSendStatus("SendAddonMessage error: " .. tostring(result))
+    return
+  end
+  if pendingBroadcast ~= broadcast then return end
   local codes = Enum and Enum.SendAddonMessageResult
-  SetSendStatus("SendAddonMessage: " .. DescribeResult(result, codes) .. "; channel=" .. channelID)
   if result == true or (codes and result == codes.Success) then
-    pendingBroadcast = nil
+    broadcast.acceptedSends = broadcast.acceptedSends + 1
+    local delay = not broadcast.recovery and ZOMBAK_RAID_BROADCAST_DELAYS[broadcast.acceptedSends]
+    if delay then
+      broadcast.nextAttemptAt = now + delay
+    else
+      pendingBroadcast = nil
+    end
     ZombakDebug("Zombak raid broadcast accepted by the API (delivery not confirmed)")
   elseif codes and result == codes.AddOnMessageLockdown then
-    -- An explicit server refusal is terminal for this announcement.
+    -- Stop this burst. A later, revalidated snapshot may retry after the recovery interval.
     pendingBroadcast = nil
   end
+  SetSendStatus("SendAddonMessage: " .. DescribeResult(result, codes) .. "; channel=" .. channelID ..
+    "; accepted=" .. broadcast.acceptedSends .. "/" .. (broadcast.recovery and 1 or (#ZOMBAK_RAID_BROADCAST_DELAYS + 1)))
 end
 
 local function MaintainZombakChannel()
-  if not channelWanted then
+  if not channelWanted or maintaining then
     return
   end
-
-  if not GetZombakChannelID() and joinAttempts < 5 then
-    joinAttempts = joinAttempts + 1
-    if not IsZombakLFGRestricted() then
-      channelJoinedByUs = true
-      JoinTemporaryChannel(ZOMBAK_RAID_CHANNEL)
-      ZombakDebug("Joining " .. ZOMBAK_RAID_CHANNEL .. ", attempt " .. joinAttempts)
+  maintaining = true
+  local now = GetTime()
+  local ok, err = pcall(function()
+    RegisterAddonMessages()
+    if GetZombakChannelID() then
+      joinAttempts, nextJoinAt = 0, 0
+    else
+      ResetChannelOrder()
+      if not IsZombakLFGRestricted() and now >= nextJoinAt then
+        joinAttempts = joinAttempts + 1
+        nextJoinAt = now + math.min(60, 5 * 2 ^ math.min(joinAttempts - 1, 4))
+        channelJoinedByUs = true
+        RR.Diagnostics.Record("CHANNEL_JOIN", { attempt = joinAttempts, retryIn = nextJoinAt - now })
+        JoinTemporaryChannel(ZOMBAK_RAID_CHANNEL)
+        ZombakDebug("Joining " .. ZOMBAK_RAID_CHANNEL .. ", attempt " .. joinAttempts)
+      end
     end
-  end
-  FlushZombakBroadcast()
+    -- Sorting is cosmetic: an API failure must not prevent announcement delivery.
+    local orderOK, orderError = pcall(MoveZombakChannelLast)
+    if not orderOK then
+      channelOrderPending = false
+      ChannelOrderStatus("error: " .. RR.Diagnostics.Safe(orderError))
+    end
+    RR.ZombakRaids.Maintain()
+    FlushZombakBroadcast()
+  end)
+  maintaining = false
+  if not ok then SetSendStatus("maintenance deferred after error: " .. tostring(err)) end
+  RR.Diagnostics.SampleHealth()
 
-  -- Bounded retries cover asynchronous channel joins and transient throttling.
-  -- No LFG search/application is ever scheduled here.
-  if not channelTimer and ((not GetZombakChannelID() and joinAttempts < 5) or pendingBroadcast) then
-    channelTimer = C_Timer.NewTimer(5, function()
+  -- A single lightweight reconciliation timer also catches missed events and channel losses.
+  -- Only the leader broadcasts; subscribed recipients never poll other clients or search LFG.
+  if not channelTimer and channelWanted then
+    local delay = ZOMBAK_RAID_MAINTENANCE_INTERVAL
+    if pendingBroadcast and pendingBroadcast.nextAttemptAt > now then
+      delay = math.min(delay, pendingBroadcast.nextAttemptAt - now)
+    end
+    channelTimer = C_Timer.NewTimer(delay, function()
       channelTimer = nil
       MaintainZombakChannel()
     end)
@@ -206,11 +378,17 @@ local function MaintainZombakChannel()
 end
 
 function RR.Comm.UpdateZombakSubscription()
+  local wasWanted = channelWanted
   channelWanted = RR.Options.IsZombakEnabled() or IsZombakCharacter(GetPlayerCharacterKey())
+  RR.Diagnostics.Change("subscription", "SUBSCRIPTION", { wanted = channelWanted, receiveEnabled = RR.Options.IsZombakEnabled() })
   if channelWanted then
-    joinAttempts = 0
+    if not wasWanted then
+      joinAttempts, nextJoinAt = 0, 0
+      ResetChannelOrder()
+    end
     MaintainZombakChannel()
   else
+    channelOrderPending = false
     if channelTimer then
       channelTimer:Cancel()
       channelTimer = nil
@@ -219,6 +397,7 @@ function RR.Comm.UpdateZombakSubscription()
     if channelJoinedByUs then
       channelJoinedByUs = false
       LeaveChannelByName(ZOMBAK_RAID_CHANNEL)
+      RR.Diagnostics.Record("CHANNEL_LEAVE", { reason = "subscription_disabled" })
     end
   end
 end
@@ -227,33 +406,37 @@ function RR.Comm.HandleChannelUpdate()
   -- Channel IDs may change after zoning or after another channel is joined.
   -- Resolve the ID by name for every send instead of caching an index.
   if channelWanted then
-    if not channelTimer then
-      MaintainZombakChannel()
-    else
-      FlushZombakBroadcast()
-    end
+    MaintainZombakChannel()
   end
 end
 
-function RR.Comm.BroadcastZombakRaid(announcement)
+function RR.Comm.BroadcastZombakRaid(announcement, recovery)
   local message = BuildAddonMessage(
-    ZOMBAK_RAID_EVENT, ZOMBAK_RAID_PROTOCOL_VERSION, announcement.leader,
+    recovery and ZOMBAK_RAID_ACTIVE_EVENT or ZOMBAK_RAID_EVENT, ZOMBAK_RAID_PROTOCOL_VERSION, announcement.leader,
     table.concat(announcement.activityIDs, ","), announcement.timestamp, announcement.nonce
   )
-  if #message > 255 then
+  if #message + (recovery and 11 or 0) > 255 then
+    SetSendStatus("announcement exceeds the addon message limit")
     ZombakDebug("Zombak raid broadcast exceeds the addon message limit")
     return
   end
 
-  pendingBroadcast = { message = message, expires = GetTime() + 30 }
+  -- Reuse the exact payload (including timestamp and nonce) for receiver deduplication.
+  pendingBroadcast = {
+    message = message, announcement = announcement, acceptedSends = 0, recovery = recovery,
+    nextAttemptAt = GetTime(), expires = GetTime() + ZOMBAK_RAID_BROADCAST_TIMEOUT,
+  }
+  RR.Diagnostics.Record("TX_QUEUED", { nonce = announcement.nonce, leader = announcement.leader,
+    kind = recovery and "ACTIVE" or "CREATED", createdAt = announcement.timestamp })
   RR.Comm.UpdateZombakSubscription()
 end
 
-function RR.Comm.PrintZombakStatus()
+function RR.Comm.GetZombakStatusLines()
   local player = GetPlayerCharacterKey()
   local version = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "unknown"
+  local lines = {}
   local function line(label, value)
-    print("[RR] " .. label .. ": " .. tostring(value))
+    lines[#lines + 1] = label .. ": " .. RR.Diagnostics.Safe(value)
   end
   line("Raid Reminder", version)
   line("player", player)
@@ -262,14 +445,31 @@ function RR.Comm.PrintZombakStatus()
   line("receiveEnabled", RR.Options.IsZombakEnabled())
   line("channelID (0 = not joined)", GetZombakChannelID() or 0)
   line("channelWanted / joinAttempts", tostring(channelWanted) .. " / " .. joinAttempts)
+  line("channelOrder", transportStatus.channelOrder or "not attempted")
+  line("nextJoinIn", math.max(0, math.ceil(nextJoinAt - GetTime())))
   line("prefixRegistered", addonMessagePrefixRegistered)
   line("prefixResult", transportStatus.prefixResult)
   line("chatLockdown", IsZombakLFGRestricted() or false)
-  line("outgoingRealmPolicy", C_ChatInfo.AreOutgoingAddonChatMessagesRestricted and
+  line("outgoingRealmPolicy", C_ChatInfo and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted and
     C_ChatInfo.AreOutgoingAddonChatMessagesRestricted() or false)
   line("lastSend", transportStatus.lastSend)
+  line("lastSendAt", transportStatus.lastSendAt or "none this session")
   line("lastReceive", transportStatus.lastReceive)
+  line("lastReceiveAt", transportStatus.lastReceiveAt or "none this session")
   line("lastListingEvent", RR.State.zombakListingStatus or "none")
+  line("pendingNotification", RR.ZombakRaids.HasPendingNotifications())
+  line("popupBlock", RR.UI.ZombakRaidPopup.GetBlockReason() or "none")
+  line("combat", InCombatLockdown() or false)
+  line("lastPopupAt", RR.State.zombakLastPopupAt or "none this session")
+  line("currentNonce", RR.State.ZombakRaid.announcement and RR.State.ZombakRaid.announcement.nonce or "none")
+  line("currentPhase", RR.State.ZombakRaid.phase or "none")
+  line("currentStatus", RR.State.ZombakRaid.statusKey or "none")
+  line("bannerPosition", RR.UI.ZombakRaidPopup.GetPositionSummary())
+  return lines
+end
+
+function RR.Comm.PrintZombakStatus()
+  for _, line in ipairs(RR.Comm.GetZombakStatusLines()) do print("[RR] " .. line) end
 end
 
 RR.Comm.RegisterAddonMessages = RegisterAddonMessages

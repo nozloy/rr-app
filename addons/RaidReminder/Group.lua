@@ -128,9 +128,11 @@ function IsSenderPlayer(sender)
     return true
   end
 
-  local senderName = SplitFullName(sender)
-  local playerName = UnitName and UnitName("player") or nil
-  return senderName and playerName and senderName == playerName
+  local senderName, senderRealm = SplitFullName(sender)
+  local playerName, playerRealm = SplitFullName(playerKey)
+  return senderName and senderName == playerName and
+    CompactRealmName(senderRealm or (GetRealmName and GetRealmName())) ==
+    CompactRealmName(playerRealm or (GetRealmName and GetRealmName()))
 end
 
 function GetDisplayCharacterName(name, realm)
@@ -225,8 +227,8 @@ function GetInstanceFields()
     return nil, nil, nil, nil
   end
 
-  local name, instanceType, difficultyID, difficultyName = GetInstanceInfo()
-  return name, instanceType, difficultyID, difficultyName
+  local name, instanceType, difficultyID, difficultyName, _, _, _, instanceID = GetInstanceInfo()
+  return name, instanceType, difficultyID, difficultyName, instanceID
 end
 
 function GetSelectedRaidDifficulty()
@@ -286,7 +288,7 @@ function GetExportFields()
   local localizedClass, classFile = UnitClass("player")
   local specName, specRole = GetPlayerSpec()
   local groupType, groupSize, members, compactMembers, roster = GetGroupInfo(specRole)
-  local instanceName, instanceType, difficultyID, difficultyName = GetInstanceFields()
+  local instanceName, instanceType, difficultyID, difficultyName, instanceID = GetInstanceFields()
   local selectedRaidDifficultyID, selectedRaidDifficultyName = GetSelectedRaidDifficulty()
   local keyLevel, keyChallengeMapID, keyMapName = GetOwnedKeystone()
 
@@ -298,6 +300,7 @@ function GetExportFields()
     groupSize = groupSize,
     groupType = groupType,
     instanceName = instanceName,
+    instanceID = instanceID,
     instanceType = instanceType,
     itemLevel = GetEquippedItemLevel(),
     keyChallengeMapID = keyChallengeMapID,
