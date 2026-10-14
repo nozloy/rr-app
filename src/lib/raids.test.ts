@@ -109,7 +109,7 @@ describe('raids', () => {
 	})
 
 	it('keeps the retail raid catalog unique and backed by 16:9 image assets', () => {
-		expect(allRaidInstances).toHaveLength(60)
+		expect(allRaidInstances).toHaveLength(61)
 		expect(legacyRaidInstances).toHaveLength(54)
 		expect(new Set(allRaidInstances.map(raid => raid.slug)).size).toBe(
 			allRaidInstances.length,

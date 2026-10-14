@@ -61,14 +61,18 @@ function realmCode(region: RealmRegion, slug: string) {
   return entry.code;
 }
 
-function makeEncounterSummary(killTimestamp?: number): BlizzardCharacterRaidEncounters {
+function makeEncounterSummary(
+  killTimestamp?: number,
+  raidName = "The Voidspire",
+  bossName = "Imperator Averzian",
+): BlizzardCharacterRaidEncounters {
   return {
     expansions: [
       {
         instances: [
           {
             instance: {
-              name: "The Voidspire",
+              name: raidName,
             },
             modes: [
               {
@@ -80,7 +84,7 @@ function makeEncounterSummary(killTimestamp?: number): BlizzardCharacterRaidEnco
                   encounters: [
                     {
                       encounter: {
-                        name: "Imperator Averzian",
+                        name: bossName,
                       },
                       completed_count: killTimestamp ? 1 : 0,
                       last_kill_timestamp: killTimestamp,
@@ -535,6 +539,84 @@ describe("raid check", () => {
         status: "locked",
       },
     ]);
+  });
+
+  it.each([
+    {
+      label: "English export",
+      instanceName: "The Unbinding of Kith'ix",
+      apiRaidName: "The Unbinding of Kith'ix",
+      raidSlug: undefined,
+    },
+    {
+      label: "Russian export and API names",
+      instanceName: "Освобождение Кит'икса",
+      apiRaidName: "Освобождение Кит'икса",
+      raidSlug: undefined,
+    },
+    {
+      label: "names without the article or apostrophe",
+      instanceName: "Освобождение Китикса",
+      apiRaidName: "Unbinding of Kith’ix",
+      raidSlug: undefined,
+    },
+    {
+      label: "manual selection",
+      instanceName: "The Voidspire",
+      apiRaidName: "The Unbinding of Kith'ix",
+      raidSlug: "the-unbinding-of-kithix",
+    },
+    {
+      label: "all season raids selection",
+      instanceName: "The Voidspire",
+      apiRaidName: "The Unbinding of Kith'ix",
+      raidSlug: ALL_SEASON_RAIDS_VALUE,
+    },
+  ])("checks Kith'ix lockouts with $label", async ({ instanceName, apiRaidName, raidSlug }) => {
+    blizzardApiMock.fetchCharacterRaidEncounters.mockImplementation(
+      async (_token: string, _realmSlug: string, characterName: string) =>
+        makeEncounterSummary(
+          Date.parse(characterName === "Locked"
+            ? "2026-05-21T10:00:00.000Z"
+            : "2026-05-13T03:00:00.000Z"),
+          apiRaidName,
+          "Kith'ix",
+        ),
+    );
+
+    const result = await checkRaidLockoutsForExport({
+      difficultyID: 15,
+      raidSlug,
+      exportText: makeExport({
+        name: "Leader",
+        realm: "Draenor",
+        classFile: "PALADIN",
+        groupType: "raid",
+        groupSize: "2",
+        instanceType: "raid",
+        instanceName,
+        roster: "Clean:Draenor:MAGE:DAMAGER,Locked:Draenor:WARLOCK:DAMAGER",
+      }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(result.raidName).toBe(raidSlug === ALL_SEASON_RAIDS_VALUE
+      ? "Все рейды сезона"
+      : "Освобождение Кит'икса");
+    expect(result.rows).toMatchObject([
+      { name: "Clean", status: "clean", killedBosses: [] },
+      {
+        name: "Locked",
+        status: "locked",
+        killedBosses: [{
+          raidSlug: "the-unbinding-of-kithix",
+          raidName: "Освобождение Кит'икса",
+          name: "Кит'икс",
+          sourceName: "Kith'ix",
+        }],
+      },
+    ]);
+    expect(blizzardApiMock.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(2);
   });
 
   it("checks every current season raid with one encounter request per character", async () => {

@@ -7,6 +7,7 @@ type MidnightRaidSlug =
 	| 'the-dreamrift'
 	| 'the-voidspire'
 	| 'sporefall'
+	| 'the-unbinding-of-kithix'
 
 type RaidBossNameEntry = {
 	id?: number
@@ -17,6 +18,14 @@ type RaidBossNameEntry = {
 }
 
 const raidBossNameCatalog: RaidBossNameEntry[] = [
+	{
+		raidSlug: 'the-unbinding-of-kithix',
+		names: {
+			en: "Kith'ix",
+			ru: "Кит'икс",
+		},
+		sourceNames: ["Kith'ix", "Кит'икс"],
+	},
 	{
 		raidSlug: 'sporefall',
 		names: {

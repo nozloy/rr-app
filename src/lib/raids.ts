@@ -32,6 +32,7 @@ const pngRaidSlugs = new Set([
   "sporefall",
   "venomous-abyss",
   "tidebound-grotto",
+  "the-unbinding-of-kithix",
 ]);
 
 function raidArtPath(slug: string) {
@@ -622,6 +623,22 @@ export const currentRaidInstances: RaidDefinition[] = [
       "Tidebound Grotto",
       "Нимрисса Волногон",
       "Nymrissa Wavecaller",
+    ],
+  },
+  {
+    slug: "the-unbinding-of-kithix",
+    name: "Освобождение Кит'икса",
+    shortName: "Кит'икс",
+    expansion: "Midnight",
+    artPath: raidArtPath("the-unbinding-of-kithix"),
+    names: {
+      en: "The Unbinding of Kith'ix",
+      ru: "Освобождение Кит'икса",
+    },
+    aliases: [
+      "Освобождение Китикса",
+      "Unbinding of Kith'ix",
+      "Kith'ix",
     ],
   },
 ];
