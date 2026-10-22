@@ -21,6 +21,12 @@ raidCheckEventFrame:RegisterEvent("CHAT_MSG_ADDON")
 raidCheckEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 raidCheckEventFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
 raidCheckEventFrame:RegisterEvent("INSPECT_READY")
+local communityEvents = {
+  INITIAL_CLUBS_LOADED = true, CLUB_ADDED = true, CLUB_REMOVED = true, CLUB_UPDATED = true,
+  CLUB_MEMBERS_UPDATED = true, CLUB_MEMBER_ADDED = true, CLUB_MEMBER_REMOVED = true,
+  CLUB_MEMBER_UPDATED = true, CLUB_MEMBER_PRESENCE_UPDATED = true, GUILD_ROSTER_UPDATE = true,
+}
+for event in pairs(communityEvents) do raidCheckEventFrame:RegisterEvent(event) end
 raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
   if event == "ADDON_LOADED" then
     if ... == ADDON_NAME then
@@ -37,6 +43,8 @@ raidCheckEventFrame:SetScript("OnEvent", function(_, event, ...)
     RR.Readiness.Resume()
   elseif event == "CHANNEL_UI_UPDATE" then
     RR.Comm.HandleChannelUpdate()
+  elseif communityEvents[event] then
+    RR.Community.HandleClubUpdate()
   elseif event == "CHAT_MSG_CHANNEL_NOTICE" or event == "CHAT_MSG_CHANNEL_NOTICE_USER" then
     RR.Diagnostics.ChannelNotice(event, ...)
   elseif event == "LFG_LIST_ACTIVE_ENTRY_UPDATE" then

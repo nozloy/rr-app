@@ -5,6 +5,7 @@ import { getRaidForecastAction } from "@/actions/raid-forecast";
 import {
   calculateRaidForecast,
   createUnknownForecastCharacters,
+  FORECAST_CACHE_MS,
   isForecastWeekCurrent,
   type RaidForecastDifficulty,
   type RaidForecastSnapshot,
@@ -63,17 +64,40 @@ export function useRaidForecast(initialServerNow: string) {
       const current = serverTime();
       setNow(current);
       if (performance.now() - lastAttempt.current >= REFRESH_MS ||
-          (snapshotRef.current && !isForecastWeekCurrent(snapshotRef.current, current))) {
+          (snapshotRef.current && (
+            !isForecastWeekCurrent(snapshotRef.current, current) ||
+            Date.parse(snapshotRef.current.checkedAt) + FORECAST_CACHE_MS <= current.getTime()
+          ))) {
         void refresh();
       }
     };
+    const onOnline = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    window.addEventListener("online", onOnline);
     return () => {
       mounted.current = false;
       clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+      window.removeEventListener("online", onOnline);
     };
   }, [refresh, serverTime]);
+
+  // A cached response may be almost ten minutes old on arrival. Refresh at its
+  // expiry instead of waiting another full polling interval from page load.
+  useEffect(() => {
+    if (!snapshot) return;
+    const expiresIn = Date.parse(snapshot.checkedAt) + FORECAST_CACHE_MS - serverTime().getTime();
+    const timer = setTimeout(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, Math.max(0, expiresIn) + 50);
+    return () => clearTimeout(timer);
+  }, [refresh, serverTime, snapshot]);
 
   // Re-align the minute boundary whenever a response corrects the server clock.
   useEffect(() => {

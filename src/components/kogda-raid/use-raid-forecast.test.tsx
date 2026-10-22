@@ -114,6 +114,77 @@ describe("live forecast clock and refresh", () => {
     expect(result.current.buttonLabel).toBe("А мифик?");
   });
 
+  it("refreshes an almost expired server snapshot as soon as its cache expires", async () => {
+    const time = "2026-10-02T09:09:30.000Z";
+    const cached = { ...snapshot(time), checkedAt: "2026-10-02T09:00:00.000Z" };
+    const updated = snapshot("2026-10-02T09:10:00.050Z", "locked", "clean");
+    forecastAction.mockResolvedValueOnce(cached).mockResolvedValue(updated);
+    const { result } = renderHook(() => useRaidForecast(time));
+    await act(async () => {});
+    expect(result.current.forecast.freeCount).toBe(10);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_049); });
+    expect(forecastAction).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+
+    expect(forecastAction).toHaveBeenCalledTimes(2);
+    expect(result.current.checkedAt).toBe(updated.checkedAt);
+    expect(result.current.forecast).toMatchObject({ freeCount: 0, lockedCount: 10 });
+    expect(result.current.initialLoading).toBe(false);
+  });
+
+  it.each(["focus", "pageshow"])("refreshes expired data on %s even after a recent cache hit", async (event) => {
+    const time = "2026-10-02T09:09:30.000Z";
+    forecastAction
+      .mockResolvedValueOnce({ ...snapshot(time), checkedAt: "2026-10-02T09:00:00.000Z" })
+      .mockResolvedValue(snapshot("2026-10-02T09:10:01.000Z", "locked", "clean"));
+    const { result } = renderHook(() => useRaidForecast(time));
+    await act(async () => {});
+    act(() => { result.current.toggleDifficulty(); });
+    await act(async () => { window.dispatchEvent(new Event(event)); });
+    expect(forecastAction).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    await act(async () => { await vi.advanceTimersByTimeAsync(31_000); });
+    expect(forecastAction).toHaveBeenCalledTimes(1);
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    await act(async () => { window.dispatchEvent(new Event(event)); });
+
+    expect(forecastAction).toHaveBeenCalledTimes(2);
+    expect(result.current.difficulty).toBe("mythic");
+    expect(result.current.forecast.freeCount).toBe(10);
+  });
+
+  it("retries immediately when the connection returns after a failed request", async () => {
+    const time = "2026-10-02T09:00:00.000Z";
+    forecastAction.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(snapshot(time));
+    const { result } = renderHook(() => useRaidForecast(time));
+    await act(async () => {});
+    expect(result.current.error).not.toBeNull();
+
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+
+    expect(forecastAction).toHaveBeenCalledTimes(2);
+    expect(result.current.error).toBeNull();
+    expect(result.current.forecast.freeCount).toBe(10);
+  });
+
+  it("stops refreshing after the page unmounts", async () => {
+    const time = "2026-10-02T09:09:30.000Z";
+    forecastAction.mockResolvedValue({ ...snapshot(time), checkedAt: "2026-10-02T09:00:00.000Z" });
+    const { unmount } = renderHook(() => useRaidForecast(time));
+    await act(async () => {});
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600_000);
+      for (const event of ["focus", "pageshow", "online"]) window.dispatchEvent(new Event(event));
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(forecastAction).toHaveBeenCalledTimes(1);
+  });
+
   it("shows unknown data when a refresh fails instead of keeping a false positive", async () => {
     const time = "2026-10-02T09:00:00.000Z";
     forecastAction.mockResolvedValueOnce(snapshot(time)).mockRejectedValueOnce(new Error("network down"));

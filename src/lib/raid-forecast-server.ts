@@ -1,5 +1,4 @@
 // Imported only by the server action; the browser uses raid-forecast-core.
-import { unstable_cache } from "next/cache";
 import {
   fetchCharacterProfile,
   fetchCharacterRaidEncounters,
@@ -8,6 +7,7 @@ import {
 import { getEuWeeklyResetStart } from "@/lib/raid-check-core";
 import {
   createUnknownForecastCharacters,
+  FORECAST_CACHE_MS,
   FORECAST_REALM,
   getRaidForecastLockout,
   type RaidForecastCharacter,
@@ -15,7 +15,6 @@ import {
   type RaidForecastSnapshot,
 } from "@/lib/raid-forecast-core";
 
-const CACHE_MS = 10 * 60_000;
 const REQUEST_TIMEOUT_MS = 12_000;
 type CachedForecast = Omit<RaidForecastSnapshot, "serverNow">;
 type ForecastCache = {
@@ -109,19 +108,15 @@ async function fetchSharedForecast(): Promise<CachedForecast> {
   try {
     const value = await promise;
     cache.value = value;
-    cache.expiresAt = Date.now() + CACHE_MS;
+    cache.expiresAt = Date.parse(value.checkedAt) + FORECAST_CACHE_MS;
     return value;
   } finally {
     if (cache.inFlight === promise) cache.inFlight = null;
   }
 }
 
-// Next's shared Data Cache stores the snapshot; server time is always calculated live.
-// Keep the key stable across weekly resets so they cannot bypass the API cooldown.
-const readCachedForecast = unstable_cache(fetchSharedForecast, ["kogda-raid-forecast-v4"], {
-  revalidate: CACHE_MS / 1_000,
-});
-
 export async function getRaidForecast(): Promise<RaidForecastSnapshot> {
-  return toCurrentSnapshot(await readCachedForecast());
+  // Wait for fresh data when the shared cooldown expires. A second stale-while-
+  // revalidate cache would return the old lockouts to the visitor starting the refresh.
+  return toCurrentSnapshot(await fetchSharedForecast());
 }

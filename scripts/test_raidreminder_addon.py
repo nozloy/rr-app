@@ -36,4 +36,6 @@ print(f"Lua 5.1 syntax, TOC paths/order input and SavedVariables: {len(entries)}
 runtime.globals().ADDON_SOURCES = runtime.table_from(sources)
 runtime.globals().ADDON_FILES = runtime.table_from(entries)
 runtime.execute((root / "tests" / "addon" / "zombak_spec.lua").read_text(encoding="utf-8"))
+runtime.execute((root / "tests" / "addon" / "zombak_community_spec.lua").read_text(encoding="utf-8"))
+runtime.execute((root / "tests" / "addon" / "zombak_search_spec.lua").read_text(encoding="utf-8"))
 runtime.execute((root / "tests" / "addon" / "readiness_spec.lua").read_text(encoding="utf-8"))

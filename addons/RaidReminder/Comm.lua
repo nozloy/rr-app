@@ -296,7 +296,7 @@ local function FlushZombakBroadcast()
   local message = broadcast.message
   if broadcast.recovery then
     -- The original creation time orders listings; the seventh field dates this fresh snapshot.
-    message = message .. ADDON_MESSAGE_SEPARATOR .. GetServerTime()
+    message = RR.Comm.BuildZombakRaidMessage(broadcast.announcement, true)
   end
   local ok, result = pcall(SendRaidReminderAddonMessage, message, "CHANNEL", tostring(channelID))
   transportStatus.lastSendAt = GetServerTime()
@@ -337,6 +337,7 @@ local function MaintainZombakChannel()
   local now = GetTime()
   local ok, err = pcall(function()
     RegisterAddonMessages()
+    RR.ZombakRaids.Maintain()
     if GetZombakChannelID() then
       joinAttempts, nextJoinAt = 0, 0
     else
@@ -356,15 +357,23 @@ local function MaintainZombakChannel()
       channelOrderPending = false
       ChannelOrderStatus("error: " .. RR.Diagnostics.Safe(orderError))
     end
-    RR.ZombakRaids.Maintain()
     FlushZombakBroadcast()
   end)
+  -- The optional community route must keep working even when joining the
+  -- local channel fails (for example, when all channel slots are occupied).
+  if RR.Community then
+    local communityOK, communityError = pcall(RR.Community.Maintain)
+    if not communityOK then
+      RR.Diagnostics.Change("community_error", "COMMUNITY_ERROR", { error = communityError })
+    end
+  end
   maintaining = false
   if not ok then SetSendStatus("maintenance deferred after error: " .. tostring(err)) end
   RR.Diagnostics.SampleHealth()
 
   -- A single lightweight reconciliation timer also catches missed events and channel losses.
-  -- Only the leader broadcasts; subscribed recipients never poll other clients or search LFG.
+  -- Recipients never search LFG automatically. Community subscriptions have a
+  -- separate, slower refresh interval within this maintenance tick.
   if not channelTimer and channelWanted then
     local delay = ZOMBAK_RAID_MAINTENANCE_INTERVAL
     if pendingBroadcast and pendingBroadcast.nextAttemptAt > now then
@@ -381,6 +390,7 @@ function RR.Comm.UpdateZombakSubscription()
   local wasWanted = channelWanted
   channelWanted = RR.Options.IsZombakEnabled() or IsZombakCharacter(GetPlayerCharacterKey())
   RR.Diagnostics.Change("subscription", "SUBSCRIPTION", { wanted = channelWanted, receiveEnabled = RR.Options.IsZombakEnabled() })
+  if RR.Community and not RR.Options.IsZombakEnabled() then RR.Community.Reset() end
   if channelWanted then
     if not wasWanted then
       joinAttempts, nextJoinAt = 0, 0
@@ -410,7 +420,7 @@ function RR.Comm.HandleChannelUpdate()
   end
 end
 
-function RR.Comm.BroadcastZombakRaid(announcement, recovery)
+function RR.Comm.BuildZombakRaidMessage(announcement, recovery)
   local message = BuildAddonMessage(
     recovery and ZOMBAK_RAID_ACTIVE_EVENT or ZOMBAK_RAID_EVENT, ZOMBAK_RAID_PROTOCOL_VERSION, announcement.leader,
     table.concat(announcement.activityIDs, ","), announcement.timestamp, announcement.nonce
@@ -420,6 +430,13 @@ function RR.Comm.BroadcastZombakRaid(announcement, recovery)
     ZombakDebug("Zombak raid broadcast exceeds the addon message limit")
     return
   end
+  if recovery then message = message .. ADDON_MESSAGE_SEPARATOR .. GetServerTime() end
+  return message
+end
+
+function RR.Comm.BroadcastZombakRaid(announcement, recovery)
+  local message = RR.Comm.BuildZombakRaidMessage(announcement, recovery)
+  if not message then return end
 
   -- Reuse the exact payload (including timestamp and nonce) for receiver deduplication.
   pendingBroadcast = {
@@ -440,7 +457,9 @@ function RR.Comm.GetZombakStatusLines()
   end
   line("Raid Reminder", version)
   line("player", player)
+  line("locale", ADDON_LOCALE)
   line("faction", UnitFactionGroup and UnitFactionGroup("player") or "unknown")
+  line("channelScope", "same faction and realm/connected realms; API success does not confirm delivery")
   line("isZombak", IsZombakCharacter(player))
   line("receiveEnabled", RR.Options.IsZombakEnabled())
   line("channelID (0 = not joined)", GetZombakChannelID() or 0)
@@ -465,6 +484,9 @@ function RR.Comm.GetZombakStatusLines()
   line("currentPhase", RR.State.ZombakRaid.phase or "none")
   line("currentStatus", RR.State.ZombakRaid.statusKey or "none")
   line("bannerPosition", RR.UI.ZombakRaidPopup.GetPositionSummary())
+  if RR.Community then
+    for _, value in ipairs(RR.Community.GetStatusLines()) do lines[#lines + 1] = value end
+  end
   return lines
 end
 

@@ -314,6 +314,7 @@ local function newClient(options)
       c.appStatus[id] = { "none", "applied" }
     end,
   }
+  if options.beforeLoad then options.beforeLoad(env, c) end
   local rr = {}
   for _, file in ipairs(ADDON_FILES) do
     local chunk = assert(loadstring(ADDON_SOURCES[file], "@" .. file))

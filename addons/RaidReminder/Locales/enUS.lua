@@ -5,7 +5,9 @@ end
 
 local ui = {
   zombakSetting = "Find Zombak raids",
-  zombakSettingTooltip = "Show a notification when one of Zombak's characters creates a raid in Blizzard's Premade Group Finder, and quickly find the listing and submit a normal Blizzard application.",
+  zombakRaidFilter = "Zombak's raids",
+  zombakRaidFilterTooltip = "Only show raids led by one of Zombak's characters. Enabling this clears the search text. The selected raid category and Blizzard's search restrictions still apply.",
+  zombakSettingTooltip = "Show raid notifications and find the listing to apply through Blizzard. The local channel reaches your faction and realm. For other factions or realms, share a WoW community or guild with Zombak. Both players need the updated add-on. Without a shared route, automatic notifications are unavailable; use the Group Finder manually.",
   zombakTitle = "ZOMBAK IS FORMING A RAID",
   zombakFoundTitle = "RAID FOUND",
   zombakDismiss = "Dismiss",

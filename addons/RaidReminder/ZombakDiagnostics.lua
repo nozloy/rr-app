@@ -82,7 +82,7 @@ function Diagnostics.Initialize()
   character = Safe(GetPlayerCharacterKey())
   RR.DB.zombakDiagnostics = { version = 1, sequence = sequence, entries = entries }
   Diagnostics.Record("SESSION", {
-    player = GetPlayerCharacterKey(), faction = UnitFactionGroup and UnitFactionGroup("player"),
+    player = GetPlayerCharacterKey(), faction = UnitFactionGroup and UnitFactionGroup("player"), locale = ADDON_LOCALE,
     version = C_AddOns and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version") or "unknown",
     receiveEnabled = RR.Options.IsZombakEnabled(),
   })

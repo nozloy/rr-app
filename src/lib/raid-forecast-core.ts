@@ -3,6 +3,7 @@ import { getEuWeeklyResetStart } from "@/lib/raid-check-core";
 
 export const FORECAST_TIME_ZONE = "Europe/Moscow";
 export const FORECAST_REALM = "howling-fjord";
+export const FORECAST_CACHE_MS = 10 * 60_000;
 export const FORECAST_TARGETS = {
   heroic: { label: "Героик", difficultyType: "HEROIC", raidId: 1320, bossId: 2888 },
   mythic: { label: "Мифик", difficultyType: "MYTHIC", raidId: 1320, bossId: 2888 },

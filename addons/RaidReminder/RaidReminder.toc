@@ -2,7 +2,7 @@
 ## Title: RaidReminder
 ## Notes: Export your current group setup and check raid readiness.
 ## Author: RaidReminder
-## Version: 0.2.10
+## Version: 0.2.12
 ## SavedVariables: RaidReminderDB
 ## IconTexture: Interface\AddOns\RaidReminder\Media\RaidReminderIcon.tga
 
@@ -31,10 +31,12 @@ Readiness.lua
 ReadinessSync.lua
 Gear.lua
 UI\Common.lua
+UI\ZombakRaidSearch.lua
 UI\RaidTargetPicker.lua
 UI\ExportFrame.lua
 UI\RaidLockoutsFrame.lua
 ZombakRaidWatcher.lua
+ZombakCommunity.lua
 UI\ZombakRaidPopup.lua
 UI\ZombakRaidEditMode.lua
 UI\ZombakDiagnosticsFrame.lua

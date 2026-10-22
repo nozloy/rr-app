@@ -366,6 +366,12 @@ function Watcher.IsAnnouncementActive(announcement)
   return listing ~= false and listing.fingerprint == announcement.fingerprint
 end
 
+function Watcher.GetActiveAnnouncement()
+  -- Direct subscribers must never get a stale/private listing, including while
+  -- Blizzard temporarily hides the active-entry data.
+  if Watcher.IsAnnouncementActive(activeAnnouncement) then return activeAnnouncement end
+end
+
 function Watcher.ClearPendingNotifications()
   for _, notice in pairs(pendingNotifications) do
     RR.Diagnostics.Record("RX_DROPPED", { nonce = notice.nonce, leader = notice.leaderKey, reason = "setting_disabled" })
@@ -487,7 +493,9 @@ function Watcher.Receive(parts, sender, distribution, ...)
   end
   if not RR.Options.IsZombakEnabled() then rejected("receiving is disabled"); return end
   if IsZombakLFGRestricted() then rejected("InChatMessagingLockdown"); return end
-  if not RR.Comm.IsZombakChannel(distribution, ...) then rejected("unexpected channel"); return end
+  if distribution ~= "WHISPER" and not RR.Comm.IsZombakChannel(distribution, ...) then
+    rejected("unexpected channel"); return
+  end
   if not IsZombakCharacter(sender) then rejected("sender is not in ZombakCharacters"); return end
   if #parts ~= (recovery and 7 or 6) or parts[2] ~= ZOMBAK_RAID_PROTOCOL_VERSION then
     rejected("invalid format or protocol version"); return

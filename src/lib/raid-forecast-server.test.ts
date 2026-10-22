@@ -1,8 +1,14 @@
 const api = vi.hoisted(() => ({
   getApplicationAccessToken: vi.fn(), fetchCharacterRaidEncounters: vi.fn(), fetchCharacterProfile: vi.fn(),
 }));
+const frameworkCache = vi.hoisted(() => ({ unstableCache: vi.fn() }));
 vi.mock("@/lib/blizzard-api", () => api);
-vi.mock("next/cache", () => ({ unstable_cache: (callback: () => Promise<unknown>) => callback }));
+vi.mock("next/cache", () => ({
+  unstable_cache: (callback: () => Promise<unknown>) => {
+    frameworkCache.unstableCache();
+    return callback;
+  },
+}));
 
 function raidHistory(heroicKill: number, mythicKill: number) {
   return { expansions: [{ instances: [
@@ -126,6 +132,34 @@ describe("forecast data service", () => {
     expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(20);
     expect(api.fetchCharacterProfile).toHaveBeenCalledTimes(20);
     expect(api.getApplicationAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits for changed lockouts on the first request after expiry", async () => {
+    const { getRaidForecast } = await service();
+    const initial = await getRaidForecast();
+    expect(initial.charactersByDifficulty.heroic[0].status).toBe("clean");
+
+    vi.setSystemTime(new Date("2026-10-02T09:10:00Z"));
+    let resolveEncounters!: (value: ReturnType<typeof raidHistory>) => void;
+    const pendingEncounters = new Promise<ReturnType<typeof raidHistory>>((resolve) => { resolveEncounters = resolve; });
+    api.fetchCharacterRaidEncounters.mockReturnValue(pendingEncounters);
+    let completed = false;
+    const refresh = getRaidForecast().then((result) => { completed = true; return result; });
+    const otherVisitor = getRaidForecast();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(completed).toBe(false);
+
+    const kill = Date.parse("2026-10-02T09:05:00Z");
+    resolveEncounters(raidHistory(kill, kill));
+    const [updated, shared] = await Promise.all([refresh, otherVisitor]);
+    expect(updated.charactersByDifficulty.heroic[0]).toMatchObject({ status: "locked", lastKillAt: new Date(kill).toISOString() });
+    expect(updated.charactersByDifficulty.mythic[0].status).toBe("locked");
+    expect(updated.checkedAt).toBe("2026-10-02T09:10:00.000Z");
+    expect(shared).toEqual(updated);
+    expect(api.fetchCharacterRaidEncounters).toHaveBeenCalledTimes(20);
+    expect(api.getApplicationAccessToken).toHaveBeenCalledTimes(2);
+    expect(frameworkCache.unstableCache).not.toHaveBeenCalled();
   });
 
   it("clears previous-week lockouts without bypassing the ten-minute cache or clearing unknown statuses", async () => {
